@@ -1,0 +1,38 @@
+.tableBlock {
+  margin: 1.5rem 0;
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  color: var(--heading-color);
+  font-weight: 600;
+}
+
+.wrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+
+  th,
+  td {
+    border: 1px solid var(--border-color);
+    padding: 0.625rem 0.875rem;
+    text-align: left;
+    color: var(--paragraph-color);
+  }
+
+  th {
+    background: var(--secondary-color);
+    color: var(--heading-color);
+    font-weight: 600;
+  }
+
+  tr:nth-child(even) {
+    background: var(--table-stripe-bg);
+  }
+}

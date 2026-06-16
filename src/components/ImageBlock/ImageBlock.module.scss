@@ -1,0 +1,17 @@
+.imageBlock {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.image {
+  max-width: 100%;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.caption {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

@@ -1,0 +1,15 @@
+.lesson {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+.unsupported {
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border: 1px dashed var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--paragraph-color);
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+}

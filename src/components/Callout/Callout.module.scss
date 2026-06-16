@@ -1,0 +1,27 @@
+.callout {
+  padding: 1rem 1.25rem;
+  border-radius: var(--border-radius);
+  margin: 1.5rem 0;
+}
+
+.info {
+  background: var(--secondary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.warning {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+}
+
+.title {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--heading-color);
+}
+
+.text {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--paragraph-color);
+}

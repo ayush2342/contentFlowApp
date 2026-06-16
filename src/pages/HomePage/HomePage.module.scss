@@ -1,0 +1,62 @@
+.home {
+  text-align: center;
+}
+
+.title {
+  color: var(--heading-color);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.card {
+  display: block;
+  text-align: left;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-color);
+  transition: box-shadow 0.2s, border-color 0.2s;
+
+  &:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--card-shadow);
+  }
+
+  h2 {
+    margin: 0 0 0.5rem;
+    color: var(--heading-color);
+  }
+
+  p {
+    margin: 0 0 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+}
+
+.chapters {
+  font-size: 0.875rem;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.status,
+.error {
+  text-align: center;
+  padding: 2rem;
+}
+
+.error {
+  color: var(--error-color);
+}

@@ -1,0 +1,25 @@
+.activity {
+  background: var(--activity-bg);
+  border: 2px dashed var(--primary-color);
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  color: var(--heading-color);
+  font-weight: 600;
+}
+
+.instructions {
+  margin: 0 0 0.75rem;
+  color: var(--text-secondary);
+}
+
+.questions {
+  margin: 0;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+  color: var(--paragraph-color);
+}

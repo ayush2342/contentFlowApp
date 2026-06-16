@@ -1,0 +1,57 @@
+{
+  "bookId": "biology-101",
+  "media": {
+    "fig-1-1": {
+      "fileName": "fig-1-1.png",
+      "caption": "NASA image of Earth"
+    },
+    "fig-1-2": {
+      "fileName": "fig-1-2.png",
+      "caption": "Toad image"
+    }
+  },
+  "chapters": [
+    {
+      "chapterNumber": 1,
+      "title": "Introduction to Biology",
+      "outline": [
+        "Themes and Concepts of Biology",
+        "The Process of Science"
+      ],
+      "introduction": "Viewed from space, Earth offers few clues about the diversity of life forms that reside there.",
+      "sections": [
+        {
+          "sectionNumber": "1.1",
+          "title": "Themes and Concepts of Biology",
+          "learningObjectives": [
+            "Identify and describe the properties of life",
+            "Describe the levels of organization among living things",
+            "List examples of different sub disciplines in biology"
+          ],
+          "content": [
+            {
+              "type": "image",
+              "mediaId": "fig-1-1"
+            },
+            {
+              "type": "paragraph",
+              "text": "Biology is the science that studies life."
+            },
+            {
+              "type": "heading",
+              "text": "Properties of Life"
+            },
+            {
+              "type": "paragraph",
+              "text": "All groups of living organisms share several key characteristics."
+            },
+            {
+              "type": "image",
+              "mediaId": "fig-1-2"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
