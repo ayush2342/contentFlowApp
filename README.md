@@ -1,16 +1,81 @@
-# React + Vite
+# ContentFlow App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ContentFlow is a React + Vite learning-content viewer that renders course data from JSON into book/chapter/lesson pages.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React
+- Vite
+- Redux Toolkit
+- React Router
+- Sass
 
-## React Compiler
+## Prerequisites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 20+ (recommended)
+- npm 10+
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev
+```
+
+Open the local URL shown in terminal (usually `http://localhost:5173`).
+
+## Available Scripts
+
+- `npm run dev` - start development server
+- `npm run build` - create production build
+- `npm run preview` - preview production build
+- `npm run lint` - run ESLint
+
+## Project Data Source
+
+The app currently uses:
+
+- `src/mock/tree_output.json`
+
+Data loading entry:
+
+- `src/services/courseService.js`
+
+Tree data mapper:
+
+- `src/utils/jsonMapper.js` (`mapTreeOutputJson`)
+
+## Images / Media
+
+Tree JSON image nodes use paths like `assets/img_0001.png`.
+For images to render in browser, place files under:
+
+- `public/assets/`
+
+Example:
+
+- `public/assets/img_0001.png`
+- `public/assets/img_0002.png`
+
+If backend has not provided media yet, image blocks may appear broken until those files are added.
+
+## High-Level App Flow
+
+`tree_output.json` -> `courseService` -> `jsonMapper` -> Redux store -> routed pages -> lesson renderer/components
+
+## Folder Notes
+
+- `src/mock/` - mock JSON inputs
+- `src/services/` - data-loading layer
+- `src/utils/` - mapping/transformation logic
+- `src/pages/` - route pages
+- `src/components/` - reusable content components
+- `src/renderers/` - lesson content renderer
+
+## Onboarding Tip
+
+When onboarding a new developer, start by reading:
+
+1. `src/services/courseService.js`
+2. `src/utils/jsonMapper.js`
+3. `src/renderers/LessonRenderer.jsx`
