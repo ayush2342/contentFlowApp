@@ -1,0 +1,1684 @@
+[
+  {
+    "kind": "tag",
+    "label": "Lesson Number",
+    "tag": "{\"type\":\"lesson-number\",\"label\":\"Lesson Number\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:45:08.124Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 400,
+            "after": 0
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "CHAPTER 1",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 14.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "paragraph",
+    "props": {
+      "style": null,
+      "alignment": null,
+      "indent": null,
+      "spacing": null,
+      "list": null
+    },
+    "children": [
+      {
+        "kind": "text",
+        "text": "Introduction to Biology",
+        "style": {
+          "bold": false,
+          "italic": false,
+          "underline": null,
+          "strike": false,
+          "vertAlign": null,
+          "color": "#1F1F1F",
+          "highlight": null,
+          "font": "Arial",
+          "size_pt": 28.0
+        }
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Image",
+    "tag": "{\"type\":\"figure-image\",\"label\":\"Image\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:45:47.252Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "image",
+            "path": "assets/img_0001.png",
+            "alt": "Picture 1",
+            "width_emu": 6625883,
+            "height_emu": 3583940
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Caption",
+    "tag": "{\"type\":\"figure-caption\",\"label\":\"Caption\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:46:37.071Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "FIGURE 1.1",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#C00000",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " This NASA image is a composite of several satellite-based views of Earth. To make the whole-Earth image, NASA scientists combine observations of different parts of the planet. (credit: modification of work by NASA).",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#404040",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:47:20.160Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "CHAPTER OUTLINE",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Topic",
+    "tag": "{\"type\":\"topic\",\"label\":\"Topic\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:47:38.003Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "1.1 Themes and Concepts of Biology",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Topic",
+    "tag": "{\"type\":\"topic\",\"label\":\"Topic\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:48:25.152Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "1.2 The Process of Science",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "paragraph",
+    "props": {
+      "style": null,
+      "alignment": null,
+      "indent": null,
+      "spacing": null,
+      "list": null
+    },
+    "children": []
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:51:15.016Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Introduction ",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": "Viewed from space, Earth (Figure 1.1) offers few clues about the diversity of life forms that reside there. The first forms of life on Earth are thought to have been microorganisms that existed for billions of years before plants and animals appeared. The mammals, birds, and flowers so familiar to us are all relatively recent, originating 130 to 200 million years ago. Humans have inhabited this planet for only the last 2.5 million years, and only in the last 300,000 years have humans started looking like we do today",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Section Title",
+    "tag": "{\"type\":\"section-title\",\"label\":\"Section Title\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:52:22.570Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 320
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "1.1 Themes and Concepts of Biology",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 18.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:52:58.137Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "LEARNING OBJECTIVES",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:53:58.070Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "By the end of this section, you will be able to:",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": "ListParagraph",
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": {
+            "num_id": 1,
+            "level": 0
+          }
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Identify and describe the properties of life ",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": "ListParagraph",
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": {
+            "num_id": 1,
+            "level": 0
+          }
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Describe the levels of organization among living things ",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": "ListParagraph",
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": {
+            "num_id": 1,
+            "level": 0
+          }
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "List examples of different sub disciplines in biology",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:55:50.499Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Biology",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " is the science that studies life. What exactly is life? This may sound like a silly question with an obvious answer, but it is not easy to define life. For example, a branch of biology called virology studies viruses, which exhibit some of the characteristics of living entities but lack others. It turns out that although viruses can attack living organisms, cause diseases, and even reproduce, FIGURE 1.1 This NASA image is a composite of several satellite-based views of Earth. To make the whole-Earth image, NASA scientists combine observations of different parts of the planet. (credit: modification of work by NASA) CHAPTER OUTLINE they do not meet the criteria that biologists use to define life",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "paragraph",
+    "props": {
+      "style": null,
+      "alignment": null,
+      "indent": null,
+      "spacing": null,
+      "list": null
+    },
+    "children": []
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:56:35.535Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "From its earliest beginnings, biology has wrestled with four questions: What are the shared properties that make something “alive”? How do those various living things function? When faced with the remarkable diversity of life, how do we organize the different kinds of organisms so that we can better understand them? And, finally—what biologists ultimately seek to understand—how did this diversity arise and how is it continuing? As new organisms are discovered every day, biologists continue to seek answers to these and other questions.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:57:09.690Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Properties of Life",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:58:16.786Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "All groups of living organisms share several key characteristics or functions: order, sensitivity or response to stimuli, reproduction, adaptation, growth and development, regulation/homeostasis, energy processing, and evolution. When viewed together, these eight characteristics serve to define life",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:58:53.753Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Order",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:59:10.962Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Organisms are highly organized structures that consist of one or more cells. Even very simple, single-celled organisms are remarkably complex. Inside each cell, atoms make up molecules. These in turn make up cell components or organelles. Multicellular organisms, which may consist of millions of individual cells, have an advantage over single-celled organisms in that their cells can be specialized to perform specific functions, and even sacrificed in certain situations for the good of the organism as a whole. How these specialized cells come together to form organs such as the heart, lung, or skin in organisms like the toad shown in Figure 1.2 will be discussed later.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Image",
+    "tag": "{\"type\":\"figure-image\",\"label\":\"Image\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T05:59:32.661Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": "center",
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "image",
+            "path": "assets/img_0002.png",
+            "alt": "Picture 2",
+            "width_emu": 2940148,
+            "height_emu": 1930035
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Caption",
+    "tag": "{\"type\":\"figure-caption\",\"label\":\"Caption\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:01:06.658Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "FIGURE 1.2",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#C00000",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " A toad represents a highly organized structure consisting of cells, tissues, organs, and organ systems. (credit: \"Ivengo(RUS)\"/Wikimedia Commons)",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#404040",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:01:38.680Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Sensitivity of Response to Stimuli",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:02:19.619Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Organisms respond to diverse stimuli. For example, plants can bend toward a source of light or respond to touch (Figure 1.3). Even tiny bacteria can move toward or away from chemicals (a process called chemotaxis) or light (phototaxis). Movement toward a stimulus is considered a positive response, while movement away from a stimulus is considered a negative response.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Image",
+    "tag": "{\"type\":\"figure-image\",\"label\":\"Image\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:02:45.007Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": "center",
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "image",
+            "path": "assets/img_0003.png",
+            "alt": "Picture 3",
+            "width_emu": 3552092,
+            "height_emu": 2691422
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Caption",
+    "tag": "{\"type\":\"figure-caption\",\"label\":\"Caption\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:03:19.798Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": null,
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "FIGURE 1.1",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#C00000",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " The leaves of this sensitive plant (Mimosa pudica) will instantly droop and fold when touched. After a few minutes, the plant returns to its normal state. (credit: Alex Lomas).",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#404040",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Topic",
+    "tag": "{\"type\":\"topic\",\"label\":\"Topic\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:03:51.657Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "LINK TO LEARNING",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:04:18.275Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Watch this ",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": "video (http://openstax.org/l/thigmonasty)",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": null,
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " to see how the sensitive plant responds to a touch stimulus",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": []
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:07:19.055Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Reproduction",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:07:40.256Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Single-celled organisms reproduce by first duplicating their DNA, which is the genetic material, and then dividing it equally as the cell prepares to divide to form two new cells. Many multicellular organisms (those made up of more than one cell) produce specialized reproductive cells that will form new individuals. When reproduction occurs, DNA containing genes is passed along to an organism’s offspring. These genes are the reason that the offspring will belong to the same species and will have characteristics similar to the parent, such as fur color and blood type.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:08:56.491Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Adaption",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:09:19.665Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "All living organisms exhibit a “fit” to their environment. Biologists refer to this fit as adaptation and it is a consequence of evolution by natural selection, which operates in every lineage of reproducing organisms. Examples of adaptations are diverse and unique, from heat-resistant Archaea that live in boiling hot springs to the tongue length of a nectar-feeding moth that matches the size of the flower from which it feeds. Adaptations enhance the reproductive potential of the individual exhibiting them, including their ability to survive to reproduce. Adaptations are not constant. As an environment changes, natural selection causes the characteristics of the individuals in a population to track those changes",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:09:44.117Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Growth and Development",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:10:07.372Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Organisms grow and develop according to specific instructions coded for by their genes. These genes provide instructions that will direct cellular growth and development, ensuring that a species’ young (Figure 1.4) will grow up to exhibit many of the same characteristics as its parents.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Image",
+    "tag": "{\"type\":\"figure-image\",\"label\":\"Image\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:10:26.682Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": "center",
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "image",
+            "path": "assets/img_0004.png",
+            "alt": "Picture 4",
+            "width_emu": 3458346,
+            "height_emu": 2314135
+          }
+        ]
+      },
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": []
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Caption",
+    "tag": "{\"type\":\"figure-caption\",\"label\":\"Caption\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:11:00.144Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "FIGURE 1.4",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#C00000",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " Although no two look alike, these kittens have inherited genes from both parents and share many of the same characteristics. (credit: Pieter & Renée Lanser)",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#404040",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:11:40.410Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Regulation/Homeostasis",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:11:56.639Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Even the smallest organisms are complex and require multiple regulatory mechanisms to coordinate internal functions, such as the transport of nutrients, response to stimuli, and coping with environmental stresses. Homeostasis (literally, “steady state”) refers to the relatively stable internal environment required to maintain life. For example, organ systems such as the digestive or circulatory systems perform specific functions like carrying oxygen throughout the body, removing wastes, delivering nutrients to every cell, and cooling the body.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:12:19.533Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "To function properly, cells require appropriate conditions such as proper temperature, pH, and concentrations of diverse chemicals. These conditions may, however, change from one moment to the next. Organisms are able to maintain homeostatic internal conditions within a narrow range almost constantly, despite environmental changes, by activation of regulatory mechanisms. For example, many organisms regulate their body temperature in a process known as thermoregulation. Organisms that live in cold climates, such as the polar bear (Figure 1.5), have body structures that help them withstand low temperatures and conserve body heat. In hot climates, organisms have methods (such as perspiration in humans or panting in dogs) that help them to shed excess body heat.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Image",
+    "tag": "{\"type\":\"figure-image\",\"label\":\"Image\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:12:39.799Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": "center",
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "image",
+            "path": "assets/img_0005.png",
+            "alt": "Picture 5",
+            "width_emu": 3948800,
+            "height_emu": 2820572
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Caption",
+    "tag": "{\"type\":\"figure-caption\",\"label\":\"Caption\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:13:01.884Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 40
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "FIGURE 1.5",
+            "style": {
+              "bold": true,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#C00000",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          },
+          {
+            "kind": "text",
+            "text": " Polar bears and other mammals living in ice-covered regions maintain their body temperature by generating heat and reducing heat loss through thick fur and a dense layer of fat under their skin. (credit: \"longhorndave\"/Flickr).",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#404040",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 9.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Chapter Overview",
+    "tag": "{\"type\":\"chapter-overview\",\"label\":\"Chapter Overview\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:13:35.508Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "before": 160,
+            "after": 80
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "Energy Processing",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#2E74B5",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 11.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "tag",
+    "label": "Text",
+    "tag": "{\"type\":\"text\",\"label\":\"Text\",\"version\":\"1.0\",\"insertedAt\":\"2026-06-16T06:13:56.699Z\",\"schema\":\"openstax-biology-chapter-formatter\"}",
+    "children": [
+      {
+        "kind": "paragraph",
+        "props": {
+          "style": null,
+          "alignment": null,
+          "indent": null,
+          "spacing": {
+            "after": 240
+          },
+          "list": null
+        },
+        "children": [
+          {
+            "kind": "text",
+            "text": "All organisms (such as the California condor shown in Figure 1.6) use a source of energy for their metabolic activities. Some organisms capture energy from the Sun and convert it into chemical energy in food; others use chemical energy from molecules they take in.",
+            "style": {
+              "bold": false,
+              "italic": false,
+              "underline": null,
+              "strike": false,
+              "vertAlign": null,
+              "color": "#1F1F1F",
+              "highlight": null,
+              "font": "Arial",
+              "size_pt": 10.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "paragraph",
+    "props": {
+      "style": null,
+      "alignment": null,
+      "indent": null,
+      "spacing": {
+        "after": 40
+      },
+      "list": null
+    },
+    "children": []
+  }
+]

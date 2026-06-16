@@ -1,11 +1,11 @@
-import outputJson from '../mock/output.json';
-import { mapOutputJson } from '../utils/jsonMapper';
+import treeOutputJson from '../mock/tree_output.json';
+import { mapTreeOutputJson } from '../utils/jsonMapper';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const getCourseData = async () => {
   await delay(300);
-  return mapOutputJson(outputJson);
+  return mapTreeOutputJson(treeOutputJson);
 };
 
 export const getBookById = (courseData, bookId) =>
