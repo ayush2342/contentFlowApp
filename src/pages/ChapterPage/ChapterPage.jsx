@@ -3,7 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useCourse } from '../../hooks/useCourse';
 import { findChapter } from '../../utils/findInCourse';
-import { setSelectedBook, setSelectedChapter } from '../../features/course/courseSlice';
+import {
+  setSelectedBook,
+  setSelectedChapter,
+  setSelectedLesson,
+} from '../../features/course/courseSlice';
+import LessonRenderer from '../../renderers/LessonRenderer';
 import styles from './ChapterPage.module.scss';
 
 const ChapterPage = () => {
@@ -19,6 +24,7 @@ const ChapterPage = () => {
     if (book && chapter) {
       dispatch(setSelectedBook(book));
       dispatch(setSelectedChapter(chapter));
+      dispatch(setSelectedLesson(null));
     }
   }, [book, chapter, dispatch]);
 
@@ -48,21 +54,18 @@ const ChapterPage = () => {
           </ul>
         </div>
       )}
-      <h2 className={styles.sectionTitle}>Sections</h2>
-      <ul className={styles.list}>
-        {chapter.lessons?.map((lesson) => (
-          <li key={lesson.id}>
-            <Link to={`/lesson/${lesson.id}`} className={styles.link}>
-              <span className={styles.linkTitle}>{lesson.title}</span>
-              <span className={styles.linkDesc}>
-                {lesson.sectionNumber
-                  ? `Section ${lesson.sectionNumber}`
-                  : lesson.description}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <h2 className={styles.sectionTitle}>Chapter Content</h2>
+      {chapter.lessons?.length ? (
+        <div className={styles.contentStack}>
+          {chapter.lessons.map((lesson) => (
+            <section key={lesson.id} className={styles.lessonSection}>
+              <LessonRenderer page={lesson.pages?.[0]} />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.emptyState}>No chapter content available yet.</p>
+      )}
     </div>
   );
 };

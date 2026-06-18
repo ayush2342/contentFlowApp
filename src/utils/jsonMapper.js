@@ -243,6 +243,42 @@ const stripFigurePrefix = (captionText) =>
     .replace(/^\s*[-–:]\s*/, '')
     .trim();
 
+const normalizeText = (value) =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractLearningObjectives = (text) => {
+  const normalized = normalizeText(text).replace(
+    /^By the end of this section, you will be able to:\s*/i,
+    ''
+  );
+
+  if (!normalized) return [];
+
+  const objectiveStartRegex =
+    /\b(Identify|Describe|List|Explain|Define|Compare|Analyze|Discuss|Evaluate|Recognize|Differentiate|Summarize)\b/g;
+
+  const starts = [...normalized.matchAll(objectiveStartRegex)].map((match) => match.index);
+  if (starts.length <= 1) return [normalized];
+
+  const objectives = [];
+  starts.forEach((start, index) => {
+    const end = starts[index + 1] ?? normalized.length;
+    const objective = normalized.slice(start, end).trim();
+    if (objective) objectives.push(objective);
+  });
+
+  return objectives;
+};
+
+const parseSectionHeading = (text) => {
+  const normalized = normalizeText(text);
+  const match = normalized.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);
+  if (!match) return null;
+  return { sectionNumber: match[1], sectionTitle: match[2] };
+};
+
 const titleFromBookId = (bookId) => {
   if (!bookId) return 'Biology 101';
   return bookId
@@ -251,8 +287,138 @@ const titleFromBookId = (bookId) => {
     .join(' ');
 };
 
+const mapClassTemplateJson = (nodes) => {
+  const outline = [];
+  const content = [];
+  const learningObjectives = [];
+  const media = {};
+
+  let chapterNumber = 1;
+  let chapterTitle = 'Introduction to Biology';
+  let sectionNumber = '1.1';
+  let sectionTitle = 'Themes and Concepts of Biology';
+  let chapterIntro = '';
+  let mediaIndex = 1;
+  let captureLearningObjectives = false;
+
+  nodes.forEach((node) => {
+    const type = node?.type;
+    const dataText = normalizeText(node?.data?.text);
+
+    if (type === 'LessonNumber' && dataText) {
+      const match = dataText.match(/chapter\s+(\d+)/i);
+      if (match) chapterNumber = Number(match[1]);
+      return;
+    }
+
+    if (type === 'SectionTitle' && dataText) {
+      const sectionMeta = parseSectionHeading(dataText);
+      if (sectionMeta) {
+        sectionNumber = sectionMeta.sectionNumber;
+        sectionTitle = sectionMeta.sectionTitle;
+      } else {
+        sectionTitle = dataText;
+      }
+      return;
+    }
+
+    if (type === 'Topic' && dataText) {
+      const sectionMeta = parseSectionHeading(dataText);
+      if (sectionMeta) {
+        outline.push(sectionMeta.sectionTitle);
+      } else {
+        content.push({ type: 'heading', text: dataText });
+      }
+      return;
+    }
+
+    if (type === 'ChapterOverview' && dataText) {
+      if (/chapter outline/i.test(dataText)) return;
+
+      if (/learning objectives/i.test(dataText)) {
+        captureLearningObjectives = true;
+        return;
+      }
+
+      content.push({ type: 'heading', text: dataText });
+      return;
+    }
+
+    if (type === 'Image' && node?.data?.url) {
+      const mediaId = `tree-media-${mediaIndex++}`;
+      const caption = normalizeText(node?.data?.caption);
+      const urlPath = normalizePublicAssetPath(node.data.url);
+
+      media[mediaId] = {
+        fileName: basenameFromPath(urlPath),
+        sourcePath: urlPath,
+        caption: stripFigurePrefix(caption) || `Image ${mediaIndex - 1}`,
+      };
+
+      content.push({ type: 'image', mediaId });
+      return;
+    }
+
+    if (type === 'Text' && dataText) {
+      if (!chapterIntro) {
+        chapterIntro = dataText.replace(/^Introduction\s+/i, '').trim();
+      }
+
+      if (captureLearningObjectives) {
+        const objectives = extractLearningObjectives(dataText);
+        if (objectives.length) {
+          learningObjectives.push(...objectives);
+          captureLearningObjectives = false;
+          return;
+        }
+      }
+
+      content.push({ type: 'paragraph', text: dataText });
+    }
+  });
+
+  const outputLike = {
+    bookId: 'biology-101',
+    media,
+    chapters: [
+      {
+        chapterNumber,
+        title: chapterTitle,
+        outline,
+        introduction: chapterIntro,
+        sections: [
+          {
+            sectionNumber,
+            title: sectionTitle,
+            learningObjectives,
+            content,
+          },
+        ],
+      },
+    ],
+  };
+
+  return {
+    bookId: outputLike.bookId,
+    media: outputLike.media,
+    books: [
+      {
+        id: outputLike.bookId,
+        title: titleFromBookId(outputLike.bookId),
+        description: outputLike.chapters[0]?.introduction ?? '',
+        chapters: outputLike.chapters.map((chapter) => mapChapter(chapter, outputLike.media)),
+      },
+    ],
+  };
+};
+
 export const mapTreeOutputJson = (treeNodes) => {
   const nodes = Array.isArray(treeNodes) ? treeNodes : [];
+  const firstNode = nodes[0];
+
+  if (firstNode?.type && firstNode?.data) {
+    return mapClassTemplateJson(nodes);
+  }
 
   const outline = [];
   const content = [];

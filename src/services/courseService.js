@@ -1,4 +1,4 @@
-import treeOutputJson from '../mock/tree_output.json';
+import treeOutputJson from '../mock/4_Pages_word_template_class.json';
 import { mapTreeOutputJson } from '../utils/jsonMapper';
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
