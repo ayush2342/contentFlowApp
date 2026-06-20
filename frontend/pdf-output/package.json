@@ -1,0 +1,9 @@
+{
+  "name": "pdf-output-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "generate": "node generate.js",
+    "sync": "node generate.js"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "extendscript-debug",
+      "request": "launch",
+      "name": "Adobe InDesign",
+      "program": "${workspaceFolder}/populate-indesign.jsx",
+      "targetSpecifier": "indesign"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+import { mapTreeOutputJson } from '../utils/jsonMapper';
+
+const DEFAULT_CONTEXT = {
+  outputId: import.meta.env.VITE_DEFAULT_OUTPUT_ID || '',
+  tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID || '',
+  documentId: import.meta.env.VITE_DEFAULT_DOCUMENT_ID || '',
+  clientName: import.meta.env.VITE_DEFAULT_CLIENT_NAME || '',
+  templateId: import.meta.env.VITE_DEFAULT_TEMPLATE_ID || '',
+};
+
+const getApiBaseUrl = () =>
+  (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/+$/, '');
+
+const CONTEXT_STORAGE_KEY = 'contentflow-output-context';
+
+const readStoredContext = () => {
+  try {
+    const raw = window.sessionStorage.getItem(CONTEXT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeStoredContext = (context) => {
+  try {
+    window.sessionStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(context));
+  } catch {
+    // Ignore storage failures; runtime context still works for current page.
+  }
+};
+
+const getRouteContext = () => {
+  const searchParams = new URLSearchParams(window.location.search);
+  const outputPathMatch = window.location.pathname.match(/\/output\/([^/?#]+)/);
+  const storedContext = readStoredContext();
+
+  const context = {
+    outputId:
+      outputPathMatch?.[1] ||
+      searchParams.get('outputId') ||
+      storedContext.outputId ||
+      DEFAULT_CONTEXT.outputId,
+    tenantId: searchParams.get('tenantId') || storedContext.tenantId || DEFAULT_CONTEXT.tenantId,
+    documentId:
+      searchParams.get('documentId') ||
+      storedContext.documentId ||
+      DEFAULT_CONTEXT.documentId,
+    clientName: searchParams.get('clientName') || storedContext.clientName || DEFAULT_CONTEXT.clientName,
+    templateId: searchParams.get('templateId') || storedContext.templateId || DEFAULT_CONTEXT.templateId,
+  };
+
+  if (context.outputId || (context.tenantId && context.documentId)) {
+    writeStoredContext(context);
+  }
+
+  return context;
+};
+
+export const getCourseData = async (inputContext = null) => {
+  const context = {
+    ...getRouteContext(),
+    ...(inputContext || {}),
+  };
+  const query = new URLSearchParams();
+  if (context.clientName) query.set('clientName', context.clientName);
+  if (context.templateId) query.set('templateId', context.templateId);
+  const queryText = query.toString();
+
+  const endpoint = context.outputId
+    ? `${getApiBaseUrl()}/api/output/${context.outputId}/document`
+    : `${getApiBaseUrl()}/api/document/${context.tenantId}/${context.documentId}${
+        queryText ? `?${queryText}` : ''
+      }`;
+
+  if (!context.outputId && (!context.tenantId || !context.documentId)) {
+    throw new Error(
+      'Missing output context. Open the app using URL returned by /api/output.'
+    );
+  }
+
+  // TODO(phase-2): add conditional fetch with ETag (If-None-Match) or client cache.
+  // Phase 1 intentionally fetches fresh JSON on every render request.
+  const response = await fetch(endpoint);
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message || `Failed to fetch document (${response.status})`);
+  }
+
+  const payload = await response.json();
+  const resolvedTenantId = payload.tenantId || context.tenantId;
+  const mapped = mapTreeOutputJson(payload.data, {
+    mediaBaseUrl: `${getApiBaseUrl()}/api/media`,
+    tenantId: resolvedTenantId,
+  });
+
+  return {
+    ...mapped,
+    // TODO(phase-2): use etag/lastModified in client-side cache key if we add local caching.
+    templateId: payload.templateId,
+    etag: payload.etag,
+    lastModified: payload.lastModified,
+  };
+};
+
+export const getBookById = (courseData, bookId) =>
+  courseData?.books?.find((book) => book.id === bookId) ?? null;
+
+export const getChapterById = (courseData, chapterId) => {
+  for (const book of courseData?.books ?? []) {
+    const chapter = book.chapters?.find((ch) => ch.id === chapterId);
+    if (chapter) return { book, chapter };
+  }
+  return null;
+};
+
+export const getLessonById = (courseData, lessonId) => {
+  for (const book of courseData?.books ?? []) {
+    for (const chapter of book.chapters ?? []) {
+      const lesson = chapter.lessons?.find((ls) => ls.id === lessonId);
+      if (lesson) return { book, chapter, lesson };
+    }
+  }
+  return null;
+};
