@@ -1,4 +1,4 @@
-# RDP Production Setup Guide (Windows VM)
+# RDP Setup and Server Start (Windows VM)
 
 This guide documents the exact setup that worked on RDP for this project, including common issues and fixes.
 
