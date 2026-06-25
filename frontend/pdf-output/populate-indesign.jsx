@@ -1,14 +1,50 @@
 // =============================================================================
-// populate-indesign.jsx  (v9 — dedicated-frame layout)
-// Reads tree_output.json and fills separate labeled frames in InDesign.
-// Compatible with legacy ExtendScript (no JSON.parse).
+// populate-indesign.jsx (server-safe)
+// Reads tree_output.json and fills labeled frames in InDesign.
+// Exports output.pdf in the SAME folder as this script.
 // =============================================================================
 
+/* global app, File, Folder, ExportFormat, FitOptions, UserInteractionLevels, ColorModel, ColorSpace */
+
 // -----------------------------------------------------------------------------
-// LEGACY JSON PARSER (json2.js style — works in ExtendScript ES3)
+// Run headless (no popups/dialogs on server)
 // -----------------------------------------------------------------------------
-// ExtendScript in many InDesign versions does not include JSON.parse.
-// This parser reads standard JSON objects, arrays, strings, and numbers.
+try {
+    app.scriptPreferences.userInteractionLevel = UserInteractionLevels.NEVER_INTERACT;
+} catch (interactionError) {
+    // Best effort only.
+}
+
+// -----------------------------------------------------------------------------
+// Small helpers
+// -----------------------------------------------------------------------------
+function trimString(value) {
+    return String(value).replace(/^\s+|\s+$/g, "");
+}
+
+function writeTextFile(filePath, content) {
+    var f = File(filePath);
+    if (f.open("w")) {
+        f.write(content);
+        f.close();
+    }
+}
+
+function logInfo(scriptFolderPath, message) {
+    try {
+        writeTextFile(scriptFolderPath + "/render.log", message);
+    } catch (e) {}
+}
+
+function logError(scriptFolderPath, message) {
+    try {
+        writeTextFile(scriptFolderPath + "/error.log", message);
+    } catch (e) {}
+}
+
+// -----------------------------------------------------------------------------
+// LEGACY JSON PARSER (ES3-compatible for ExtendScript)
+// -----------------------------------------------------------------------------
 function parseJSON(text) {
     var at = 0;
     var ch = " ";
@@ -219,14 +255,8 @@ function parseJSON(text) {
 }
 
 // -----------------------------------------------------------------------------
-// TEXT + STYLE HELPERS
+// Styling maps
 // -----------------------------------------------------------------------------
-
-function trimString(value) {
-    return String(value).replace(/^\s+|\s+$/g, "");
-}
-
-// Styles matched to "sample test 4 pages.docx" / 4_Pages_word_template_class.json
 var FRAME_STYLES = {
     lessonNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
     chapterOverview: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
@@ -236,7 +266,6 @@ var FRAME_STYLES = {
     imageCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] }
 };
 
-// Backend JSON block type -> style profile.
 var TYPE_TO_STYLE = {
     LessonNumber: FRAME_STYLES.lessonNumber,
     ChapterOverview: FRAME_STYLES.chapterOverview,
@@ -245,16 +274,20 @@ var TYPE_TO_STYLE = {
     SectionTitle: FRAME_STYLES.sectionTitle
 };
 
-// Track skipped frames and how many frames were populated.
+var TYPE_TO_LABEL_PREFIX = {
+    LessonNumber: "lessonNumber",
+    ChapterOverview: "chapterOverview",
+    Topic: "topic",
+    Text: "text",
+    SectionTitle: "sectionTitle"
+};
+
 var warnings = [];
 var populatedCount = 0;
 
 // -----------------------------------------------------------------------------
-// STEP 3 — Find text frames by Script Label
+// Frame lookup helpers
 // -----------------------------------------------------------------------------
-// In the InDesign DOM the Script Label property is called "label".
-// Only TextFrame objects support .contents.
-
 function getItemLabel(item) {
     try {
         return item.label;
@@ -274,69 +307,21 @@ function findTextFrameByLabel(document, labelName) {
             return document.textFrames[i];
         }
     }
-
     return null;
 }
 
-// -----------------------------------------------------------------------------
-// STEP 3b — Image helpers (resolve path + place into a graphic frame)
-// -----------------------------------------------------------------------------
-// JSON is read-only from the backend — we do NOT change it.
-// Backend may send URLs like "url.com/img.jpg" that don't match local filenames.
-// Resolution order:
-//   1. Use url/path as-is if the file exists
-//   2. Try the filename part inside assets/
-//   3. Fall back to assets/img_0001.png, img_0002.png by Image block order
-
-function padImageIndex(number) {
-    var numStr = String(number);
-
-    while (numStr.length < 4) {
-        numStr = "0" + numStr;
-    }
-
-    return numStr;
-}
-
-function resolveImageFile(urlOrPath, scriptFolder, imageIndex) {
-    var normalized = String(urlOrPath).replace(/\\/g, "/");
-    var parts;
-    var fileName;
-    var candidate;
-    var candidates = [];
-    var indexedBase;
+function clearLabeledTextFrames(document) {
     var i;
+    var frame;
+    var label;
 
-    if (!normalized) {
-        return null;
-    }
-
-    candidates.push(normalized);
-    candidates.push(scriptFolder + "/" + normalized);
-    candidates.push(scriptFolder + "/assets/" + normalized);
-
-    parts = normalized.split("/");
-    fileName = parts[parts.length - 1];
-
-    if (fileName) {
-        candidates.push(scriptFolder + "/assets/" + fileName);
-    }
-
-    if (imageIndex && imageIndex > 0) {
-        indexedBase = "img_" + padImageIndex(imageIndex);
-        candidates.push(scriptFolder + "/assets/" + indexedBase + ".png");
-        candidates.push(scriptFolder + "/assets/" + indexedBase + ".jpg");
-        candidates.push(scriptFolder + "/assets/" + indexedBase + ".jpeg");
-    }
-
-    for (i = 0; i < candidates.length; i++) {
-        candidate = File(candidates[i]);
-        if (candidate.exists) {
-            return candidate;
+    for (i = 0; i < document.textFrames.length; i++) {
+        frame = document.textFrames[i];
+        label = trimString(getItemLabel(frame));
+        if (label) {
+            frame.contents = "";
         }
     }
-
-    return null;
 }
 
 function findPlaceableFrameByLabel(document, labelName) {
@@ -358,8 +343,57 @@ function findPlaceableFrameByLabel(document, labelName) {
             if (typeof item.place === "function") {
                 return item;
             }
-        } catch (placeCheckError) {
-            // This page item cannot hold a placed image.
+        } catch (placeCheckError) {}
+    }
+
+    return null;
+}
+
+// -----------------------------------------------------------------------------
+// Image helpers
+// -----------------------------------------------------------------------------
+function padImageIndex(number) {
+    var numStr = String(number);
+    while (numStr.length < 4) {
+        numStr = "0" + numStr;
+    }
+    return numStr;
+}
+
+function resolveImageFile(urlOrPath, scriptFolder, imageIndex) {
+    var normalized = String(urlOrPath || "").replace(/\\/g, "/");
+    var parts;
+    var fileName;
+    var candidate;
+    var candidates = [];
+    var indexedBase;
+    var i;
+
+    if (!normalized) {
+        return null;
+    }
+
+    candidates.push(normalized);
+    candidates.push(scriptFolder + "/" + normalized);
+    candidates.push(scriptFolder + "/assets/" + normalized);
+
+    parts = normalized.split("/");
+    fileName = parts[parts.length - 1];
+    if (fileName) {
+        candidates.push(scriptFolder + "/assets/" + fileName);
+    }
+
+    if (imageIndex && imageIndex > 0) {
+        indexedBase = "img_" + padImageIndex(imageIndex);
+        candidates.push(scriptFolder + "/assets/" + indexedBase + ".png");
+        candidates.push(scriptFolder + "/assets/" + indexedBase + ".jpg");
+        candidates.push(scriptFolder + "/assets/" + indexedBase + ".jpeg");
+    }
+
+    for (i = 0; i < candidates.length; i++) {
+        candidate = File(candidates[i]);
+        if (candidate.exists) {
+            return candidate;
         }
     }
 
@@ -370,42 +404,28 @@ function fitFrameToContent(frame) {
     try {
         frame.fit(FitOptions.PROPORTIONALLY);
         return;
-    } catch (fitErrorA) {
-        // Try alternate enum name used in some InDesign versions.
-    }
+    } catch (fitErrorA) {}
 
     try {
         frame.fit(FitOptions.proportionally);
-    } catch (fitErrorB) {
-        // Keep the placed image at its default size if fit fails.
-    }
+    } catch (fitErrorB) {}
 }
 
 function placeImageInFrame(document, labelName, urlOrPath, scriptFolder, imageIndex) {
     var frame;
     var imageFile;
 
-    if (!urlOrPath) {
-        return;
-    }
+    if (!urlOrPath) return;
 
     frame = findPlaceableFrameByLabel(document, labelName);
-
     if (frame === null) {
-        warnings.push(
-            'Skipped "' + labelName + '": rectangle/graphic frame not found. ' +
-            "Create a rectangle and set its Script Label to imageFrame."
-        );
+        warnings.push('Skipped "' + labelName + '": graphic frame not found.');
         return;
     }
 
     imageFile = resolveImageFile(urlOrPath, scriptFolder, imageIndex);
-
     if (imageFile === null) {
-        warnings.push(
-            'Image file not found for backend url: "' + urlOrPath + '". ' +
-            "Expected a matching file in the assets folder."
-        );
+        warnings.push('Image file not found for "' + urlOrPath + '".');
         return;
     }
 
@@ -419,20 +439,15 @@ function placeImageInFrame(document, labelName, urlOrPath, scriptFolder, imageIn
 }
 
 // -----------------------------------------------------------------------------
-// STEP 4 — Apply character and paragraph formatting to a text frame
+// Text style helpers
 // -----------------------------------------------------------------------------
-// Font families use different style names (Regular vs Roman, etc.).
-// We try several common names and skip gracefully if none are available.
-
 function ensureDocumentColor(document, colorName, rgb) {
     var color;
-
     try {
         color = document.colors.itemByName(colorName);
+        color.name;
         return color;
-    } catch (missingColor) {
-        // Create the swatch the first time we need it.
-    }
+    } catch (missingColor) {}
 
     try {
         color = document.colors.add({
@@ -452,9 +467,7 @@ function applyTextColor(textRange, style) {
     var colorName;
     var doc;
 
-    if (!textRange || !style || !style.color) {
-        return;
-    }
+    if (!textRange || !style || !style.color) return;
 
     try {
         doc = app.activeDocument;
@@ -484,17 +497,13 @@ function applyFontStyleSafe(textRange, bold, italic) {
         candidates = ["Regular", "Roman", "Book", "Normal", "Light", "Plain"];
     }
 
-    // First try setting fontStyle directly on the current font family.
     for (i = 0; i < candidates.length; i++) {
         try {
             textRange.fontStyle = candidates[i];
             return;
-        } catch (styleError) {
-            // Try the next common style name.
-        }
+        } catch (styleError) {}
     }
 
-    // Fallback: request the font by "Family<Tab>Style" name.
     try {
         family = textRange.fontFamily;
     } catch (familyError) {
@@ -506,9 +515,7 @@ function applyFontStyleSafe(textRange, bold, italic) {
             styleName = family + "\t" + candidates[i];
             textRange.appliedFont = app.fonts.item(styleName);
             return;
-        } catch (fontError) {
-            // Try the next font style combination.
-        }
+        } catch (fontError) {}
     }
 }
 
@@ -516,15 +523,10 @@ function applyFrameStyle(textFrame, style) {
     var story;
     var textRange;
 
-    if (!textFrame || !style) {
-        return;
-    }
+    if (!textFrame || !style) return;
 
     story = textFrame.parentStory;
-
-    if (!story || story.texts.length === 0) {
-        return;
-    }
+    if (!story || story.texts.length === 0) return;
 
     textRange = story.texts[0];
 
@@ -532,7 +534,7 @@ function applyFrameStyle(textFrame, style) {
         try {
             textRange.pointSize = style.pointSize;
         } catch (sizeError) {
-            warnings.push("Could not set point size on a frame.");
+            warnings.push("Could not set point size.");
         }
     }
 
@@ -543,25 +545,18 @@ function applyFrameStyle(textFrame, style) {
         try {
             story.paragraphs[0].leftIndent = style.leftIndent;
         } catch (indentError) {
-            warnings.push("Could not set left indent on a frame.");
+            warnings.push("Could not set left indent.");
         }
     }
 }
 
-// -----------------------------------------------------------------------------
-// STEP 5 — Populate one labeled frame (skip + warn if missing)
-// -----------------------------------------------------------------------------
-
 function populateFrame(document, labelName, textContent, style) {
     var frame;
-    var cleanText = trimString(textContent);
+    var cleanText = trimString(textContent || "");
 
-    if (!cleanText) {
-        return;
-    }
+    if (!cleanText) return;
 
     frame = findTextFrameByLabel(document, labelName);
-
     if (frame === null) {
         warnings.push('Skipped "' + labelName + '": text frame not found.');
         return;
@@ -573,20 +568,8 @@ function populateFrame(document, labelName, textContent, style) {
 }
 
 // -----------------------------------------------------------------------------
-// STEP 6 — Populate dedicated labeled frames in JSON array order
+// Populate blocks in order
 // -----------------------------------------------------------------------------
-// Each JSON block maps to its own Script Label (e.g. text1, chapterOverview3).
-// See INDESIGN_TEMPLATE_MAPPING.md for the full label convention.
-
-// Label prefix per JSON block type (see INDESIGN_TEMPLATE_MAPPING.md).
-var TYPE_TO_LABEL_PREFIX = {
-    LessonNumber: "lessonNumber",
-    ChapterOverview: "chapterOverview",
-    Topic: "topic",
-    Text: "text",
-    SectionTitle: "sectionTitle"
-};
-
 function resolveTextFrameLabel(document, baseLabel, index) {
     var numberedLabel = baseLabel + index;
 
@@ -658,71 +641,20 @@ function populateInJsonOrder(document, contentItems, scriptFolder) {
 }
 
 // -----------------------------------------------------------------------------
-// STEP 7 — Export the active document as PDF
+// Export PDF strictly to script folder
 // -----------------------------------------------------------------------------
-
-// Windows often prevents writing into Program Files. If tree_output.json lives under:
-//   C:\Program Files\...\Scripts\Scripts Panel\...
-// then exporting output.pdf to the same folder will fail.
-//
-// We try to export next to tree_output.json first (as requested). If that folder
-// is not writable, we fall back to Desktop (or Documents) and report the path.
-
-function canWriteToFolder(folder) {
-    var testFile;
-    var ok = false;
-
-    try {
-        testFile = File(folder + "/__pdf_export_test__.tmp");
-        ok = testFile.open("w");
-        if (ok) {
-            testFile.write("ok");
-            testFile.close();
-            testFile.remove();
-            return true;
-        }
-    } catch (e) {
-        // Not writable.
-    }
-
-    return false;
-}
-
-function pickWritableExportFolder(preferredFolder) {
-    // 1) Preferred folder (same as tree_output.json)
-    if (preferredFolder && canWriteToFolder(preferredFolder)) {
-        return preferredFolder;
-    }
-
-    // 2) Desktop
-    try {
-        if (Folder.desktop && canWriteToFolder(Folder.desktop.fsName)) {
-            warnings.push("Export folder not writable; used Desktop instead.");
-            return Folder.desktop.fsName;
-        }
-    } catch (e1) {}
-
-    // 3) Documents (My Documents)
-    try {
-        if (Folder.myDocuments && canWriteToFolder(Folder.myDocuments.fsName)) {
-            warnings.push("Export folder not writable; used Documents instead.");
-            return Folder.myDocuments.fsName;
-        }
-    } catch (e2) {}
-
-    // 4) Last resort: current folder (may still fail)
-    return preferredFolder;
-}
-
-function exportActiveDocumentToPdf(document, preferredFolder) {
-    var exportFolder = pickWritableExportFolder(preferredFolder);
-    var pdfFile = File(exportFolder + "/output.pdf");
+function exportActiveDocumentToPdf(document, scriptFolderPath) {
+    var pdfFile = File(scriptFolderPath + "/output.pdf");
     var exportPreset;
 
-    // Choose a PDF preset safely. itemByName is safer than item("name").
+    try {
+        if (pdfFile.exists) {
+            pdfFile.remove();
+        }
+    } catch (removeErr) {}
+
     try {
         exportPreset = app.pdfExportPresets.itemByName("[High Quality Print]");
-        // Touching a property forces resolution; otherwise itemByName can be a lazy reference.
         exportPreset.name;
     } catch (presetErrorA) {
         try {
@@ -735,101 +667,80 @@ function exportActiveDocumentToPdf(document, preferredFolder) {
     if (exportPreset) {
         document.exportFile(ExportFormat.PDF_TYPE, pdfFile, false, exportPreset);
     } else {
-        // If no presets exist, export with default settings.
         document.exportFile(ExportFormat.PDF_TYPE, pdfFile);
+    }
+
+    if (!pdfFile.exists) {
+        throw new Error("PDF export command completed, but output.pdf was not created.");
     }
 
     return pdfFile;
 }
 
 // -----------------------------------------------------------------------------
-// STEP 1 — Read and parse tree_output.json
+// Main
 // -----------------------------------------------------------------------------
-
-var scriptFile = File($.fileName);
-var scriptFolder = scriptFile.parent;
-var dataFile = File(scriptFolder + "/tree_output.json");
-
-if (!dataFile.exists) {
-    alert("tree_output.json was not found.\n\nExpected location:\n" + dataFile.fsName);
-    exit();
-}
-
-dataFile.open("r");
-var rawJson = dataFile.read();
-dataFile.close();
-
-var contentItems;
-
-try {
-    contentItems = parseJSON(rawJson);
-} catch (parseError) {
-    alert("Could not parse tree_output.json:\n\n" + parseError.message);
-    exit();
-}
-
-if (!contentItems || !contentItems.length) {
-    alert("tree_output.json is empty or not a valid content array.");
-    exit();
-}
-
-// -----------------------------------------------------------------------------
-// STEP 2 — Get the active InDesign document
-// -----------------------------------------------------------------------------
-
-if (app.documents.length === 0) {
+function main() {
+    var scriptFile = File($.fileName);
+    var scriptFolder = scriptFile.parent;
+    var scriptFolderPath = scriptFolder.fsName;
+    var dataFile = File(scriptFolder + "/tree_output.json");
     var autoTemplate = File(scriptFolder + "/templates/projectX.indd");
-    if (autoTemplate.exists) {
-        try {
-            app.open(autoTemplate);
-        } catch (openTemplateError) {
-            alert("Template open failed:\n\n" + openTemplateError.message);
-            exit();
-        }
-    } else {
-        alert("Please open an InDesign document first.\n\nTemplate not found at:\n" + autoTemplate.fsName);
-        exit();
+
+    var rawJson;
+    var contentItems;
+    var doc;
+    var pdfFile;
+    var w;
+    var warningText = "";
+
+    if (!dataFile.exists) {
+        throw new Error("tree_output.json not found at: " + dataFile.fsName);
     }
+
+    if (!dataFile.open("r")) {
+        throw new Error("Could not open tree_output.json for reading.");
+    }
+    rawJson = dataFile.read();
+    dataFile.close();
+
+    contentItems = parseJSON(rawJson);
+    if (!contentItems || !contentItems.length) {
+        throw new Error("tree_output.json is empty or invalid.");
+    }
+
+    if (app.documents.length === 0) {
+        if (!autoTemplate.exists) {
+            throw new Error("No open document and template not found at: " + autoTemplate.fsName);
+        }
+        app.open(autoTemplate);
+    }
+
+    doc = app.activeDocument;
+    clearLabeledTextFrames(doc);
+    populateInJsonOrder(doc, contentItems, scriptFolderPath);
+    pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
+
+    if (warnings.length > 0) {
+        warningText = "Warnings:\n";
+        for (w = 0; w < warnings.length; w++) {
+            warningText += "- " + warnings[w] + "\n";
+        }
+    }
+
+    logInfo(
+        scriptFolderPath,
+        "PDF export success\n" +
+        "Frames populated: " + populatedCount + "\n" +
+        "PDF: " + pdfFile.fsName + "\n" +
+        warningText
+    );
 }
-
-var doc = app.activeDocument;
-
-// -----------------------------------------------------------------------------
-// STEP 8 — Populate all labeled frames from JSON
-// -----------------------------------------------------------------------------
-
-populateInJsonOrder(doc, contentItems, scriptFolder.fsName);
-
-// -----------------------------------------------------------------------------
-// STEP 9 — Export PDF next to tree_output.json
-// -----------------------------------------------------------------------------
-
-var pdfFile;
-var successMessage;
-var warningMessage = "";
-var w;
 
 try {
-    pdfFile = exportActiveDocumentToPdf(doc, scriptFolder.fsName);
-} catch (exportError) {
-    alert(
-        "Frames populated, but PDF export failed:\n\n" +
-        exportError.message
-    );
-    exit();
+    main();
+} catch (e) {
+    var scriptPathForError = File($.fileName).parent.fsName;
+    logError(scriptPathForError, "PDF render failed: " + e.message);
+    throw e;
 }
-
-if (warnings.length > 0) {
-    warningMessage = "\n\nWarnings:\n";
-    for (w = 0; w < warnings.length; w++) {
-        warningMessage += "- " + warnings[w] + "\n";
-    }
-}
-
-successMessage =
-    "Document populated and exported successfully!\n\n" +
-    "Frames populated: " + populatedCount + "\n" +
-    "PDF saved to:\n" +
-    pdfFile.fsName;
-
-alert(successMessage);

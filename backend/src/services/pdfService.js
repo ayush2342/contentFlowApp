@@ -56,9 +56,20 @@ const resolveInDesignPaths = () => {
 
 const runInDesignScript = async ({ scriptPath }) =>
   new Promise((resolve, reject) => {
-    const child = spawn(env.inDesignExePath, ['-runScript', scriptPath], {
-      windowsHide: true,
-    });
+    const escapedScriptPath = scriptPath.replace(/'/g, "''");
+
+    const psCommand = [
+      "$ErrorActionPreference='Stop'",
+      "$app = New-Object -ComObject InDesign.Application",
+      `$app.DoScript('${escapedScriptPath}', 1246973031)`, // 1246973031 = JavaScript
+      "Write-Output 'INDESIGN_SCRIPT_DONE'",
+    ].join('; ');
+
+    const child = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', psCommand],
+      { windowsHide: true }
+    );
 
     let stderr = '';
     let stdout = '';
@@ -83,7 +94,7 @@ const runInDesignScript = async ({ scriptPath }) =>
     child.on('close', (code) => {
       clearTimeout(timeout);
       if (code !== 0) {
-        reject(new Error(`InDesign exited with code ${code}. ${stderr || stdout}`));
+        reject(new Error(`InDesign COM execution failed (code ${code}). ${stderr || stdout}`));
         return;
       }
       resolve({ stdout, stderr });
