@@ -259,22 +259,13 @@ const basenameFromPath = (value) => {
   return parts[parts.length - 1] || normalized;
 };
 
-const stripFigurePrefix = (captionText) =>
-  captionText
-    .replace(/^FIGURE\s+\d+(\.\d+)?\s*/i, '')
-    .replace(/^\s*[-–:]\s*/, '')
-    .trim();
-
 const normalizeText = (value) =>
   String(value ?? '')
     .replace(/\s+/g, ' ')
     .trim();
 
 const extractLearningObjectives = (text) => {
-  const normalized = normalizeText(text).replace(
-    /^By the end of this section, you will be able to:\s*/i,
-    ''
-  );
+  const normalized = normalizeText(text);
 
   if (!normalized) return [];
 
@@ -350,7 +341,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     if (type === 'Topic' && dataText) {
       const sectionMeta = parseSectionHeading(dataText);
       if (sectionMeta) {
-        outline.push(sectionMeta.sectionTitle);
+        outline.push(dataText);
       } else {
         if (!chapterTitle && canUseAsChapterTitle(dataText)) {
           chapterTitle = dataText;
@@ -381,7 +372,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       media[mediaId] = {
         fileName: basenameFromPath(urlPath),
         sourcePath: urlPath,
-        caption: stripFigurePrefix(caption) || '',
+        caption,
       };
 
       content.push({ type: 'image', mediaId });
@@ -390,7 +381,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 
     if (type === 'Text' && dataText) {
       if (!chapterIntro) {
-        chapterIntro = dataText.replace(/^Introduction\s+/i, '').trim();
+        chapterIntro = dataText;
       }
 
       if (captureLearningObjectives) {
@@ -492,7 +483,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
 
     if (tagType === 'topic' && joinedText) {
       if (/^\d+(\.\d+)?\s+/.test(joinedText)) {
-        outline.push(joinedText.replace(/^\d+(\.\d+)?\s+/, '').trim());
+        outline.push(joinedText);
       } else if (!chapterTitle && canUseAsChapterTitle(joinedText)) {
         chapterTitle = joinedText;
       } else {
@@ -535,7 +526,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     }
 
     if (tagType === 'figure-caption' && nextImagePath) {
-      const caption = stripFigurePrefix(joinedText);
+      const caption = joinedText;
       const mediaId = `tree-media-${mediaIndex++}`;
       media[mediaId] = {
         fileName: basenameFromPath(nextImagePath),

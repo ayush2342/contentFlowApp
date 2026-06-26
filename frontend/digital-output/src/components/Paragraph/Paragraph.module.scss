@@ -5,3 +5,9 @@
   color: var(--paragraph-color);
   margin: 0 0 1rem;
 }
+
+.link {
+  color: var(--primary-color);
+  text-decoration: underline;
+  word-break: break-all;
+}
