@@ -270,6 +270,14 @@ const normalizeText = (value) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const pickCourseTitle = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized = normalizeText(candidate);
+    if (normalized) return normalized;
+  }
+  return '';
+};
+
 const extractLearningObjectives = (text) => {
   const normalized = normalizeText(text).replace(
     /^By the end of this section, you will be able to:\s*/i,
@@ -380,7 +388,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       media[mediaId] = {
         fileName: basenameFromPath(urlPath),
         sourcePath: urlPath,
-        caption: stripFigurePrefix(caption) || `Image ${mediaIndex - 1}`,
+        caption: stripFigurePrefix(caption) || '',
       };
 
       content.push({ type: 'image', mediaId });
@@ -429,7 +437,8 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       : null;
 
   const outputLike = {
-    bookId: 'course',
+    bookId: slugify(chapterTitle) || 'course',
+    title: pickCourseTitle(chapterTitle, chapterIntro, sectionTitle),
     media,
     chapters: chapter ? [chapter] : [],
   };
@@ -440,7 +449,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     books: [
       {
         id: outputLike.bookId,
-        title: titleFromBookId(outputLike.bookId),
+        title: outputLike.title || titleFromBookId(outputLike.bookId),
         description: outputLike.chapters[0]?.introduction ?? '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)
@@ -540,7 +549,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
       media[mediaId] = {
         fileName: basenameFromPath(nextImagePath),
         sourcePath: normalizePublicAssetPath(nextImagePath),
-        caption: caption || `Image ${mediaIndex - 1}`,
+        caption: caption || '',
       };
       content.push({ type: 'image', mediaId });
       nextImagePath = null;
@@ -588,7 +597,8 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
       : null;
 
   const outputLike = {
-    bookId: 'course',
+    bookId: slugify(chapterTitle) || 'course',
+    title: pickCourseTitle(chapterTitle, chapterIntro, sectionTitle),
     media,
     chapters: chapter ? [chapter] : [],
   };
@@ -599,7 +609,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     books: [
       {
         id: outputLike.bookId,
-        title: titleFromBookId(outputLike.bookId),
+        title: outputLike.title || titleFromBookId(outputLike.bookId),
         description: outputLike.chapters[0]?.introduction ?? '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)
