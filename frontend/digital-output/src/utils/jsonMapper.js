@@ -107,23 +107,27 @@ const mapContentItem = (item, media, index, options = {}) => {
   return null;
 };
 
-const mapSectionToLesson = (section, media, options = {}) => {
-  const sectionId = `section-${slugify(section.sectionNumber)}`;
+const mapSectionToLesson = (section, media, options = {}, sectionIndex = 0) => {
+  const sectionKey = section.sectionNumber || section.title || `section-${sectionIndex + 1}`;
+  const sectionId = `section-${slugify(sectionKey) || sectionIndex + 1}`;
   const mappedContent =
     section.content
       ?.map((item, index) => mapContentItem(item, media, index, options))
       .filter(Boolean) ?? [];
 
-  const components = [
-    {
+  const sectionHeading = [section.sectionNumber, section.title].filter(Boolean).join(' ').trim();
+  const components = [];
+
+  if (sectionHeading) {
+    components.push({
       id: `${sectionId}-title`,
       type: 'Heading',
       props: {
-        text: `${section.sectionNumber} ${section.title}`,
+        text: sectionHeading,
         level: 1,
       },
-    },
-  ];
+    });
+  }
 
   if (section.learningObjectives?.length) {
     components.push({
@@ -142,12 +146,12 @@ const mapSectionToLesson = (section, media, options = {}) => {
     id: sectionId,
     sectionNumber: section.sectionNumber,
     title: section.title,
-    description: `Section ${section.sectionNumber}`,
+    description: section.sectionNumber ? `Section ${section.sectionNumber}` : '',
     learningObjectives: section.learningObjectives,
     pages: [
       {
-        id: `page-${slugify(section.sectionNumber)}`,
-        title: section.title,
+        id: `page-${slugify(sectionKey) || sectionIndex + 1}`,
+        title: section.title || section.sectionNumber || `Section ${sectionIndex + 1}`,
         sectionNumber: section.sectionNumber,
         components,
       },
@@ -155,14 +159,20 @@ const mapSectionToLesson = (section, media, options = {}) => {
   };
 };
 
-const mapChapter = (chapter, media, options = {}) => ({
-  id: `chapter-${chapter.chapterNumber}`,
+const mapChapter = (chapter, media, options = {}, chapterIndex = 0) => {
+  const chapterKey = chapter.chapterNumber || chapter.title || `chapter-${chapterIndex + 1}`;
+  return {
+  id: `chapter-${slugify(chapterKey) || chapterIndex + 1}`,
   chapterNumber: chapter.chapterNumber,
   title: chapter.title,
   description: chapter.introduction,
   outline: chapter.outline,
-  lessons: chapter.sections?.map((section) => mapSectionToLesson(section, media, options)) ?? [],
-});
+  lessons:
+    chapter.sections?.map((section, sectionIndex) =>
+      mapSectionToLesson(section, media, options, sectionIndex)
+    ) ?? [],
+  };
+};
 
 /**
  * Transforms Transformation Team output.json into the internal course model
@@ -292,7 +302,7 @@ const parseSectionHeading = (text) => {
 };
 
 const titleFromBookId = (bookId) => {
-  if (!bookId) return 'Biology 101';
+  if (!bookId) return 'Untitled Course';
   return bookId
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -305,13 +315,14 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   const learningObjectives = [];
   const media = {};
 
-  let chapterNumber = 1;
-  let chapterTitle = 'Introduction to Biology';
-  let sectionNumber = '1.1';
-  let sectionTitle = 'Themes and Concepts of Biology';
+  let chapterNumber = null;
+  let chapterTitle = '';
+  let sectionNumber = '';
+  let sectionTitle = '';
   let chapterIntro = '';
   let mediaIndex = 1;
   let captureLearningObjectives = false;
+  let sawSectionTitle = false;
 
   nodes.forEach((node) => {
     const type = node?.type;
@@ -331,6 +342,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       } else {
         sectionTitle = dataText;
       }
+      sawSectionTitle = true;
       return;
     }
 
@@ -339,7 +351,11 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       if (sectionMeta) {
         outline.push(sectionMeta.sectionTitle);
       } else {
-        content.push({ type: 'heading', text: dataText });
+        if (!chapterTitle) {
+          chapterTitle = dataText;
+        } else {
+          content.push({ type: 'heading', text: dataText });
+        }
       }
       return;
     }
@@ -389,25 +405,33 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     }
   });
 
-  const outputLike = {
-    bookId: 'biology-101',
-    media,
-    chapters: [
-      {
-        chapterNumber,
-        title: chapterTitle,
-        outline,
-        introduction: chapterIntro,
-        sections: [
+  const chapterSections =
+    sawSectionTitle || learningObjectives.length
+      ? [
           {
             sectionNumber,
             title: sectionTitle,
             learningObjectives,
             content,
           },
-        ],
-      },
-    ],
+        ]
+      : [];
+
+  const chapter =
+    chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
+      ? {
+          chapterNumber,
+          title: chapterTitle || (chapterNumber != null ? `Chapter ${chapterNumber}` : ''),
+          outline,
+          introduction: chapterIntro,
+          sections: chapterSections,
+        }
+      : null;
+
+  const outputLike = {
+    bookId: 'course',
+    media,
+    chapters: chapter ? [chapter] : [],
   };
 
   return {
@@ -418,8 +442,8 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         id: outputLike.bookId,
         title: titleFromBookId(outputLike.bookId),
         description: outputLike.chapters[0]?.introduction ?? '',
-        chapters: outputLike.chapters.map((chapter) =>
-          mapChapter(chapter, outputLike.media, options)
+        chapters: outputLike.chapters.map((chapter, chapterIndex) =>
+          mapChapter(chapter, outputLike.media, options, chapterIndex)
         ),
       },
     ],
@@ -439,10 +463,10 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
   const learningObjectives = [];
   const media = {};
 
-  let chapterNumber = 1;
-  let chapterTitle = 'Introduction to Biology';
-  let sectionNumber = '1.1';
-  let sectionTitle = 'Themes and Concepts of Biology';
+  let chapterNumber = null;
+  let chapterTitle = '';
+  let sectionNumber = '';
+  let sectionTitle = '';
   let chapterIntro = '';
   let nextImagePath = null;
   let captureLearningObjectives = false;
@@ -540,25 +564,33 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     chapterIntro = firstParagraph?.text ?? '';
   }
 
-  const outputLike = {
-    bookId: `biology-${String(chapterNumber).padStart(3, '0')}`,
-    media,
-    chapters: [
-      {
-        chapterNumber,
-        title: chapterTitle,
-        outline,
-        introduction: chapterIntro,
-        sections: [
+  const chapterSections =
+    sawSectionTitle || learningObjectives.length
+      ? [
           {
             sectionNumber,
             title: sectionTitle,
             learningObjectives,
             content,
           },
-        ],
-      },
-    ],
+        ]
+      : [];
+
+  const chapter =
+    chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
+      ? {
+          chapterNumber,
+          title: chapterTitle || (chapterNumber != null ? `Chapter ${chapterNumber}` : ''),
+          outline,
+          introduction: chapterIntro,
+          sections: chapterSections,
+        }
+      : null;
+
+  const outputLike = {
+    bookId: 'course',
+    media,
+    chapters: chapter ? [chapter] : [],
   };
 
   return {
@@ -569,8 +601,8 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
         id: outputLike.bookId,
         title: titleFromBookId(outputLike.bookId),
         description: outputLike.chapters[0]?.introduction ?? '',
-        chapters: outputLike.chapters.map((chapter) =>
-          mapChapter(chapter, outputLike.media, options)
+        chapters: outputLike.chapters.map((chapter, chapterIndex) =>
+          mapChapter(chapter, outputLike.media, options, chapterIndex)
         ),
       },
     ],
