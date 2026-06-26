@@ -270,14 +270,6 @@ const normalizeText = (value) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const pickCourseTitle = (...candidates) => {
-  for (const candidate of candidates) {
-    const normalized = normalizeText(candidate);
-    if (normalized) return normalized;
-  }
-  return '';
-};
-
 const extractLearningObjectives = (text) => {
   const normalized = normalizeText(text).replace(
     /^By the end of this section, you will be able to:\s*/i,
@@ -309,12 +301,13 @@ const parseSectionHeading = (text) => {
   return { sectionNumber: match[1], sectionTitle: match[2] };
 };
 
-const titleFromBookId = (bookId) => {
-  if (!bookId) return 'Untitled Course';
-  return bookId
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+const NON_TITLE_TOPIC_REGEX = [/^link to learning$/i, /^chapter outline$/i, /^learning objectives$/i];
+
+const canUseAsChapterTitle = (text) => {
+  const normalized = normalizeText(text);
+  if (!normalized) return false;
+  if (parseSectionHeading(normalized)) return false;
+  return !NON_TITLE_TOPIC_REGEX.some((pattern) => pattern.test(normalized));
 };
 
 const mapClassTemplateJson = (nodes, options = {}) => {
@@ -359,7 +352,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       if (sectionMeta) {
         outline.push(sectionMeta.sectionTitle);
       } else {
-        if (!chapterTitle) {
+        if (!chapterTitle && canUseAsChapterTitle(dataText)) {
           chapterTitle = dataText;
         } else {
           content.push({ type: 'heading', text: dataText });
@@ -429,7 +422,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
       ? {
           chapterNumber,
-          title: chapterTitle || (chapterNumber != null ? `Chapter ${chapterNumber}` : ''),
+          title: chapterTitle,
           outline,
           introduction: chapterIntro,
           sections: chapterSections,
@@ -438,7 +431,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 
   const outputLike = {
     bookId: slugify(chapterTitle) || 'course',
-    title: pickCourseTitle(chapterTitle, chapterIntro, sectionTitle),
+    title: chapterTitle,
     media,
     chapters: chapter ? [chapter] : [],
   };
@@ -449,7 +442,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     books: [
       {
         id: outputLike.bookId,
-        title: outputLike.title || titleFromBookId(outputLike.bookId),
+        title: outputLike.title,
         description: outputLike.chapters[0]?.introduction ?? '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)
@@ -497,16 +490,14 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
       continue;
     }
 
-    if (!tagType && paragraphTexts.length) {
-      const likelyTitle = paragraphTexts.find((text) => text.split(/\s+/).length <= 6);
-      if (likelyTitle && !sawSectionTitle) {
-        chapterTitle = likelyTitle;
+    if (tagType === 'topic' && joinedText) {
+      if (/^\d+(\.\d+)?\s+/.test(joinedText)) {
+        outline.push(joinedText.replace(/^\d+(\.\d+)?\s+/, '').trim());
+      } else if (!chapterTitle && canUseAsChapterTitle(joinedText)) {
+        chapterTitle = joinedText;
+      } else {
+        content.push({ type: 'heading', text: joinedText });
       }
-      continue;
-    }
-
-    if (tagType === 'topic' && joinedText && /^\d+(\.\d+)?\s+/.test(joinedText)) {
-      outline.push(joinedText.replace(/^\d+(\.\d+)?\s+/, '').trim());
       continue;
     }
 
@@ -589,7 +580,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
       ? {
           chapterNumber,
-          title: chapterTitle || (chapterNumber != null ? `Chapter ${chapterNumber}` : ''),
+          title: chapterTitle,
           outline,
           introduction: chapterIntro,
           sections: chapterSections,
@@ -598,7 +589,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
 
   const outputLike = {
     bookId: slugify(chapterTitle) || 'course',
-    title: pickCourseTitle(chapterTitle, chapterIntro, sectionTitle),
+    title: chapterTitle,
     media,
     chapters: chapter ? [chapter] : [],
   };
@@ -609,7 +600,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     books: [
       {
         id: outputLike.bookId,
-        title: outputLike.title || titleFromBookId(outputLike.bookId),
+        title: outputLike.title,
         description: outputLike.chapters[0]?.introduction ?? '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)

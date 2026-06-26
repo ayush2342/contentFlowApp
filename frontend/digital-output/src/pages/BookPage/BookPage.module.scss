@@ -1,3 +1,13 @@
+.page {
+  width: 100%;
+}
+
+.backRow {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 0 2rem 1rem;
+}
+
 .book {
   width: 100%;
 }
@@ -29,6 +39,16 @@
 .sectionTitle {
   color: var(--heading-color);
   margin-bottom: 1rem;
+}
+
+.outlineBlock {
+  margin-bottom: 1rem;
+}
+
+.outlineTitle {
+  color: var(--heading-color);
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
 }
 
 .list {

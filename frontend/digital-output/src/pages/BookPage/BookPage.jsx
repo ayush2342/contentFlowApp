@@ -27,46 +27,49 @@ const BookPage = () => {
   if (!book) return <p className={styles.error}>Book not found.</p>;
 
   return (
-    <div className={styles.book}>
-      <Link to={{ pathname: '/', search }} className={styles.back}>&larr; Back to Library</Link>
-      <h1 className={styles.title}>{book.title}</h1>
-      <p className={styles.description}>{book.description}</p>
-      {book.chapters?.length ? (
-        <div className={styles.contentStack}>
-          {book.chapters.map((chapter, chapterIndex) => (
-            <section key={chapter.id} className={styles.chapterSection}>
-              <h2 className={styles.sectionTitle}>
-                {chapter.chapterNumber ? `Chapter ${chapter.chapterNumber}: ` : ''}
-                {chapter.title || `Chapter ${chapterIndex + 1}`}
-              </h2>
-              {chapter.description ? <p className={styles.linkDesc}>{chapter.description}</p> : null}
-              {chapter.outline?.length ? (
-                <ul className={styles.list}>
-                  {chapter.outline.map((item) => (
-                    <li key={`${chapter.id}-${item}`} className={styles.linkDesc}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+    <div className={styles.page}>
+      <div className={styles.backRow}>
+        <Link to={{ pathname: '/', search }} className={styles.back}>
+          &larr; Back to Library
+        </Link>
+      </div>
+      <div className={styles.book}>
+        {book.chapters?.length ? (
+          <div className={styles.contentStack}>
+            {book.chapters.map((chapter, chapterIndex) => (
+              <section key={chapter.id} className={styles.chapterSection}>
+                <h2 className={styles.sectionTitle}>
+                  {chapter.chapterNumber ? `Chapter ${chapter.chapterNumber}` : `Chapter ${chapterIndex + 1}`}
+                  {chapter.title ? `: ${chapter.title}` : ''}
+                </h2>
 
-              {chapter.lessons?.length ? (
-                <div className={styles.lessonStack}>
-                  {chapter.lessons.map((lesson) => (
-                    <section key={lesson.id} className={styles.lessonSection}>
-                      <LessonRenderer page={lesson.pages?.[0]} />
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <p className={styles.linkDesc}>No section/lesson details provided for this chapter.</p>
-              )}
-            </section>
-          ))}
-        </div>
-      ) : (
-        <p className={styles.linkDesc}>No chapters provided in this payload.</p>
-      )}
+                {chapter.outline?.length ? (
+                  <div className={styles.outlineBlock}>
+                    <h3 className={styles.outlineTitle}>Chapter Outline</h3>
+                    <ul className={styles.list}>
+                      {chapter.outline.map((item) => (
+                        <li key={`${chapter.id}-${item}`} className={styles.linkDesc}>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {chapter.lessons?.length ? (
+                  <div className={styles.lessonStack}>
+                    {chapter.lessons.map((lesson) => (
+                      <section key={lesson.id} className={styles.lessonSection}>
+                        <LessonRenderer page={lesson.pages?.[0]} />
+                      </section>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

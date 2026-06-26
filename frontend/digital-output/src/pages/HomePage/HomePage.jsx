@@ -22,11 +22,13 @@ const HomePage = () => {
             to={{ pathname: `/book/${book.id}`, search }}
             className={styles.card}
           >
-            <h2>{book.title}</h2>
-            <p>{book.description}</p>
-            <span className={styles.chapters}>
-              {book.chapters?.length} chapters
-            </span>
+            {book.title ? <h2>{book.title}</h2> : null}
+            {book.description ? <p>{book.description}</p> : null}
+            {book.chapters?.length ? (
+              <span className={styles.chapters}>
+                {book.chapters.length} chapters
+              </span>
+            ) : null}
           </Link>
         ))}
       </div>
