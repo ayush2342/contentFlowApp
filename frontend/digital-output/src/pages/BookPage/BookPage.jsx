@@ -11,10 +11,15 @@ const BookPage = () => {
   const { bookId } = useParams();
   const location = useLocation();
   const search = location.search || '';
+  const searchParams = new URLSearchParams(search);
+  const selectedChapterId = searchParams.get('chapterId');
   const dispatch = useDispatch();
   const { loading, error, courseData } = useCourse();
 
   const book = findBook(courseData, bookId);
+  const chaptersToRender = selectedChapterId
+    ? (book?.chapters ?? []).filter((chapter) => chapter.id === selectedChapterId)
+    : (book?.chapters ?? []);
 
   useEffect(() => {
     if (book) {
@@ -30,13 +35,13 @@ const BookPage = () => {
     <div className={styles.page}>
       <div className={styles.backRow}>
         <Link to={{ pathname: '/', search }} className={styles.back}>
-          &larr; Back to Library
+          &larr; Back to Chapter Library
         </Link>
       </div>
       <div className={styles.book}>
-        {book.chapters?.length ? (
+        {chaptersToRender.length ? (
           <div className={styles.contentStack}>
-            {book.chapters.map((chapter, chapterIndex) => (
+            {chaptersToRender.map((chapter, chapterIndex) => (
               <section key={chapter.id} className={styles.chapterSection}>
                 <h2 className={styles.sectionTitle}>
                   {chapter.chapterNumber ? `Chapter ${chapter.chapterNumber}` : `Chapter ${chapterIndex + 1}`}
