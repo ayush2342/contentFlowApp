@@ -42,9 +42,6 @@ const ChapterPage = () => {
       <h1 className={styles.title}>
         {chapter.title || (chapter.chapterNumber != null ? `Chapter ${chapter.chapterNumber}` : 'Chapter')}
       </h1>
-      {chapter.description && (
-        <p className={styles.description}>{chapter.description}</p>
-      )}
       {chapter.outline?.length > 0 && (
         <div className={styles.outline}>
           <h2 className={styles.sectionTitle}>Chapter Outline</h2>

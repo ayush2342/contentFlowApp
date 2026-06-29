@@ -39,7 +39,6 @@ const HomePage = () => {
             className={styles.card}
           >
             <h2>{chapter.title}</h2>
-            {chapter.description ? <p>{chapter.description}</p> : null}
           </Link>
         ))}
       </div>

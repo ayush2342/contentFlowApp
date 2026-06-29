@@ -165,7 +165,7 @@ const mapChapter = (chapter, media, options = {}, chapterIndex = 0) => {
   id: `chapter-${slugify(chapterKey) || chapterIndex + 1}`,
   chapterNumber: chapter.chapterNumber,
   title: chapter.title,
-  description: chapter.introduction,
+  description: chapter.description || '',
   outline: chapter.outline,
   lessons:
     chapter.sections?.map((section, sectionIndex) =>
@@ -188,7 +188,7 @@ export const mapOutputJson = (output, options = {}) => {
       {
         id: output.bookId,
         title: formatBookTitle(output.bookId),
-        description: output.chapters?.[0]?.introduction ?? '',
+        description: output.description ?? '',
         chapters: output.chapters?.map((chapter) => mapChapter(chapter, media, options)) ?? [],
       },
     ],
@@ -311,7 +311,6 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   let chapterTitle = '';
   let sectionNumber = '';
   let sectionTitle = '';
-  let chapterIntro = '';
   let mediaIndex = 1;
   let captureLearningObjectives = false;
   let sawSectionTitle = false;
@@ -380,10 +379,6 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     }
 
     if (type === 'Text' && dataText) {
-      if (!chapterIntro) {
-        chapterIntro = dataText;
-      }
-
       if (captureLearningObjectives) {
         const objectives = extractLearningObjectives(dataText);
         if (objectives.length) {
@@ -410,12 +405,12 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       : [];
 
   const chapter =
-    chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
+    chapterTitle || chapterNumber != null || outline.length || chapterSections.length
       ? {
           chapterNumber,
           title: chapterTitle,
           outline,
-          introduction: chapterIntro,
+          description: '',
           sections: chapterSections,
         }
       : null;
@@ -434,7 +429,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       {
         id: outputLike.bookId,
         title: outputLike.title,
-        description: outputLike.chapters[0]?.introduction ?? '',
+        description: '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)
         ),
@@ -460,7 +455,6 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
   let chapterTitle = '';
   let sectionNumber = '';
   let sectionTitle = '';
-  let chapterIntro = '';
   let nextImagePath = null;
   let captureLearningObjectives = false;
   let mediaIndex = 1;
@@ -550,11 +544,6 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
     }
   }
 
-  if (!chapterIntro) {
-    const firstParagraph = content.find((item) => item.type === 'paragraph');
-    chapterIntro = firstParagraph?.text ?? '';
-  }
-
   const chapterSections =
     sawSectionTitle || learningObjectives.length
       ? [
@@ -568,12 +557,12 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
       : [];
 
   const chapter =
-    chapterTitle || chapterNumber != null || chapterIntro || outline.length || chapterSections.length
+    chapterTitle || chapterNumber != null || outline.length || chapterSections.length
       ? {
           chapterNumber,
           title: chapterTitle,
           outline,
-          introduction: chapterIntro,
+          description: '',
           sections: chapterSections,
         }
       : null;
@@ -592,7 +581,7 @@ export const mapTreeOutputJson = (treeNodes, options = {}) => {
       {
         id: outputLike.bookId,
         title: outputLike.title,
-        description: outputLike.chapters[0]?.introduction ?? '',
+        description: '',
         chapters: outputLike.chapters.map((chapter, chapterIndex) =>
           mapChapter(chapter, outputLike.media, options, chapterIndex)
         ),
