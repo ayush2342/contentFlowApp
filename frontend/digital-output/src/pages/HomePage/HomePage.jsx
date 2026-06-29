@@ -5,30 +5,40 @@ import styles from './HomePage.module.scss';
 const HomePage = () => {
   const { loading, error, courseData } = useCourse();
   const location = useLocation();
-  const search = location.search || '';
+
+  const chapterCards =
+    courseData?.books?.flatMap((book) =>
+      (book.chapters ?? []).map((chapter, index) => {
+        const chapterTitle =
+          `${chapter.chapterNumber ? `Chapter ${chapter.chapterNumber}` : `Chapter ${index + 1}`}${
+            chapter.title ? `: ${chapter.title}` : ''
+          }`;
+
+        return {
+          id: chapter.id,
+          title: chapterTitle,
+          description: chapter.description || '',
+          search: location.search || '',
+        };
+      })
+    ) ?? [];
 
   if (loading) return <p className={styles.status}>Loading course...</p>;
   if (error) return <p className={styles.error}>{error}</p>;
 
   return (
     <div className={styles.home}>
-      <h1 className={styles.title}>Course Library</h1>
-      <p className={styles.subtitle}>Select a book to begin your learning journey.</p>
+      <h1 className={styles.title}>Chapter Library</h1>
+      <p className={styles.subtitle}>Select a chapter to open full details.</p>
 
       <div className={styles.grid}>
-        {courseData?.books?.map((book) => (
+        {chapterCards.map((chapter) => (
           <Link
-            key={book.id}
-            to={{ pathname: `/book/${book.id}`, search }}
+            key={chapter.id}
+            to={{ pathname: `/chapter/${chapter.id}`, search: chapter.search }}
             className={styles.card}
           >
-            {book.title ? <h2>{book.title}</h2> : null}
-            {book.description ? <p>{book.description}</p> : null}
-            {book.chapters?.length ? (
-              <span className={styles.chapters}>
-                {book.chapters.length} chapters
-              </span>
-            ) : null}
+            <h2>{chapter.title}</h2>
           </Link>
         ))}
       </div>

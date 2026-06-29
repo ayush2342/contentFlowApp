@@ -4,7 +4,6 @@ import { useDispatch } from 'react-redux';
 import { useCourse } from '../../hooks/useCourse';
 import { findChapter } from '../../utils/findInCourse';
 import {
-  setSelectedBook,
   setSelectedChapter,
   setSelectedLesson,
 } from '../../features/course/courseSlice';
@@ -19,16 +18,14 @@ const ChapterPage = () => {
   const { loading, error, courseData } = useCourse();
 
   const result = findChapter(courseData, chapterId);
-  const book = result?.book;
   const chapter = result?.chapter;
 
   useEffect(() => {
-    if (book && chapter) {
-      dispatch(setSelectedBook(book));
+    if (chapter) {
       dispatch(setSelectedChapter(chapter));
       dispatch(setSelectedLesson(null));
     }
-  }, [book, chapter, dispatch]);
+  }, [chapter, dispatch]);
 
   if (loading) return <p className={styles.status}>Loading...</p>;
   if (error) return <p className={styles.error}>{error}</p>;
@@ -36,16 +33,15 @@ const ChapterPage = () => {
 
   return (
     <div className={styles.chapter}>
-      <Link to={{ pathname: `/book/${book.id}`, search }} className={styles.back}>
-        &larr; Back to {book.title}
+      <Link to={{ pathname: '/', search }} className={styles.back}>
+        &larr; Back to Chapter Library
       </Link>
       {chapter.chapterNumber != null && (
         <p className={styles.meta}>Chapter {chapter.chapterNumber}</p>
       )}
-      <h1 className={styles.title}>{chapter.title}</h1>
-      {chapter.description && (
-        <p className={styles.description}>{chapter.description}</p>
-      )}
+      <h1 className={styles.title}>
+        {chapter.title || (chapter.chapterNumber != null ? `Chapter ${chapter.chapterNumber}` : 'Chapter')}
+      </h1>
       {chapter.outline?.length > 0 && (
         <div className={styles.outline}>
           <h2 className={styles.sectionTitle}>Chapter Outline</h2>
