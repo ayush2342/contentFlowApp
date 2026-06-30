@@ -18,9 +18,6 @@ const MainLayout = () => {
       <main className={styles.main}>
         <Outlet />
       </main>
-      <footer className={styles.footer}>
-        <p>&copy; 2026 ContentFlow Biology Course</p>
-      </footer>
     </div>
   );
 };
