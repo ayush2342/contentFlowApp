@@ -4,7 +4,33 @@
 // Exports output.pdf in the SAME folder as this script.
 // =============================================================================
 
-/* global app, File, Folder, ExportFormat, FitOptions, UserInteractionLevels, ColorModel, ColorSpace */
+/* global app, File, Folder, ExportFormat, FitOptions, UserInteractionLevels, ColorModel, ColorSpace, SaveOptions, PagesPerDocumentOptions, MeasurementUnits */
+
+// -----------------------------------------------------------------------------
+// Layout mode: true = create frames from proto:* prototypes (Option B)
+//             false = fill pre-numbered frames (lessonTitle1, text2, …)
+// -----------------------------------------------------------------------------
+var USE_DYNAMIC_LAYOUT = true;
+
+var DYNAMIC_LAYOUT = {
+    protoPrefix: "proto:",
+    // Spacing values are expressed in POINTS. The document ruler is forced to
+    // points in normalizeDocumentForDynamicLayout() so these stay consistent
+    // regardless of the template's saved measurement units.
+    blockGap: 6,            // ~8px / 0.5rem uniform gap between every block
+    imageCaptionGap: 6,
+    prototypeOffPageTop: -2000,
+    minTextFrameHeight: 24,
+    defaultImageFrameHeight: 180
+};
+
+var layoutState = null;
+var contentLayer = null;
+
+var PROTOTYPE_TEXT_FALLBACK = "proto:text";
+var POPULATE_SCRIPT_VERSION = "dynamic-v14";
+var prototypeMetrics = {};
+var scriptLogFolderPath = "";
 
 // -----------------------------------------------------------------------------
 // Run headless (no popups/dialogs on server)
@@ -24,10 +50,63 @@ function trimString(value) {
 
 function writeTextFile(filePath, content) {
     var f = File(filePath);
+    var parentFolder;
+
+    try {
+        parentFolder = f.parent;
+        if (parentFolder && !parentFolder.exists) {
+            parentFolder.create();
+        }
+    } catch (folderError) {}
+
     if (f.open("w")) {
         f.write(content);
         f.close();
+        return true;
     }
+
+    return false;
+}
+
+function buildRenderLogText(status, extraLines) {
+    var logText = "";
+    var w;
+
+    logText = "Render log status: " + (status || "in-progress") + "\n";
+    logText += "Script version: " + POPULATE_SCRIPT_VERSION + "\n";
+    if (scriptLogFolderPath) {
+        logText += "Log folder: " + scriptLogFolderPath + "\n";
+        logText += "render.log: " + scriptLogFolderPath + "/render.log\n";
+        logText += "error.log:  " + scriptLogFolderPath + "/error.log\n";
+        logText += "output.pdf: " + scriptLogFolderPath + "/output.pdf\n";
+    }
+    logText += "Updated: " + new Date().toString() + "\n";
+
+    if (extraLines) {
+        logText += "\n" + extraLines + "\n";
+    }
+
+    if (renderLogEntries.length > 0) {
+        logText += "\nBlock mapping log:\n";
+        for (w = 0; w < renderLogEntries.length; w++) {
+            logText += renderLogEntries[w] + "\n";
+        }
+    }
+
+    return logText;
+}
+
+function flushRenderLog(status, extraLines) {
+    var logText;
+    var written;
+
+    if (!scriptLogFolderPath) {
+        return false;
+    }
+
+    logText = buildRenderLogText(status, extraLines);
+    written = writeTextFile(scriptLogFolderPath + "/render.log", logText);
+    return written;
 }
 
 function logInfo(scriptFolderPath, message) {
@@ -37,8 +116,16 @@ function logInfo(scriptFolderPath, message) {
 }
 
 function logError(scriptFolderPath, message) {
+    var errorText;
+
     try {
-        writeTextFile(scriptFolderPath + "/error.log", message);
+        errorText = message;
+        if (renderLogEntries.length > 0) {
+            errorText += "\n\nPartial block mapping log:\n";
+            errorText += buildRenderLogText("failed").split("Block mapping log:\n").pop();
+        }
+        writeTextFile(scriptFolderPath + "/error.log", errorText);
+        flushRenderLog("failed", message);
     } catch (e) {}
 }
 
@@ -259,6 +346,7 @@ function parseJSON(text) {
 // -----------------------------------------------------------------------------
 var FRAME_STYLES = {
     lessonNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
+    lessonTitle: { pointSize: 24, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
     chapterOverview: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
     topic: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
     text: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
@@ -266,24 +354,110 @@ var FRAME_STYLES = {
     imageCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] }
 };
 
-var TYPE_TO_STYLE = {
-    LessonNumber: FRAME_STYLES.lessonNumber,
-    ChapterOverview: FRAME_STYLES.chapterOverview,
-    Topic: FRAME_STYLES.topic,
-    Text: FRAME_STYLES.text,
-    SectionTitle: FRAME_STYLES.sectionTitle
-};
-
-var TYPE_TO_LABEL_PREFIX = {
-    LessonNumber: "lessonNumber",
-    ChapterOverview: "chapterOverview",
-    Topic: "topic",
-    Text: "text",
-    SectionTitle: "sectionTitle"
+var BLOCK_REGISTRY = {
+    LessonNumber: {
+        label: "lessonNumber",
+        style: FRAME_STYLES.lessonNumber,
+        kind: "text",
+        prototype: "proto:lessonNumber",
+        spacingAfter: 8
+    },
+    LessonTitle: {
+        label: "lessonTitle",
+        style: FRAME_STYLES.lessonTitle,
+        kind: "text",
+        prototype: "proto:lessonTitle",
+        spacingAfter: 16
+    },
+    ChapterOverview: {
+        label: "chapterOverview",
+        style: FRAME_STYLES.chapterOverview,
+        kind: "text",
+        prototype: "proto:chapterOverview",
+        spacingAfter: 8
+    },
+    Topic: {
+        label: "topic",
+        style: FRAME_STYLES.topic,
+        kind: "text",
+        prototype: "proto:topic",
+        spacingAfter: 6
+    },
+    SectionTitle: {
+        label: "sectionTitle",
+        style: FRAME_STYLES.sectionTitle,
+        kind: "text",
+        prototype: "proto:sectionTitle",
+        spacingAfter: 14
+    },
+    Text: {
+        label: "text",
+        style: FRAME_STYLES.text,
+        kind: "text",
+        prototype: "proto:text",
+        spacingAfter: 12
+    },
+    Image: {
+        frameLabel: "imageFrame",
+        captionLabel: "imageCaption",
+        framePrototype: "proto:imageFrame",
+        captionPrototype: "proto:imageCaption",
+        style: FRAME_STYLES.imageCaption,
+        kind: "image",
+        spacingAfter: 14
+    }
 };
 
 var warnings = [];
 var populatedCount = 0;
+var usedLabels = {};
+var renderLogEntries = [];
+
+function appendRenderLog(line) {
+    renderLogEntries.push(String(line));
+}
+
+function markLabelUsed(labelName) {
+    var label = trimString(labelName || "");
+    if (label) {
+        usedLabels[label] = true;
+    }
+}
+
+function buildTextFrameLabel(labelPrefix, blockIndex) {
+    return labelPrefix + blockIndex;
+}
+
+function getBlockTypeCount(typeCounts, itemType) {
+    if (!typeCounts[itemType]) {
+        typeCounts[itemType] = 0;
+    }
+    typeCounts[itemType] += 1;
+    return typeCounts[itemType];
+}
+
+function logUnsupportedBlockType(itemType) {
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: " + itemType);
+    appendRenderLog("Resolved Script Label: (unsupported)");
+    appendRenderLog("Status: not populated — unsupported block type");
+    warnings.push('Skipped unknown block type: "' + itemType + '".');
+}
+
+function populateTextBlock(document, registryEntry, itemType, data, blockIndex) {
+    var frameLabel = buildTextFrameLabel(registryEntry.label, blockIndex);
+    var text = data.text || "";
+
+    populateFrame(document, frameLabel, text, registryEntry.style, itemType);
+}
+
+function populateImageBlock(document, registryEntry, data, blockIndex, scriptFolder) {
+    var frameLabel = buildTextFrameLabel(registryEntry.frameLabel, blockIndex);
+    var captionLabel = buildTextFrameLabel(registryEntry.captionLabel, blockIndex);
+
+    placeImageInFrame(document, frameLabel, data.url, scriptFolder, blockIndex, "Image");
+    populateFrame(document, captionLabel, data.caption, registryEntry.style, "ImageCaption");
+}
 
 // -----------------------------------------------------------------------------
 // Frame lookup helpers
@@ -310,17 +484,263 @@ function findTextFrameByLabel(document, labelName) {
     return null;
 }
 
-function clearLabeledTextFrames(document) {
+function clearGraphicsFromFrame(frame) {
+    try {
+        if (frame.graphics && frame.graphics.length > 0) {
+            frame.graphics.everyItem().remove();
+        }
+    } catch (removeError) {
+        try {
+            while (frame.graphics.length > 0) {
+                frame.graphics[0].remove();
+            }
+        } catch (loopError) {}
+    }
+}
+
+function clearLabeledImageFrames(document) {
+    var i;
+    var item;
+    var label;
+    var allItems = document.allPageItems;
+
+    for (i = 0; i < allItems.length; i++) {
+        item = allItems[i];
+        label = trimString(getItemLabel(item));
+        if (!label) {
+            continue;
+        }
+
+        try {
+            if (typeof item.place !== "function") {
+                continue;
+            }
+        } catch (placeCheckError) {
+            continue;
+        }
+
+        clearGraphicsFromFrame(item);
+    }
+}
+
+function prepareTemplateForJson(document) {
     var i;
     var frame;
     var label;
+    var clearedStories = {};
+    var story;
+    var storyId;
 
     for (i = 0; i < document.textFrames.length; i++) {
         frame = document.textFrames[i];
         label = trimString(getItemLabel(frame));
-        if (label) {
-            frame.contents = "";
+        if (!label) {
+            continue;
         }
+
+        try {
+            frame.contents = "";
+        } catch (clearFrameError) {}
+
+        story = frame.parentStory;
+        if (!story) {
+            continue;
+        }
+
+        try {
+            storyId = story.id;
+        } catch (idError) {
+            storyId = "story-" + i;
+        }
+
+        if (!clearedStories[storyId]) {
+            try {
+                story.contents = "";
+            } catch (clearStoryError) {}
+            clearedStories[storyId] = true;
+        }
+    }
+
+    clearLabeledImageFrames(document);
+}
+
+function fitTextFrameToContent(textFrame) {
+    try {
+        textFrame.fit(FitOptions.FRAME_TO_CONTENT);
+        return;
+    } catch (fitErrorA) {}
+
+    try {
+        textFrame.fit(FitOptions.frameToContent);
+    } catch (fitErrorB) {}
+}
+
+function collapseUnusedLabeledFrames(document) {
+    var i;
+    var item;
+    var label;
+    var frame;
+    var allItems = document.allPageItems;
+
+    for (i = 0; i < document.textFrames.length; i++) {
+        frame = document.textFrames[i];
+        label = trimString(getItemLabel(frame));
+        if (!label || usedLabels[label]) {
+            continue;
+        }
+
+        try {
+            frame.contents = "";
+        } catch (clearFrameError) {}
+        fitTextFrameToContent(frame);
+    }
+
+    for (i = 0; i < allItems.length; i++) {
+        item = allItems[i];
+        label = trimString(getItemLabel(item));
+        if (!label || usedLabels[label]) {
+            continue;
+        }
+
+        try {
+            if (typeof item.place !== "function") {
+                continue;
+            }
+        } catch (placeCheckError) {
+            continue;
+        }
+
+        clearGraphicsFromFrame(item);
+    }
+}
+
+function pageHasContentLayerContent(page) {
+    var items;
+    var i;
+    var item;
+    var label;
+
+    try {
+        items = page.pageItems;
+    } catch (pageItemsError) {
+        return false;
+    }
+
+    for (i = 0; i < items.length; i++) {
+        item = items[i];
+        label = trimString(getItemLabel(item));
+        if (isPrototypeLabel(label)) {
+            continue;
+        }
+        if (itemHasVisibleContent(item)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function itemHasVisibleContent(item) {
+    try {
+        if (item.overflows === true) {
+            return true;
+        }
+    } catch (overflowFlagError) {}
+
+    try {
+        if (item.nextTextFrame || item.previousTextFrame) {
+            return true;
+        }
+    } catch (threadFlagError) {}
+
+    try {
+        if (item.contents !== undefined && trimString(String(item.contents)) !== "") {
+            return true;
+        }
+    } catch (contentsError) {}
+
+    try {
+        if (item.graphics && item.graphics.length > 0) {
+            return true;
+        }
+    } catch (graphicsError) {}
+
+    return false;
+}
+
+function pageHasVisibleContent(page) {
+    return pageHasContentLayerContent(page);
+}
+
+function removeAllRuntimeContent(document) {
+    var i;
+    var item;
+    var label;
+    var toRemove = [];
+
+    for (i = 0; i < document.allPageItems.length; i++) {
+        item = document.allPageItems[i];
+        label = trimString(getItemLabel(item));
+        if (isPrototypeLabel(label)) {
+            continue;
+        }
+        toRemove.push(item);
+    }
+
+    for (i = toRemove.length - 1; i >= 0; i--) {
+        try {
+            toRemove[i].remove();
+        } catch (removeError) {}
+    }
+}
+
+function removeAllEmptyPages(document) {
+    var i;
+    var page;
+    var removed;
+
+    do {
+        removed = false;
+        for (i = document.pages.length - 1; i >= 0; i--) {
+            if (document.pages.length <= 1) {
+                break;
+            }
+            page = document.pages[i];
+            if (!pageHasContentLayerContent(page)) {
+                page.remove();
+                removed = true;
+            }
+        }
+    } while (removed);
+}
+
+function removeTrailingEmptyPages(document) {
+    var lastPage;
+
+    while (document.pages.length > 1) {
+        lastPage = document.pages[document.pages.length - 1];
+        if (pageHasVisibleContent(lastPage)) {
+            break;
+        }
+        lastPage.remove();
+    }
+}
+
+function removeInteriorEmptyPages(document) {
+    removeAllEmptyPages(document);
+}
+
+function setPrototypesLayerNonPrinting(document) {
+    var i;
+    var layer;
+
+    for (i = 0; i < document.layers.length; i++) {
+        layer = document.layers[i];
+        try {
+            if (layer.name === "Prototypes") {
+                layer.printable = false;
+            }
+        } catch (layerError) {}
     }
 }
 
@@ -411,29 +831,221 @@ function fitFrameToContent(frame) {
     } catch (fitErrorB) {}
 }
 
-function placeImageInFrame(document, labelName, urlOrPath, scriptFolder, imageIndex) {
+function logImagePlacementDiagnostics(frame, contextLabel) {
+    var bounds;
+    var graphic;
+    var graphicBounds;
+    var i;
+    var layerName = "(unknown)";
+
+    appendRenderLog("Image diagnostics: " + contextLabel);
+
+    try {
+        bounds = frame.geometricBounds;
+        appendRenderLog(
+            "  frame geometricBounds: [" +
+            bounds[0] + ", " + bounds[1] + ", " +
+            bounds[2] + ", " + bounds[3] + "]"
+        );
+    } catch (frameBoundsError) {
+        appendRenderLog("  frame geometricBounds: (unavailable)");
+    }
+
+    try {
+        appendRenderLog("  graphics.length: " + frame.graphics.length);
+        for (i = 0; i < frame.graphics.length; i++) {
+            graphic = frame.graphics[i];
+            graphicBounds = graphic.geometricBounds;
+            appendRenderLog(
+                "  graphic[" + i + "] geometricBounds: [" +
+                graphicBounds[0] + ", " + graphicBounds[1] + ", " +
+                graphicBounds[2] + ", " + graphicBounds[3] + "]"
+            );
+            appendRenderLog("  graphic[" + i + "] horizontalScale: " + graphic.horizontalScale);
+            appendRenderLog("  graphic[" + i + "] verticalScale: " + graphic.verticalScale);
+            appendRenderLog("  graphic[" + i + "] rotationAngle: " + graphic.rotationAngle);
+            appendRenderLog("  graphic[" + i + "] absoluteHorizontalScale: " + graphic.absoluteHorizontalScale);
+            appendRenderLog("  graphic[" + i + "] absoluteVerticalScale: " + graphic.absoluteVerticalScale);
+        }
+    } catch (graphicsError) {
+        appendRenderLog("  graphics.length: 0");
+    }
+
+    try {
+        layerName = frame.itemLayer.name;
+    } catch (layerError) {}
+    appendRenderLog("  frame layer: " + layerName);
+
+    try {
+        appendRenderLog("  frame visible: " + frame.visible);
+    } catch (visibleError) {}
+}
+
+function ensureGraphicFrameVisible(frame) {
+    assignFrameToContentLayer(frame);
+
+    try {
+        if (contentLayer) {
+            contentLayer.visible = true;
+            contentLayer.printable = true;
+            frame.itemLayer = contentLayer;
+        }
+    } catch (layerError) {}
+
+    try {
+        frame.visible = true;
+    } catch (visibleError) {}
+
+    try {
+        frame.locked = false;
+    } catch (lockError) {}
+
+    try {
+        frame.bringToFront();
+    } catch (zOrderError) {}
+}
+
+function fitPlacedImageInFrame(frame, savedBounds) {
+    var fitResults = [];
+    var bounds;
+    var frameHeight;
+    var minHeight = 48;
+
+    try {
+        frame.fit(FitOptions.PROPORTIONALLY);
+        fitResults.push("PROPORTIONALLY:ok");
+    } catch (fitErrorA) {
+        try {
+            frame.fit(FitOptions.proportionally);
+            fitResults.push("PROPORTIONALLY:ok");
+        } catch (fitErrorA2) {
+            fitResults.push("PROPORTIONALLY:fail");
+        }
+    }
+    logImagePlacementDiagnostics(frame, "after PROPORTIONALLY");
+
+    try {
+        frame.fit(FitOptions.CENTER_CONTENT);
+        fitResults.push("CENTER_CONTENT:ok");
+    } catch (fitErrorB) {
+        try {
+            frame.fit(FitOptions.centerContent);
+            fitResults.push("CENTER_CONTENT:ok");
+        } catch (fitErrorB2) {
+            fitResults.push("CENTER_CONTENT:fail");
+        }
+    }
+    logImagePlacementDiagnostics(frame, "after CENTER_CONTENT");
+
+    try {
+        bounds = frame.geometricBounds;
+        frameHeight = bounds[2] - bounds[0];
+        if (savedBounds && savedBounds.length === 4 && frameHeight < minHeight) {
+            frame.geometricBounds = savedBounds;
+            try {
+                frame.fit(FitOptions.PROPORTIONALLY);
+                fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:ok");
+            } catch (restoreFitError) {
+                try {
+                    frame.fit(FitOptions.proportionally);
+                    fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:ok");
+                } catch (restoreFitError2) {
+                    fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:fail");
+                }
+            }
+            logImagePlacementDiagnostics(frame, "after RESTORE_BOUNDS+PROPORTIONALLY");
+        }
+    } catch (collapseCheckError) {}
+
+    return fitResults.join(", ");
+}
+
+function placeImageContentInFrame(frame, imageFile) {
+    var savedBounds;
+    var graphicsCount = 0;
+    var fittingResult;
+
+    savedBounds = frame.geometricBounds;
+    clearGraphicsFromFrame(frame);
+    frame.place(imageFile);
+
+    try {
+        graphicsCount = frame.graphics.length;
+    } catch (graphicsCountError) {}
+
+    appendRenderLog("Image graphics after place: " + graphicsCount);
+
+    if (graphicsCount < 1) {
+        warnings.push('Image place completed but frame has no graphics for "' + imageFile.fsName + '".');
+        appendRenderLog("Image fitting result: skipped (no graphic)");
+        logImagePlacementDiagnostics(frame, "after place (no graphic)");
+        return false;
+    }
+
+    logImagePlacementDiagnostics(frame, "after place (before fit)");
+
+    fittingResult = fitPlacedImageInFrame(frame, savedBounds);
+    appendRenderLog("Image fitting result: " + fittingResult);
+
+    ensureGraphicFrameVisible(frame);
+    logImagePlacementDiagnostics(frame, "after fit");
+
+    try {
+        if (frame.graphics.length < 1) {
+            warnings.push("Image graphic missing after fitting for \"" + imageFile.fsName + "\".");
+            return false;
+        }
+    } catch (postFitGraphicsError) {
+        return false;
+    }
+
+    return true;
+}
+
+function placeImageInFrame(document, labelName, urlOrPath, scriptFolder, imageIndex, blockType) {
     var frame;
     var imageFile;
+    var itemType = blockType || "Image";
 
-    if (!urlOrPath) return;
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: " + itemType);
+    appendRenderLog("Resolved Script Label: " + labelName);
+    appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
+
+    if (!urlOrPath) {
+        appendRenderLog("Frame found: n/a");
+        appendRenderLog("Status: not populated — empty image url in JSON");
+        return;
+    }
 
     frame = findPlaceableFrameByLabel(document, labelName);
     if (frame === null) {
+        appendRenderLog("Frame found: no");
+        appendRenderLog("Status: not populated — graphic frame not found in template");
         warnings.push('Skipped "' + labelName + '": graphic frame not found.');
         return;
     }
 
+    appendRenderLog("Frame found: yes");
+
     imageFile = resolveImageFile(urlOrPath, scriptFolder, imageIndex);
     if (imageFile === null) {
+        appendRenderLog("Status: not populated — image file not found on disk");
         warnings.push('Image file not found for "' + urlOrPath + '".');
         return;
     }
 
     try {
-        frame.place(imageFile);
-        fitFrameToContent(frame);
+        if (!placeImageContentInFrame(frame, imageFile)) {
+            appendRenderLog("Status: not populated — graphic not visible after place/fit");
+            return;
+        }
+        markLabelUsed(labelName);
         populatedCount += 1;
+        appendRenderLog("Resolved image file: " + imageFile.fsName);
+        appendRenderLog("Status: populated");
     } catch (placeError) {
+        appendRenderLog("Status: not populated — " + placeError.message);
         warnings.push('Could not place image "' + imageFile.fsName + '": ' + placeError.message);
     }
 }
@@ -550,94 +1162,1433 @@ function applyFrameStyle(textFrame, style) {
     }
 }
 
-function populateFrame(document, labelName, textContent, style) {
+function populateFrame(document, labelName, textContent, style, blockType) {
     var frame;
     var cleanText = trimString(textContent || "");
+    var itemType = blockType || "Text";
 
-    if (!cleanText) return;
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: " + itemType);
+    appendRenderLog("Resolved Script Label: " + labelName);
+    appendRenderLog("Text length: " + cleanText.length);
+
+    if (!cleanText) {
+        appendRenderLog("Frame found: n/a");
+        appendRenderLog("Status: not populated — empty text in JSON");
+        return;
+    }
 
     frame = findTextFrameByLabel(document, labelName);
     if (frame === null) {
+        appendRenderLog("Frame found: no");
+        appendRenderLog("Status: not populated — text frame not found in template");
         warnings.push('Skipped "' + labelName + '": text frame not found.');
         return;
     }
 
+    appendRenderLog("Frame found: yes");
+
     frame.contents = cleanText;
     applyFrameStyle(frame, style);
+    markLabelUsed(labelName);
     populatedCount += 1;
+    appendRenderLog("Status: populated");
 }
 
 // -----------------------------------------------------------------------------
-// Populate blocks in order
+// Dynamic layout (Option B) — create frames from proto:* prototypes
 // -----------------------------------------------------------------------------
-function resolveTextFrameLabel(document, baseLabel, index) {
-    var numberedLabel = baseLabel + index;
+function ensureContentLayer(document) {
+    var layer;
 
-    if (findTextFrameByLabel(document, numberedLabel) !== null) {
-        return numberedLabel;
-    }
+    try {
+        layer = document.layers.itemByName("Content");
+        layer.name;
+        return layer;
+    } catch (missingLayer) {}
 
-    if (index === 1 && findTextFrameByLabel(document, baseLabel) !== null) {
-        return baseLabel;
-    }
-
-    return numberedLabel;
+    layer = document.layers.add();
+    layer.name = "Content";
+    return layer;
 }
 
+function assignFrameToContentLayer(frame) {
+    if (!contentLayer || !frame) {
+        return;
+    }
+
+    try {
+        frame.itemLayer = contentLayer;
+    } catch (layerError) {}
+}
+
+function getBlockText(data) {
+    var fields;
+    var i;
+    var value;
+
+    if (!data) {
+        return "";
+    }
+
+    fields = ["text", "title", "label", "content", "value"];
+    for (i = 0; i < fields.length; i++) {
+        if (data[fields[i]] !== undefined && data[fields[i]] !== null) {
+            value = trimString(data[fields[i]]);
+            if (value) {
+                return value;
+            }
+        }
+    }
+
+    return "";
+}
+
+function normalizeBlockType(itemType) {
+    var compact;
+    var aliases;
+
+    compact = trimString(itemType || "").replace(/\s+/g, "").toLowerCase();
+    aliases = {
+        lessonnumber: "LessonNumber",
+        lessontitle: "LessonTitle",
+        chapteroverview: "ChapterOverview",
+        topic: "Topic",
+        sectiontitle: "SectionTitle",
+        text: "Text",
+        image: "Image"
+    };
+
+    if (aliases[compact]) {
+        return aliases[compact];
+    }
+
+    return trimString(itemType || "");
+}
+
+function normalizeDocumentForDynamicLayout(document) {
+    // Force the ruler to points so all spacing constants (blockGap, seed/min
+    // heights) and geometricBounds math behave in points instead of the
+    // template's saved units (e.g. picas), which caused oversized gaps.
+    try {
+        document.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.POINTS;
+        document.viewPreferences.verticalMeasurementUnits = MeasurementUnits.POINTS;
+    } catch (measurementUnitError) {}
+
+    try {
+        document.documentPreferences.facingPages = false;
+    } catch (facingError) {}
+
+    try {
+        document.documentPreferences.pagesPerDocument = PagesPerDocumentOptions.SINGLE_PAGE;
+    } catch (pagesError) {}
+}
+
+function saveLastInputJson(scriptFolderPath, contentItems) {
+    try {
+        writeTextFile(scriptFolderPath + "/last-input.json", JSON.stringify(contentItems, null, 2));
+    } catch (saveError) {}
+}
+
+function resolveRegistryEntry(itemType) {
+    var key;
+    var normalized = normalizeBlockType(itemType);
+
+    if (BLOCK_REGISTRY[normalized]) {
+        return BLOCK_REGISTRY[normalized];
+    }
+
+    for (key in BLOCK_REGISTRY) {
+        if (BLOCK_REGISTRY.hasOwnProperty(key) && key.toLowerCase() === normalized.toLowerCase()) {
+            return BLOCK_REGISTRY[key];
+        }
+    }
+
+    return null;
+}
+
+function isPlaceholderText(text) {
+    var normalized = trimString(text).toLowerCase();
+    return normalized === "click or tap here to enter text." ||
+        normalized === "click or tap here to enter text" ||
+        normalized.indexOf("click or tap here") === 0;
+}
+
+function logJsonBlockSummary(contentItems) {
+    var i;
+    var item;
+    var preview;
+
+    appendRenderLog("JSON block summary:");
+    for (i = 0; i < contentItems.length; i++) {
+        item = contentItems[i];
+        preview = getBlockText(item.data || {});
+        if (preview.length > 60) {
+            preview = preview.substring(0, 60) + "...";
+        }
+        appendRenderLog(
+            "  " + (i + 1) + ". " + item.type +
+            (preview ? ' text="' + preview + '"' : " (EMPTY - will skip)")
+        );
+    }
+}
+
+function cachePrototypeMetrics(document) {
+    var i;
+    var item;
+    var label;
+    var bounds;
+    var allItems = document.allPageItems;
+
+    prototypeMetrics = {};
+
+    for (i = 0; i < allItems.length; i++) {
+        item = allItems[i];
+        label = trimString(getItemLabel(item));
+        if (!isPrototypeLabel(label)) {
+            continue;
+        }
+
+        try {
+            bounds = item.geometricBounds;
+            prototypeMetrics[label] = {
+                height: Math.max(bounds[2] - bounds[0], DYNAMIC_LAYOUT.minTextFrameHeight),
+                width: bounds[3] - bounds[1]
+            };
+        } catch (metricError) {
+            prototypeMetrics[label] = {
+                height: DYNAMIC_LAYOUT.minTextFrameHeight,
+                width: 0
+            };
+        }
+    }
+}
+
+function getPrototypeHeight(protoLabel, fallbackHeight) {
+    var metrics = prototypeMetrics[protoLabel];
+    if (metrics && metrics.height) {
+        return metrics.height;
+    }
+    return fallbackHeight;
+}
+
+function getDynamicTextSeedHeight(protoLabel, usedFallbackLabel) {
+    var height = getPrototypeHeight(protoLabel, DYNAMIC_LAYOUT.minTextFrameHeight);
+
+    if (usedFallbackLabel) {
+        height = Math.min(height, getPrototypeHeight(usedFallbackLabel, height));
+    }
+
+    height = Math.max(height, DYNAMIC_LAYOUT.minTextFrameHeight);
+    if (height > 120) {
+        height = 120;
+    }
+
+    return height;
+}
+
+function clearPrototypeFrameContents(document) {
+    var i;
+    var item;
+    var label;
+
+    for (i = 0; i < document.allPageItems.length; i++) {
+        item = document.allPageItems[i];
+        label = trimString(getItemLabel(item));
+        if (!isPrototypeLabel(label)) {
+            continue;
+        }
+
+        try {
+            if (item.contents !== undefined) {
+                item.contents = "";
+            }
+        } catch (clearError) {}
+
+        try {
+            clearGraphicsFromFrame(item);
+        } catch (graphicError) {}
+    }
+}
+
+function resolveTextPrototype(document, protoLabel) {
+    var frame = findPageItemByLabel(document, protoLabel);
+
+    if (frame !== null) {
+        return { frame: frame, label: protoLabel, usedFallback: false };
+    }
+
+    if (protoLabel !== PROTOTYPE_TEXT_FALLBACK) {
+        frame = findPageItemByLabel(document, PROTOTYPE_TEXT_FALLBACK);
+        if (frame !== null) {
+            warnings.push('Using "' + PROTOTYPE_TEXT_FALLBACK + '" fallback for missing "' + protoLabel + '".');
+            return { frame: frame, label: PROTOTYPE_TEXT_FALLBACK, usedFallback: true };
+        }
+    }
+
+    return null;
+}
+
+function textFrameOverflows(frame) {
+    try {
+        return frame.overflows === true;
+    } catch (overflowError) {
+        return false;
+    }
+}
+
+function createTextFrameOnPage(page, layoutBounds, top, height) {
+    var frame;
+
+    frame = page.textFrames.add({
+        geometricBounds: [top, layoutBounds.left, top + height, layoutBounds.right]
+    });
+    assignFrameToContentLayer(frame);
+    clearRuntimeLabel(frame);
+    return frame;
+}
+
+function createGraphicFrameOnPage(page, layoutBounds, top, height) {
+    var frame;
+    var document;
+    var imageProto;
+    var protoBounds;
+    var frameLeft;
+    var frameWidth;
+    var frameHeight;
+
+    try {
+        document = app.activeDocument;
+    } catch (docError) {
+        document = null;
+    }
+
+    if (document) {
+        imageProto = findPageItemByLabel(document, "proto:imageFrame");
+    }
+
+    if (imageProto !== null) {
+        protoBounds = imageProto.geometricBounds;
+        frameLeft = protoBounds[1];
+        frameWidth = protoBounds[3] - protoBounds[1];
+        frameHeight = protoBounds[2] - protoBounds[0];
+
+        frame = page.rectangles.add({
+            geometricBounds: [top, frameLeft, top + frameHeight, frameLeft + frameWidth]
+        });
+
+        try {
+            if (imageProto.appliedObjectStyle) {
+                frame.applyObjectStyle(imageProto.appliedObjectStyle);
+            }
+        } catch (styleError) {}
+
+        try {
+            frame.strokeWeight = imageProto.strokeWeight;
+            frame.strokeColor = imageProto.strokeColor;
+            frame.strokeTint = imageProto.strokeTint;
+            frame.fillColor = imageProto.fillColor;
+            frame.fillTint = imageProto.fillTint;
+        } catch (strokeFillError) {}
+
+        try {
+            frame.frameFittingOptions.fittingOnEmptyFrame = imageProto.frameFittingOptions.fittingOnEmptyFrame;
+            frame.frameFittingOptions.fittingAlignment = imageProto.frameFittingOptions.fittingAlignment;
+            frame.frameFittingOptions.autoFit = imageProto.frameFittingOptions.autoFit;
+        } catch (fittingError) {}
+
+        appendRenderLog(
+            "Created image frame from proto:imageFrame " + frameWidth + " x " + frameHeight
+        );
+    } else {
+        frame = page.rectangles.add({
+            geometricBounds: [top, layoutBounds.left, top + height, layoutBounds.right]
+        });
+        appendRenderLog(
+            "Created image frame width=" + (layoutBounds.right - layoutBounds.left)
+        );
+    }
+
+    assignFrameToContentLayer(frame);
+    clearRuntimeLabel(frame);
+    return frame;
+}
+
+function getAvailableColumnHeight(layoutState) {
+    var layoutBounds = getPageLayoutBounds(layoutState.page);
+    return layoutBounds.bottom - layoutState.cursorY;
+}
+
+function getLastFrameInChain(frame) {
+    var current = frame;
+    var next;
+
+    while (current) {
+        try {
+            next = current.nextTextFrame;
+            if (!next) {
+                break;
+            }
+            current = next;
+        } catch (chainError) {
+            break;
+        }
+    }
+
+    return current;
+}
+
+function getFrameBottomY(frame) {
+    var bounds;
+    var chainEnd;
+
+    if (!frame) {
+        return 0;
+    }
+
+    chainEnd = getLastFrameInChain(frame);
+
+    try {
+        bounds = chainEnd.geometricBounds;
+        if (bounds && bounds.length === 4) {
+            return bounds[2];
+        }
+    } catch (boundsError) {}
+
+    return 0;
+}
+
+function getImageContentBottomY(imageFrame) {
+    var frameBottom = getFrameBottomY(imageFrame);
+    var graphicBottom = -1;
+    var graphics;
+    var i;
+    var gb;
+
+    try {
+        graphics = imageFrame.graphics;
+        for (i = 0; i < graphics.length; i++) {
+            gb = graphics[i].geometricBounds;
+            if (gb && gb.length === 4 && gb[2] > graphicBottom) {
+                graphicBottom = gb[2];
+            }
+        }
+    } catch (graphicBoundsError) {}
+
+    // Use the visible graphic bottom when it sits inside the frame so the
+    // caption hugs the rendered image instead of the (possibly taller) frame.
+    if (graphicBottom > 0 && graphicBottom <= frameBottom) {
+        return graphicBottom;
+    }
+
+    return frameBottom;
+}
+
+function syncLayoutPageFromFrame(layoutState, frame) {
+    try {
+        if (frame && frame.parentPage) {
+            layoutState.page = frame.parentPage;
+        }
+    } catch (parentError) {}
+}
+
+function listPrototypeLabels(document) {
+    var i;
+    var item;
+    var label;
+    var labels = [];
+    var allItems = document.allPageItems;
+
+    for (i = 0; i < allItems.length; i++) {
+        item = allItems[i];
+        label = trimString(getItemLabel(item));
+        if (isPrototypeLabel(label)) {
+            labels.push(label);
+        }
+    }
+
+    return labels;
+}
+
+function getPrototypeParagraphSpaceBefore(protoFrame) {
+    try {
+        return protoFrame.parentStory.paragraphs[0].appliedParagraphStyle.spaceBefore;
+    } catch (spaceBeforeError) {
+        return 0;
+    }
+}
+
+function getTextFrameBottomY(textFrame) {
+    var bounds;
+    var endBaseline;
+    var spaceAfter = 0;
+    var paragraphs;
+    var tailPadding = 1;
+
+    try {
+        bounds = textFrame.geometricBounds;
+        endBaseline = textFrame.texts[0].endBaseline;
+        paragraphs = textFrame.parentStory.paragraphs;
+        if (paragraphs.length > 0) {
+            spaceAfter = paragraphs[paragraphs.length - 1].spaceAfter;
+        }
+        if (endBaseline > bounds[0]) {
+            return endBaseline + spaceAfter + tailPadding;
+        }
+    } catch (bottomError) {}
+
+    try {
+        return textFrame.geometricBounds[2];
+    } catch (boundsError) {
+        return 0;
+    }
+}
+
+function shrinkTextFrameToContentBottom(textFrame) {
+    var bounds;
+    var contentBottom;
+
+    try {
+        bounds = textFrame.geometricBounds;
+        contentBottom = getTextFrameBottomY(textFrame);
+        if (contentBottom > bounds[0] && contentBottom < bounds[2]) {
+            textFrame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
+        }
+    } catch (shrinkError) {}
+}
+
+function tightenTextFrameToRenderedContent(textFrame) {
+    var story;
+    var fitPass;
+
+    for (fitPass = 0; fitPass < 2; fitPass++) {
+        try {
+            fitTextFrameToContent(textFrame);
+        } catch (fitPassError) {}
+        try {
+            story = textFrame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeFitStoryError) {}
+    }
+
+    shrinkTextFrameToContentBottom(textFrame);
+}
+
+function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
+    var layoutBounds;
+    var available;
+    var frameHeight;
+    var frameTop;
+    var frame;
+    var firstFrame;
+    var lastFrame;
+    var chainEnd;
+    var safety = 0;
+    var maxOverflowPages = 40;
+    var initialHeight = seedHeight || Math.max(minHeight * 2, 96);
+    var story;
+    var bounds;
+    var fitPass;
+    var contentBottom;
+    var tailPadding = 1;
+
+    layoutBounds = ensureLayoutSpace(layoutState, minHeight);
+    available = getAvailableColumnHeight(layoutState);
+
+    if (available < DYNAMIC_LAYOUT.minTextFrameHeight) {
+        addLayoutPage(layoutState);
+        layoutBounds = getPageLayoutBounds(layoutState.page);
+        available = getAvailableColumnHeight(layoutState);
+    }
+
+    frameHeight = Math.min(available, Math.max(initialHeight, minHeight));
+    if (frameHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
+        frameHeight = Math.min(available, DYNAMIC_LAYOUT.minTextFrameHeight);
+    }
+
+    frameTop = layoutState.cursorY;
+    frame = createTextFrameOnPage(layoutState.page, layoutBounds, frameTop, frameHeight);
+    frame.contents = cleanText;
+    applyFrameStyle(frame, style);
+
+    // Force story reflow before any overflow or bounds reads.
+    try {
+        story = frame.parentStory;
+        if (story) {
+            story.recompose();
+        }
+    } catch (recomposeStoryError) {}
+    try {
+        layoutState.document.recompose();
+    } catch (recomposeDocError) {}
+
+    firstFrame = frame;
+    lastFrame = frame;
+
+    if (textFrameOverflows(lastFrame) && available > frameHeight + 12) {
+        try {
+            frameHeight = available;
+            lastFrame.geometricBounds = [
+                frameTop,
+                layoutBounds.left,
+                frameTop + frameHeight,
+                layoutBounds.right
+            ];
+        } catch (growError) {}
+        try {
+            story = lastFrame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeGrowStoryError) {}
+        try {
+            layoutState.document.recompose();
+        } catch (recomposeGrowDocError) {}
+    }
+
+    while (textFrameOverflows(lastFrame) && safety < maxOverflowPages) {
+        safety += 1;
+        addLayoutPage(layoutState);
+        layoutBounds = getPageLayoutBounds(layoutState.page);
+        frameHeight = layoutBounds.bottom - layoutBounds.top;
+        if (frameHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
+            warnings.push("Layout page has no usable height; stopping text overflow.");
+            break;
+        }
+
+        frame = createTextFrameOnPage(layoutState.page, layoutBounds, layoutBounds.top, frameHeight);
+
+        try {
+            lastFrame.nextTextFrame = frame;
+        } catch (linkError) {
+            warnings.push("Could not link overflow text to the next page.");
+            try {
+                frame.remove();
+            } catch (removeError) {}
+            break;
+        }
+
+        lastFrame = frame;
+
+        try {
+            story = lastFrame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeThreadStoryError) {}
+        try {
+            layoutState.document.recompose();
+        } catch (recomposeThreadDocError) {}
+    }
+
+    chainEnd = getLastFrameInChain(firstFrame);
+
+    while (textFrameOverflows(chainEnd) && safety < maxOverflowPages) {
+        safety += 1;
+        addLayoutPage(layoutState);
+        layoutBounds = getPageLayoutBounds(layoutState.page);
+        frameHeight = layoutBounds.bottom - layoutBounds.top;
+        if (frameHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
+            warnings.push("Layout page has no usable height; stopping text overflow.");
+            break;
+        }
+
+        frame = createTextFrameOnPage(layoutState.page, layoutBounds, layoutBounds.top, frameHeight);
+
+        try {
+            chainEnd.nextTextFrame = frame;
+        } catch (linkAfterFitError) {
+            warnings.push("Could not link overflow text to the next page.");
+            try {
+                frame.remove();
+            } catch (removeAfterFitError) {}
+            break;
+        }
+
+        chainEnd = frame;
+
+        try {
+            story = chainEnd.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeTailStoryError) {}
+        try {
+            layoutState.document.recompose();
+        } catch (recomposeTailDocError) {}
+    }
+
+    if (safety >= maxOverflowPages && textFrameOverflows(chainEnd)) {
+        warnings.push("Stopped text overflow pagination after " + maxOverflowPages + " pages.");
+    }
+
+    // Shrink the tail frame to the rendered text bottom before cursor placement.
+    if (!textFrameOverflows(chainEnd) && !chainEnd.nextTextFrame) {
+        tightenTextFrameToRenderedContent(chainEnd);
+        try {
+            story = chainEnd.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeFinalStoryError) {}
+        try {
+            layoutState.document.recompose();
+        } catch (recomposeFinalDocError) {}
+    }
+
+    syncLayoutPageFromFrame(layoutState, chainEnd);
+
+    return chainEnd;
+}
+
+function findPageItemByLabel(document, labelName) {
+    var i;
+    var item;
+    var itemLabel;
+    var targetLabel = trimString(labelName).toLowerCase();
+    var allItems = document.allPageItems;
+
+    for (i = 0; i < allItems.length; i++) {
+        item = allItems[i];
+        itemLabel = trimString(getItemLabel(item)).toLowerCase();
+        if (itemLabel === targetLabel) {
+            return item;
+        }
+    }
+
+    return null;
+}
+
+function isPrototypeLabel(labelName) {
+    return trimString(labelName).indexOf(DYNAMIC_LAYOUT.protoPrefix) === 0;
+}
+
+function getPageLayoutBounds(page) {
+    var bounds;
+    var margins;
+    var topMargin;
+    var leftMargin;
+    var bottomMargin;
+    var rightMargin;
+
+    try {
+        bounds = page.bounds;
+    } catch (boundsError) {
+        bounds = [0, 0, 792, 612];
+    }
+
+    try {
+        margins = page.marginPreferences;
+        topMargin = margins.top;
+        leftMargin = margins.left;
+        bottomMargin = margins.bottom;
+        rightMargin = margins.right;
+    } catch (marginError) {
+        topMargin = 72;
+        leftMargin = 72;
+        bottomMargin = 72;
+        rightMargin = 72;
+    }
+
+    appendRenderLog(
+    "Layout Bounds => left=" + leftMargin +
+    ", right=" + rightMargin +
+    ", page=[" + bounds.join(",") + "]" +
+    ", usable=[" +
+    (bounds[1] + leftMargin) + "," +
+    (bounds[3] - rightMargin) + "]"
+);
+
+    return {
+        top: bounds[0] + topMargin,
+        left: bounds[1] + leftMargin,
+        bottom: bounds[2] - bottomMargin,
+        right: bounds[3] - rightMargin
+    };
+}
+
+function getFrameHeight(frame, fallbackHeight) {
+    var bounds;
+
+    try {
+        bounds = frame.geometricBounds;
+        if (bounds && bounds.length === 4) {
+            return bounds[2] - bounds[0];
+        }
+    } catch (heightError) {}
+
+    return fallbackHeight;
+}
+
+function clearRuntimeLabel(frame) {
+    try {
+        frame.label = "";
+    } catch (labelError) {}
+}
+
+function relocatePrototypesOffPage(document) {
+    var i;
+    var item;
+    var label;
+    var bounds;
+    var height;
+    var offPageTop = DYNAMIC_LAYOUT.prototypeOffPageTop;
+
+    for (i = 0; i < document.allPageItems.length; i++) {
+        item = document.allPageItems[i];
+        label = trimString(getItemLabel(item));
+        if (!isPrototypeLabel(label)) {
+            continue;
+        }
+
+        try {
+            bounds = item.geometricBounds;
+            height = bounds[2] - bounds[0];
+            item.geometricBounds = [offPageTop - height, bounds[1], offPageTop, bounds[3]];
+        } catch (moveError) {
+            warnings.push('Could not relocate prototype "' + label + '".');
+        }
+    }
+}
+
+function removeNonPrototypeItemsFromPage(page) {
+    var i;
+    var item;
+    var label;
+    var itemsToRemove = [];
+
+    for (i = 0; i < page.pageItems.length; i++) {
+        item = page.pageItems[i];
+        label = trimString(getItemLabel(item));
+        if (isPrototypeLabel(label)) {
+            continue;
+        }
+        itemsToRemove.push(item);
+    }
+
+    for (i = itemsToRemove.length - 1; i >= 0; i--) {
+        try {
+            itemsToRemove[i].remove();
+        } catch (removeError) {}
+    }
+}
+
+function validateDynamicPrototypes(document) {
+    var blockType;
+    var entry;
+    var missing = [];
+
+    for (blockType in BLOCK_REGISTRY) {
+        if (!BLOCK_REGISTRY.hasOwnProperty(blockType)) {
+            continue;
+        }
+
+        entry = BLOCK_REGISTRY[blockType];
+
+        if (entry.kind === "text" && entry.prototype) {
+            if (findPageItemByLabel(document, entry.prototype) === null) {
+                missing.push(entry.prototype);
+            }
+        }
+
+        if (entry.kind === "image") {
+            if (entry.framePrototype && findPageItemByLabel(document, entry.framePrototype) === null) {
+                missing.push(entry.framePrototype);
+            }
+            if (entry.captionPrototype && findPageItemByLabel(document, entry.captionPrototype) === null) {
+                missing.push(entry.captionPrototype);
+            }
+        }
+    }
+
+    return missing;
+}
+
+function createLayoutState(document, page) {
+    var bounds = getPageLayoutBounds(page);
+
+    return {
+        document: document,
+        page: page,
+        cursorY: bounds.top,
+        blockGap: DYNAMIC_LAYOUT.blockGap
+    };
+}
+
+function addLayoutPage(layoutState) {
+    layoutState.page = layoutState.document.pages.add();
+    layoutState.cursorY = getPageLayoutBounds(layoutState.page).top;
+}
+
+function ensureLayoutSpace(layoutState, requiredHeight) {
+    var bounds = getPageLayoutBounds(layoutState.page);
+    var needed = requiredHeight || DYNAMIC_LAYOUT.minTextFrameHeight;
+    var pageBreak;
+
+    pageBreak = layoutState.cursorY >= bounds.bottom || layoutState.cursorY + needed > bounds.bottom;
+    appendRenderLog(
+        "ensureLayoutSpace: cursorY=" + layoutState.cursorY +
+        ", needed=" + needed +
+        ", bounds.top=" + bounds.top +
+        ", bounds.bottom=" + bounds.bottom +
+        ", cursorY+needed=" + (layoutState.cursorY + needed) +
+        ", pageBreak=" + pageBreak
+    );
+
+    // Add one page at a time; multi-page text flow is handled in flowDynamicText().
+    if (pageBreak) {
+        addLayoutPage(layoutState);
+        bounds = getPageLayoutBounds(layoutState.page);
+    }
+
+    return bounds;
+}
+
+function advanceLayoutCursor(layoutState, frame, gapAfter) {
+    var chainEnd;
+    var gap = gapAfter !== undefined && gapAfter !== null ? gapAfter : 0;
+    var story;
+    var bounds;
+
+    chainEnd = getLastFrameInChain(frame);
+    syncLayoutPageFromFrame(layoutState, chainEnd);
+
+    try {
+        story = chainEnd.parentStory;
+        if (story) {
+            story.recompose();
+        }
+    } catch (recomposeStoryError) {}
+    try {
+        layoutState.document.recompose();
+    } catch (recomposeDocError) {}
+
+    try {
+        if (chainEnd.contents !== undefined && !chainEnd.nextTextFrame && !textFrameOverflows(chainEnd)) {
+            tightenTextFrameToRenderedContent(chainEnd);
+        }
+    } catch (textTightenError) {}
+
+    try {
+        story = chainEnd.parentStory;
+        if (story) {
+            story.recompose();
+        }
+    } catch (recomposeCursorStoryError) {}
+    try {
+        layoutState.document.recompose();
+    } catch (recomposeCursorDocError) {}
+
+    bounds = chainEnd.geometricBounds;
+
+    if (chainEnd.contents !== undefined && !chainEnd.nextTextFrame && !textFrameOverflows(chainEnd)) {
+        shrinkTextFrameToContentBottom(chainEnd);
+        layoutState.cursorY = getTextFrameBottomY(chainEnd) + gap;
+    } else {
+        layoutState.cursorY = bounds[2] + gap;
+    }
+}
+
+function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame) {
+    var imageBottom;
+    var captionBottom;
+    var blockBottom;
+    var gap = layoutState.blockGap;
+
+    if (!imageFrame) {
+        return;
+    }
+
+    if (gap === undefined || gap === null) {
+        gap = DYNAMIC_LAYOUT.blockGap;
+    }
+
+    syncLayoutPageFromFrame(layoutState, captionFrame || imageFrame);
+
+    imageBottom = getImageContentBottomY(imageFrame);
+    blockBottom = imageBottom;
+
+    if (captionFrame) {
+        captionBottom = getFrameBottomY(getLastFrameInChain(captionFrame));
+        if (captionBottom > blockBottom) {
+            blockBottom = captionBottom;
+        }
+    }
+
+    layoutState.cursorY = blockBottom + gap;
+    appendRenderLog(
+        "Image block cursorY: " + layoutState.cursorY +
+        " (bottom=" + blockBottom + ", gap=" + gap + ")"
+    );
+}
+
+function pageHasPrototypeItems(page) {
+    var i;
+    var items;
+    var label;
+
+    try {
+        items = page.pageItems;
+    } catch (pageItemsError) {
+        return false;
+    }
+
+    for (i = 0; i < items.length; i++) {
+        label = trimString(getItemLabel(items[i]));
+        if (isPrototypeLabel(label)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function findPageIndexWithPrototypes(document) {
+    var p;
+
+    for (p = 0; p < document.pages.length; p++) {
+        if (pageHasPrototypeItems(document.pages[p])) {
+            return p;
+        }
+    }
+
+    return -1;
+}
+
+function collapseToSinglePrototypePage(document) {
+    var protoPageIndex;
+
+    protoPageIndex = findPageIndexWithPrototypes(document);
+
+    if (protoPageIndex < 0) {
+        while (document.pages.length > 1) {
+            document.pages[document.pages.length - 1].remove();
+        }
+        return;
+    }
+
+    while (document.pages.length - 1 > protoPageIndex) {
+        document.pages[document.pages.length - 1].remove();
+    }
+
+    while (protoPageIndex > 0) {
+        document.pages[0].remove();
+        protoPageIndex -= 1;
+    }
+}
+
+function setFrameColumnBounds(frame, layoutBounds, top, height) {
+    frame.geometricBounds = [top, layoutBounds.left, top + height, layoutBounds.right];
+}
+
+function restoreCleanTemplateState(document) {
+    removeAllRuntimeContent(document);
+
+    while (document.pages.length > 1) {
+        document.pages[document.pages.length - 1].remove();
+    }
+
+    relocatePrototypesOffPage(document);
+    appendRenderLog("Template restored: 1 page with prototypes only (safe to save .indd)");
+}
+
+function prepareTemplateForDynamicLayout(document) {
+    var page;
+    var missingProtos;
+    var foundProtos;
+    var p;
+
+    contentLayer = ensureContentLayer(document);
+    try {
+        contentLayer.visible = true;
+        contentLayer.printable = true;
+    } catch (layerVisError) {}
+
+    normalizeDocumentForDynamicLayout(document);
+    appendRenderLog("Facing pages disabled for layout (required for dynamic flow)");
+
+    foundProtos = listPrototypeLabels(document);
+    appendRenderLog("Script version: " + POPULATE_SCRIPT_VERSION);
+    appendRenderLog("Prototypes in template: " + (foundProtos.length ? foundProtos.join(", ") : "(none found)"));
+
+    missingProtos = validateDynamicPrototypes(document);
+    for (p = 0; p < missingProtos.length; p++) {
+        warnings.push('Missing prototype frame "' + missingProtos[p] + '" in InDesign template.');
+    }
+
+    cachePrototypeMetrics(document);
+    clearPrototypeFrameContents(document);
+    removeAllRuntimeContent(document);
+    collapseToSinglePrototypePage(document);
+
+    page = document.pages[0];
+    removeNonPrototypeItemsFromPage(page);
+    relocatePrototypesOffPage(document);
+    setPrototypesLayerNonPrinting(document);
+    layoutState = createLayoutState(document, page);
+
+    appendRenderLog("Dynamic layout: cleared stale content, ready for JSON-only render");
+    appendRenderLog("Content layer: " + contentLayer.name);
+}
+
+function populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex) {
+    var protoLabel = registryEntry.prototype;
+    var protoResult;
+    var protoFrame;
+    var protoHeight;
+    var frame;
+    var cleanText = getBlockText(data);
+
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: " + itemType);
+    appendRenderLog("Dynamic prototype: " + protoLabel);
+    appendRenderLog("Occurrence: " + blockIndex);
+    appendRenderLog("Text length: " + cleanText.length);
+
+    if (!cleanText || isPlaceholderText(cleanText)) {
+        appendRenderLog("Status: not populated - empty or placeholder text in JSON");
+        return;
+    }
+
+    protoResult = resolveTextPrototype(document, protoLabel);
+    if (protoResult === null) {
+        appendRenderLog("Prototype found: no");
+        appendRenderLog("Status: not populated - prototype frame not found in template");
+        warnings.push('Skipped dynamic "' + itemType + '" #' + blockIndex + ': prototype "' + protoLabel + '" not found.');
+        return;
+    }
+
+    protoFrame = protoResult.frame;
+    appendRenderLog("Prototype found: yes" + (protoResult.usedFallback ? " (via " + protoResult.label + " fallback)" : ""));
+
+    protoHeight = getDynamicTextSeedHeight(
+        protoResult.usedFallback ? protoResult.label : protoLabel,
+        protoResult.usedFallback ? protoLabel : null
+    );
+
+    try {
+        frame = flowDynamicText(
+            layoutState,
+            cleanText,
+            registryEntry.style,
+            DYNAMIC_LAYOUT.minTextFrameHeight,
+            protoHeight
+        );
+        advanceLayoutCursor(layoutState, frame, DYNAMIC_LAYOUT.blockGap);
+        populatedCount += 1;
+        appendRenderLog("Status: populated (dynamic frame created on Content layer)");
+    } catch (textError) {
+        appendRenderLog("Status: not populated - " + textError.message);
+        warnings.push('Could not create dynamic text frame for "' + itemType + '" #' + blockIndex + ": " + textError.message);
+    }
+}
+
+function findPrecedingTextFrameNearCursor(layoutState) {
+    var items;
+    var i;
+    var item;
+    var label;
+    var bounds;
+    var frameTop;
+    var frameBottom;
+    var bestFrame = null;
+    var bestFrameBottom = -1;
+    var cursorY = layoutState.cursorY;
+
+    try {
+        items = layoutState.page.pageItems;
+    } catch (pageItemsError) {
+        return null;
+    }
+
+    for (i = 0; i < items.length; i++) {
+        item = items[i];
+        label = trimString(getItemLabel(item));
+        if (isPrototypeLabel(label)) {
+            continue;
+        }
+
+        try {
+            if (item.contents === undefined || item.nextTextFrame) {
+                continue;
+            }
+        } catch (contentsCheckError) {
+            continue;
+        }
+
+        try {
+            bounds = item.geometricBounds;
+            frameTop = bounds[0];
+            frameBottom = bounds[2];
+            // Match when cursor sits at the frame bottom OR inside slack below rendered text.
+            if (frameBottom + 2 < cursorY) {
+                continue;
+            }
+            if (frameTop > cursorY + 2) {
+                continue;
+            }
+            if (frameBottom > bestFrameBottom) {
+                bestFrameBottom = frameBottom;
+                bestFrame = item;
+            }
+        } catch (matchError) {}
+    }
+
+    return bestFrame;
+}
+
+function compactCursorYBeforeImage(layoutState) {
+    var precedingFrame;
+    var contentBottom;
+    var previousCursorY = layoutState.cursorY;
+
+    precedingFrame = findPrecedingTextFrameNearCursor(layoutState);
+    if (precedingFrame === null) {
+        return;
+    }
+
+    shrinkTextFrameToContentBottom(precedingFrame);
+    contentBottom = getTextFrameBottomY(precedingFrame);
+    if (contentBottom > 0 && contentBottom < layoutState.cursorY) {
+        layoutState.cursorY = contentBottom;
+    }
+
+    if (layoutState.cursorY !== previousCursorY) {
+        appendRenderLog(
+            "Image layout cursorY compacted: " + previousCursorY + " -> " + layoutState.cursorY
+        );
+    }
+}
+
+function populateDynamicImageBlock(layoutState, document, registryEntry, data, blockIndex, scriptFolder) {
+    var frameProtoLabel = registryEntry.framePrototype;
+    var captionProtoLabel = registryEntry.captionPrototype;
+    var imageProto;
+    var captionProto;
+    var captionProtoResult;
+    var layoutBounds;
+    var imageFrame;
+    var captionFrame;
+    var imageFile;
+    var protoHeight;
+    var cleanCaption;
+    var urlOrPath = data.url;
+
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: Image");
+    appendRenderLog("Dynamic prototype: " + frameProtoLabel);
+    appendRenderLog("Occurrence: " + blockIndex);
+    appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
+
+    if (!urlOrPath) {
+        appendRenderLog("Status: not populated — empty image url in JSON");
+        return;
+    }
+
+    imageProto = findPageItemByLabel(document, frameProtoLabel);
+    if (imageProto === null) {
+        appendRenderLog("Prototype found: no (using default graphic frame size)");
+        warnings.push('Image prototype "' + frameProtoLabel + '" not found; using default graphic frame size.');
+        protoHeight = DYNAMIC_LAYOUT.defaultImageFrameHeight;
+    } else {
+        appendRenderLog("Prototype found: yes");
+        protoHeight = getFrameHeight(imageProto, DYNAMIC_LAYOUT.defaultImageFrameHeight);
+        // if (protoHeight < 48) {
+        //     protoHeight = DYNAMIC_LAYOUT.defaultImageFrameHeight;
+        // }
+    }
+
+    imageFile = resolveImageFile(urlOrPath, scriptFolder, blockIndex);
+    if (imageFile === null) {
+        appendRenderLog("Status: not populated — image file not found on disk");
+        warnings.push('Image file not found for "' + urlOrPath + '".');
+        return;
+    }
+
+    appendRenderLog("Image block cursor trace [entry]: cursorY=" + layoutState.cursorY);
+    appendRenderLog("Image block cursor trace [before compactCursorYBeforeImage]: cursorY=" + layoutState.cursorY);
+    compactCursorYBeforeImage(layoutState);
+    appendRenderLog("Image block cursor trace [after compactCursorYBeforeImage]: cursorY=" + layoutState.cursorY);
+
+    appendRenderLog("Image block cursor trace [before ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
+    layoutBounds = ensureLayoutSpace(layoutState, protoHeight);
+    appendRenderLog("Image block cursor trace [after ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
+
+    appendRenderLog("Image block cursor trace [before createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
+    try {
+        imageFrame = createGraphicFrameOnPage(layoutState.page, layoutBounds, layoutState.cursorY, protoHeight);
+        appendRenderLog("Image block cursor trace [after createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
+        if (!placeImageContentInFrame(imageFrame, imageFile)) {
+            appendRenderLog("Status: not populated — graphic not visible after place/fit");
+            warnings.push('Image #' + blockIndex + ' place/fit did not produce a visible graphic.');
+            try {
+                imageFrame.remove();
+            } catch (removeFailedFrameError) {}
+            return;
+        }
+        populatedCount += 1;
+        appendRenderLog("Resolved image file: " + imageFile.fsName);
+        appendRenderLog("Image status: populated (dynamic frame created on Content layer)");
+
+        cleanCaption = trimString(data.caption || "");
+        if (!cleanCaption) {
+            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+            return;
+        }
+
+        captionProtoResult = resolveTextPrototype(document, captionProtoLabel);
+        if (captionProtoResult === null) {
+            appendRenderLog("Caption prototype found: no");
+            warnings.push('Image #' + blockIndex + ' placed but no caption prototype or "' + PROTOTYPE_TEXT_FALLBACK + '" fallback found.');
+            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+            return;
+        }
+
+        syncLayoutPageFromFrame(layoutState, imageFrame);
+        layoutState.cursorY = getImageContentBottomY(imageFrame);
+    } catch (imageError) {
+        appendRenderLog("Status: not populated — " + imageError.message);
+        warnings.push('Could not create dynamic image frame #' + blockIndex + ": " + imageError.message);
+        return;
+    }
+
+    captionProto = captionProtoResult.frame;
+    appendRenderLog("Caption prototype found: yes" + (captionProtoResult.usedFallback ? " (via fallback)" : ""));
+
+    protoHeight = getFrameHeight(captionProto, DYNAMIC_LAYOUT.minTextFrameHeight);
+    if (protoHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
+        protoHeight = DYNAMIC_LAYOUT.minTextFrameHeight;
+    }
+
+    // Reserve only a single-line minimum (not the full caption prototype height)
+    // so the caption stays directly below the image instead of breaking early
+    // and leaving blank space at the bottom of the page. flowDynamicText() still
+    // handles the real page break and overflow threading internally.
+    layoutBounds = ensureLayoutSpace(layoutState, DYNAMIC_LAYOUT.minTextFrameHeight);
+
+    try {
+        captionFrame = flowDynamicText(
+            layoutState,
+            cleanCaption,
+            registryEntry.style,
+            DYNAMIC_LAYOUT.minTextFrameHeight,
+            getDynamicTextSeedHeight(
+                captionProtoResult.usedFallback ? captionProtoResult.label : captionProtoLabel,
+                captionProtoResult.usedFallback ? captionProtoLabel : null
+            )
+        );
+        populatedCount += 1;
+        appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
+        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame);
+    } catch (captionError) {
+        warnings.push('Could not create dynamic caption for Image #' + blockIndex + ": " + captionError.message);
+        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+    }
+}
+
+function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
+    var i;
+    var item;
+    var itemType;
+    var data;
+    var registryEntry;
+    var typeCounts = {};
+    var blockIndex;
+
+    if (!layoutState) {
+        layoutState = createLayoutState(document, document.pages[0]);
+    }
+
+    for (i = 0; i < contentItems.length; i++) {
+        item = contentItems[i];
+        itemType = normalizeBlockType(item.type);
+        data = item.data || {};
+        registryEntry = resolveRegistryEntry(itemType);
+
+        if (!registryEntry) {
+            logUnsupportedBlockType(itemType);
+            continue;
+        }
+
+        blockIndex = getBlockTypeCount(typeCounts, itemType);
+
+        if (registryEntry.kind === "image") {
+            populateDynamicImageBlock(layoutState, document, registryEntry, data, blockIndex, scriptFolder);
+            continue;
+        }
+
+        if (registryEntry.kind === "text") {
+            populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex);
+            continue;
+        }
+
+        logUnsupportedBlockType(itemType);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Populate blocks in order (fixed-slot mode)
+// -----------------------------------------------------------------------------
 function populateInJsonOrder(document, contentItems, scriptFolder) {
     var i;
     var item;
     var itemType;
     var data;
-    var style;
-    var text;
-    var imageCount = 0;
+    var registryEntry;
     var typeCounts = {};
-    var frameLabel;
-    var captionLabel;
-    var labelPrefix;
     var blockIndex;
 
     for (i = 0; i < contentItems.length; i++) {
         item = contentItems[i];
         itemType = item.type;
         data = item.data || {};
+        registryEntry = BLOCK_REGISTRY[itemType];
 
-        if (itemType === "Image") {
-            imageCount += 1;
-            frameLabel = "imageFrame" + imageCount;
-            captionLabel = "imageCaption" + imageCount;
-
-            if (findPlaceableFrameByLabel(document, frameLabel) === null && imageCount === 1) {
-                frameLabel = "imageFrame";
-            }
-            if (findTextFrameByLabel(document, captionLabel) === null && imageCount === 1) {
-                captionLabel = "imageCaption";
-            }
-
-            placeImageInFrame(document, frameLabel, data.url, scriptFolder, imageCount);
-            populateFrame(document, captionLabel, data.caption, FRAME_STYLES.imageCaption);
+        if (!registryEntry) {
+            logUnsupportedBlockType(itemType);
             continue;
         }
 
-        style = TYPE_TO_STYLE[itemType];
-        labelPrefix = TYPE_TO_LABEL_PREFIX[itemType];
+        blockIndex = getBlockTypeCount(typeCounts, itemType);
 
-        if (!style || !labelPrefix) {
-            warnings.push('Skipped unknown block type: "' + itemType + '".');
+        if (registryEntry.kind === "image") {
+            populateImageBlock(document, registryEntry, data, blockIndex, scriptFolder);
             continue;
         }
 
-        if (!typeCounts[itemType]) {
-            typeCounts[itemType] = 0;
+        if (registryEntry.kind === "text") {
+            populateTextBlock(document, registryEntry, itemType, data, blockIndex);
+            continue;
         }
-        typeCounts[itemType] += 1;
-        blockIndex = typeCounts[itemType];
 
-        text = data.text || "";
-        frameLabel = resolveTextFrameLabel(document, labelPrefix, blockIndex);
-        populateFrame(document, frameLabel, text, style);
+        logUnsupportedBlockType(itemType);
     }
+}
+
+function closeAllOpenDocuments() {
+    while (app.documents.length > 0) {
+        try {
+            app.documents[0].close(SaveOptions.NO);
+        } catch (closeError) {
+            try {
+                app.documents[0].close();
+            } catch (closeFallback) {
+                break;
+            }
+        }
+    }
+}
+
+function openTemplateDocument(templateFile) {
+    if (!templateFile.exists) {
+        throw new Error("InDesign template not found at: " + templateFile.fsName);
+    }
+
+    closeAllOpenDocuments();
+    app.open(templateFile);
+    return app.activeDocument;
 }
 
 // -----------------------------------------------------------------------------
@@ -693,6 +2644,22 @@ function main() {
     var pdfFile;
     var w;
     var warningText = "";
+    var logText;
+
+    warnings = [];
+    populatedCount = 0;
+    usedLabels = {};
+    renderLogEntries = [];
+    layoutState = null;
+    contentLayer = null;
+    scriptLogFolderPath = scriptFolderPath;
+
+    appendRenderLog("Block mapping started");
+    appendRenderLog("Script file: " + scriptFile.fsName);
+    appendRenderLog("Working folder: " + scriptFolderPath);
+    appendRenderLog("Expected tree_output.json: " + dataFile.fsName);
+    appendRenderLog("Expected template: " + autoTemplate.fsName);
+    flushRenderLog("started");
 
     if (!dataFile.exists) {
         throw new Error("tree_output.json not found at: " + dataFile.fsName);
@@ -709,17 +2676,33 @@ function main() {
         throw new Error("tree_output.json is empty or invalid.");
     }
 
-    if (app.documents.length === 0) {
-        if (!autoTemplate.exists) {
-            throw new Error("No open document and template not found at: " + autoTemplate.fsName);
-        }
-        app.open(autoTemplate);
+    doc = openTemplateDocument(autoTemplate);
+    appendRenderLog("Layout mode: " + (USE_DYNAMIC_LAYOUT ? "dynamic (proto:*)" : "fixed-slot"));
+    appendRenderLog("JSON blocks: " + contentItems.length);
+    logJsonBlockSummary(contentItems);
+    saveLastInputJson(scriptFolderPath, contentItems);
+    flushRenderLog("json-loaded");
+
+    if (USE_DYNAMIC_LAYOUT) {
+        prepareTemplateForDynamicLayout(doc);
+        flushRenderLog("template-prepared");
+        populateInJsonOrderDynamic(doc, contentItems, scriptFolderPath);
+        removeAllEmptyPages(doc);
+        appendRenderLog("Pages in document before PDF export: " + doc.pages.length);
+        flushRenderLog("populated");
+        pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
+        restoreCleanTemplateState(doc);
+    } else {
+        prepareTemplateForJson(doc);
+        populateInJsonOrder(doc, contentItems, scriptFolderPath);
+        collapseUnusedLabeledFrames(doc);
+        removeTrailingEmptyPages(doc);
+        pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
     }
 
-    doc = app.activeDocument;
-    clearLabeledTextFrames(doc);
-    populateInJsonOrder(doc, contentItems, scriptFolderPath);
-    pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
+    try {
+        doc.close(SaveOptions.NO);
+    } catch (closeDocError) {}
 
     if (warnings.length > 0) {
         warningText = "Warnings:\n";
@@ -728,19 +2711,27 @@ function main() {
         }
     }
 
-    logInfo(
-        scriptFolderPath,
-        "PDF export success\n" +
-        "Frames populated: " + populatedCount + "\n" +
-        "PDF: " + pdfFile.fsName + "\n" +
-        warningText
-    );
+    logText = "PDF export success\n";
+    logText += "Script version: " + POPULATE_SCRIPT_VERSION + "\n";
+    logText += "JSON blocks: " + contentItems.length + "\n";
+    logText += "Frames populated: " + populatedCount + "\n";
+    logText += "last-input.json: " + scriptFolderPath + "/last-input.json\n";
+    logText += "PDF: " + pdfFile.fsName + "\n";
+    if (warningText) {
+        logText += "\n" + warningText;
+    }
+
+    flushRenderLog("success", logText);
 }
 
 try {
     main();
 } catch (e) {
     var scriptPathForError = File($.fileName).parent.fsName;
+    if (!scriptLogFolderPath) {
+        scriptLogFolderPath = scriptPathForError;
+    }
+    appendRenderLog("FATAL ERROR: " + e.message);
     logError(scriptPathForError, "PDF render failed: " + e.message);
     throw e;
 }
