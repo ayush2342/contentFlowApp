@@ -1,7 +1,42 @@
 .heading {
-  color: var(--heading-color);
-  font-family: var(--font-family);
-  font-weight: 700;
+  font-family: var(--typography-sectionTitle-font, var(--font-family));
+  font-weight: var(--typography-sectionTitle-weight, 700);
+  color: var(--typography-sectionTitle-color, var(--heading-color));
   margin: 0 0 1rem;
   line-height: 1.2;
+}
+
+.chapterTitle {
+  font-family: var(--typography-chapterTitle-font, var(--font-family));
+  font-size: var(--typography-chapterTitle-size, 22pt);
+  font-weight: var(--typography-chapterTitle-weight, 400);
+  color: var(--typography-chapterTitle-color, #000000);
+}
+
+.lessonTitle {
+  font-family: var(--typography-lessonTitle-font, var(--font-family));
+  font-size: var(--typography-lessonTitle-size, 12pt);
+  font-weight: var(--typography-lessonTitle-weight, 400);
+  color: var(--typography-lessonTitle-color, var(--heading-color));
+}
+
+.sectionTitle {
+  font-family: var(--typography-sectionTitle-font, var(--font-family));
+  font-size: var(--typography-sectionTitle-size, 11pt);
+  font-weight: var(--typography-sectionTitle-weight, 400);
+  color: var(--typography-sectionTitle-color, var(--heading-color));
+}
+
+.subSectionTitle {
+  font-family: var(--typography-subSectionTitle-font, var(--font-family));
+  font-size: var(--typography-subSectionTitle-size, 9pt);
+  font-weight: var(--typography-subSectionTitle-weight, 700);
+  color: var(--typography-subSectionTitle-color, var(--heading-color));
+}
+
+.chapterOverview {
+  font-family: var(--typography-chapterOverview-font, var(--font-family));
+  font-size: var(--typography-chapterOverview-size, 9pt);
+  font-weight: var(--typography-chapterOverview-weight, 700);
+  color: var(--typography-chapterOverview-color, var(--heading-color));
 }

@@ -1,8 +1,9 @@
 .paragraph {
-  font-family: var(--font-family);
-  font-size: 1rem;
+  font-family: var(--typography-paragraphText-font, var(--font-family));
+  font-size: var(--typography-paragraphText-size, 9pt);
   line-height: 1.7;
-  color: var(--paragraph-color);
+  color: var(--typography-paragraphText-color, var(--paragraph-color));
+  font-weight: var(--typography-paragraphText-weight, 400);
   margin: 0 0 1rem;
 }
 
@@ -14,4 +15,11 @@
 
 .leadLabel {
   font-weight: 700;
+}
+
+.bulletList {
+  font-family: var(--typography-bulletList-font, var(--font-family));
+  font-size: var(--typography-bulletList-size, 9pt);
+  color: var(--typography-bulletList-color, var(--paragraph-color));
+  font-weight: var(--typography-bulletList-weight, 400);
 }

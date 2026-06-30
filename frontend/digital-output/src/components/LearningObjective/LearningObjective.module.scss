@@ -8,18 +8,24 @@
 
 .title {
   margin: 0 0 0.75rem;
-  color: var(--heading-color);
-  font-weight: 600;
+  font-family: var(--typography-learningObjectives-font, var(--font-family));
+  font-size: var(--typography-learningObjectives-size, 9pt);
+  color: var(--typography-learningObjectives-color, var(--heading-color));
+  font-weight: var(--typography-learningObjectives-weight, 700);
 }
 
 .intro {
   margin: 0 0 0.5rem;
-  color: var(--paragraph-color);
+  font-family: var(--typography-paragraphText-font, var(--font-family));
+  font-size: var(--typography-paragraphText-size, 9pt);
+  color: var(--typography-paragraphText-color, var(--paragraph-color));
 }
 
 .list {
   margin: 0;
   padding-left: 1.25rem;
   line-height: 1.6;
-  color: var(--paragraph-color);
+  font-family: var(--typography-bulletList-font, var(--font-family));
+  font-size: var(--typography-bulletList-size, 9pt);
+  color: var(--typography-bulletList-color, var(--paragraph-color));
 }
