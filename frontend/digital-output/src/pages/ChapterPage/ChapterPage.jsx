@@ -32,38 +32,30 @@ const ChapterPage = () => {
   if (!chapter) return <p className={styles.error}>Chapter not found.</p>;
 
   return (
-    <div className={styles.chapter}>
-      <Link to={{ pathname: '/', search }} className={styles.back}>
-        &larr; Back to Chapter Library
-      </Link>
-      {chapter.chapterNumber != null && (
-        <p className={styles.meta}>Chapter {chapter.chapterNumber}</p>
-      )}
-      <h1 className={styles.title}>
-        {chapter.title || (chapter.chapterNumber != null ? `Chapter ${chapter.chapterNumber}` : 'Chapter')}
-      </h1>
-      {chapter.outline?.length > 0 && (
-        <div className={styles.outline}>
-          <h2 className={styles.sectionTitle}>Chapter Outline</h2>
-          <ul className={styles.outlineList}>
-            {chapter.outline.map((item) => (
-              <li key={item}>{item}</li>
+    <div className={styles.page}>
+      <div className={styles.backRow}>
+        <Link to={{ pathname: '/', search }} className={styles.back}>
+          &larr; Back to Chapter Library
+        </Link>
+      </div>
+
+      <div className={styles.chapter}>
+        {chapter.chapterNumber != null && (
+          <p className={styles.meta}>Chapter {chapter.chapterNumber}</p>
+        )}
+        {chapter.title ? <h1 className={styles.title}>{chapter.title}</h1> : null}
+        {chapter.lessons?.length ? (
+          <div className={styles.contentStack}>
+            {chapter.lessons.map((lesson) => (
+              <section key={lesson.id} className={styles.lessonSection}>
+                <LessonRenderer page={lesson.pages?.[0]} />
+              </section>
             ))}
-          </ul>
-        </div>
-      )}
-      <h2 className={styles.sectionTitle}>Chapter Content</h2>
-      {chapter.lessons?.length ? (
-        <div className={styles.contentStack}>
-          {chapter.lessons.map((lesson) => (
-            <section key={lesson.id} className={styles.lessonSection}>
-              <LessonRenderer page={lesson.pages?.[0]} />
-            </section>
-          ))}
-        </div>
-      ) : (
-        <p className={styles.emptyState}>No chapter content available yet.</p>
-      )}
+          </div>
+        ) : (
+          <p className={styles.emptyState}>No chapter content available yet.</p>
+        )}
+      </div>
     </div>
   );
 };

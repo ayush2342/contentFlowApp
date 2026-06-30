@@ -1,13 +1,24 @@
+.page {
+  width: 100%;
+}
+
+.backRow {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 0 2rem 1rem;
+}
+
 .chapter {
   max-width: 700px;
 }
 
 .back {
-  display: inline-block;
+  display: block;
   margin-bottom: 1.5rem;
   color: var(--primary-color);
   text-decoration: none;
   font-weight: 500;
+  width: fit-content;
 
   &:hover {
     text-decoration: underline;
