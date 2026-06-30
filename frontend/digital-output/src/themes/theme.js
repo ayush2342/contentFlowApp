@@ -1,15 +1,20 @@
+import { typographyStyles, generateAllCssVariables } from '../../../../shared/typography-styles.js';
+
 export const theme = {
-  primaryColor: '#0055AA',
+  primaryColor: typographyStyles.chapterTitle.color === '#000000' 
+    ? typographyStyles.sectionTitle.color 
+    : typographyStyles.chapterTitle.color,
   secondaryColor: '#EAF3FF',
-  fontFamily: 'Inter, system-ui, sans-serif',
+  fontFamily: `${typographyStyles.paragraphText.font}, sans-serif`,
 };
 
 export const applyTheme = (root = document.documentElement) => {
-  root.style.setProperty('--primary-color', theme.primaryColor);
+  // Base theme variables
+  root.style.setProperty('--primary-color', typographyStyles.sectionTitle.color);
   root.style.setProperty('--secondary-color', theme.secondaryColor);
   root.style.setProperty('--font-family', theme.fontFamily);
-  root.style.setProperty('--heading-color', theme.primaryColor);
-  root.style.setProperty('--paragraph-color', '#333333');
+  root.style.setProperty('--heading-color', typographyStyles.sectionTitle.color);
+  root.style.setProperty('--paragraph-color', typographyStyles.paragraphText.color);
   root.style.setProperty('--border-radius', '8px');
   root.style.setProperty('--surface-color', '#ffffff');
   root.style.setProperty('--on-primary-color', '#ffffff');
@@ -22,7 +27,16 @@ export const applyTheme = (root = document.documentElement) => {
   root.style.setProperty('--activity-bg', '#f9f9f9');
   root.style.setProperty('--table-stripe-bg', '#fafafa');
   root.style.setProperty('--quote-color', '#444444');
-  root.style.setProperty('--body-color', '#222222');
+  root.style.setProperty('--body-color', typographyStyles.paragraphText.color);
   root.style.setProperty('--body-bg', '#ffffff');
   root.style.setProperty('--card-shadow', '0 4px 12px rgba(0, 85, 170, 0.15)');
+
+  // Apply all typography CSS variables
+  const typographyVars = generateAllCssVariables();
+  Object.entries(typographyVars).forEach(([varName, value]) => {
+    root.style.setProperty(varName, value);
+  });
 };
+
+// Export typography styles for direct access if needed
+export { typographyStyles };

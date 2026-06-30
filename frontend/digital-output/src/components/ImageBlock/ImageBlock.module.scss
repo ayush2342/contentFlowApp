@@ -11,14 +11,18 @@
 
 .caption {
   margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--text-muted);
+  font-family: var(--typography-imageFigureText-font, var(--font-family));
+  font-size: var(--typography-imageFigureText-size, 7.5pt);
+  color: var(--typography-imageFigureText-color, var(--text-muted));
+  font-weight: var(--typography-imageFigureText-weight, 400);
   font-style: normal;
   text-align: left;
 }
 
 .figurePrefix {
-  color: #c62828;
-  font-weight: 700;
+  font-family: var(--typography-imageFigureNumber-font, var(--font-family));
+  color: var(--typography-imageFigureNumber-color, #C31427);
+  font-weight: var(--typography-imageFigureNumber-weight, 700);
+  font-size: var(--typography-imageFigureNumber-size, 7.5pt);
   margin-right: 0.35rem;
 }

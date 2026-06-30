@@ -1,0 +1,117 @@
+{
+  "chapterHeading": {
+    "font": "Arial",
+    "size": 15,
+    "color": "#0074BC",
+    "bold": false
+  },
+  "chapterTitle": {
+    "font": "Arial",
+    "size": 22,
+    "color": "#000000",
+    "bold": false
+  },
+  "chapterOverview": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#0074BC",
+    "bold": true
+  },
+  "lessonOverview": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#000000",
+    "bold": true
+  },
+  "lessonTitle": {
+    "font": "Arial",
+    "size": 12,
+    "color": "#0074BC",
+    "bold": false
+  },
+  "learningObjectives": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#0074BC",
+    "bold": true
+  },
+  "sectionTitle": {
+    "font": "Arial",
+    "size": 11,
+    "color": "#0074BC",
+    "bold": false
+  },
+  "subSectionTitle": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#0074BC",
+    "bold": true
+  },
+  "paragraphText": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#000000",
+    "bold": false
+  },
+  "bulletList": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#000000",
+    "bold": false
+  },
+  "imageFigureNumber": {
+    "font": "Arial",
+    "size": 7.5,
+    "color": "#C31427",
+    "bold": true
+  },
+  "imageFigureText": {
+    "font": "Arial",
+    "size": 7.5,
+    "color": "#000000",
+    "bold": false
+  },
+  "lessonNumber": {
+    "font": "Arial",
+    "size": 14,
+    "color": "#0074BC",
+    "bold": false
+  },
+  "chapterNumber": {
+    "font": "Arial",
+    "size": 14,
+    "color": "#0074BC",
+    "bold": false
+  },
+  "topic": {
+    "font": "Arial",
+    "size": 11,
+    "color": "#000000",
+    "bold": true
+  },
+  "text": {
+    "font": "Arial",
+    "size": 9,
+    "color": "#000000",
+    "bold": false
+  },
+  "imageCaption": {
+    "font": "Arial",
+    "size": 7.5,
+    "color": "#000000",
+    "bold": false
+  },
+  "figureCaption": {
+    "font": "Arial",
+    "size": 7.5,
+    "color": "#404040",
+    "bold": false,
+    "italic": true
+  },
+  "logoText": {
+    "font": "Arial",
+    "size": 11,
+    "color": "#0074BC",
+    "bold": true
+  }
+}

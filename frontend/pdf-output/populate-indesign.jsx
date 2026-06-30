@@ -342,26 +342,120 @@ function parseJSON(text) {
 }
 
 // -----------------------------------------------------------------------------
-// Styling maps
+// Typography configuration loader
+// Loads centralized styles from shared/typography-styles.json
 // -----------------------------------------------------------------------------
-var FRAME_STYLES = {
-    lessonNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    lessonTitle: { pointSize: 24, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    chapterOverview: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    topic: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    text: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    sectionTitle: { pointSize: 18, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    imageCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
-    chapterNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    chapterTitle: { pointSize: 28, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    lessonOverview: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    paragraphText: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
-    learningObjectives: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    bulletList: { pointSize: 12, bold: false, italic: false, leftIndent: 12, color: [31, 31, 31] },
-    logoText: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    subSectionTitle: { pointSize: 14, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    figureCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] }
+function hexToRgb(hex) {
+    var result;
+    var hexClean = String(hex || "").replace(/^#/, "");
+    
+    if (hexClean.length === 6) {
+        return [
+            parseInt(hexClean.substring(0, 2), 16),
+            parseInt(hexClean.substring(2, 4), 16),
+            parseInt(hexClean.substring(4, 6), 16)
+        ];
+    }
+    return [0, 0, 0];
+}
+
+function convertTypographyStyle(style) {
+    return {
+        pointSize: style.size || 12,
+        bold: style.bold === true,
+        italic: style.italic === true,
+        leftIndent: style.leftIndent || 0,
+        color: hexToRgb(style.color)
+    };
+}
+
+function loadTypographyConfig(scriptFolder) {
+    var configPaths = [
+        scriptFolder + "/../../shared/typography-styles.json",
+        scriptFolder + "/../../../shared/typography-styles.json",
+        scriptFolder + "/typography-styles.json"
+    ];
+    
+    var configFile;
+    var i;
+    var rawJson;
+    var config;
+    
+    for (i = 0; i < configPaths.length; i++) {
+        configFile = File(configPaths[i]);
+        if (configFile.exists) {
+            break;
+        }
+        configFile = null;
+    }
+    
+    if (!configFile || !configFile.exists) {
+        return null;
+    }
+    
+    if (!configFile.open("r")) {
+        return null;
+    }
+    
+    rawJson = configFile.read();
+    configFile.close();
+    
+    try {
+        config = parseJSON(rawJson);
+        return config;
+    } catch (parseError) {
+        return null;
+    }
+}
+
+function buildFrameStylesFromConfig(typographyConfig) {
+    var styles = {};
+    var key;
+    
+    if (!typographyConfig) {
+        return null;
+    }
+    
+    for (key in typographyConfig) {
+        if (typographyConfig.hasOwnProperty(key)) {
+            styles[key] = convertTypographyStyle(typographyConfig[key]);
+        }
+    }
+    
+    // Ensure bulletList has proper indent
+    if (styles.bulletList) {
+        styles.bulletList.leftIndent = 12;
+    }
+    
+    return styles;
+}
+
+// -----------------------------------------------------------------------------
+// Styling maps - defaults (will be overridden by typography config if available)
+// -----------------------------------------------------------------------------
+var FRAME_STYLES_DEFAULTS = {
+    lessonNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    lessonTitle: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    chapterOverview: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    chapterHeading: { pointSize: 15, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    topic: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    text: { pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    sectionTitle: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    imageCaption: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    chapterNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    chapterTitle: { pointSize: 22, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    lessonOverview: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    paragraphText: { pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    learningObjectives: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    bulletList: { pointSize: 9, bold: false, italic: false, leftIndent: 12, color: [0, 0, 0] },
+    logoText: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    subSectionTitle: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    figureCaption: { pointSize: 7.5, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
+    imageFigureNumber: { pointSize: 7.5, bold: true, italic: false, leftIndent: 0, color: [195, 20, 39] },
+    imageFigureText: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] }
 };
+
+var FRAME_STYLES = FRAME_STYLES_DEFAULTS;
 
 var BLOCK_REGISTRY = {
     LessonNumber: {
@@ -2904,6 +2998,45 @@ function exportActiveDocumentToPdf(document, scriptFolderPath) {
 }
 
 // -----------------------------------------------------------------------------
+// Initialize FRAME_STYLES from typography config and rebuild BLOCK_REGISTRY
+// -----------------------------------------------------------------------------
+function initializeStylesFromConfig(scriptFolderPath) {
+    var typographyConfig = loadTypographyConfig(File(scriptFolderPath));
+    var configStyles;
+    
+    if (typographyConfig) {
+        configStyles = buildFrameStylesFromConfig(typographyConfig);
+        if (configStyles) {
+            FRAME_STYLES = configStyles;
+            appendRenderLog("Typography config loaded from shared/typography-styles.json");
+            return true;
+        }
+    }
+    
+    appendRenderLog("Using default FRAME_STYLES (typography config not found)");
+    return false;
+}
+
+function rebuildBlockRegistry() {
+    BLOCK_REGISTRY.LessonNumber.style = FRAME_STYLES.lessonNumber || FRAME_STYLES_DEFAULTS.lessonNumber;
+    BLOCK_REGISTRY.LessonTitle.style = FRAME_STYLES.lessonTitle || FRAME_STYLES_DEFAULTS.lessonTitle;
+    BLOCK_REGISTRY.ChapterOverview.style = FRAME_STYLES.chapterOverview || FRAME_STYLES_DEFAULTS.chapterOverview;
+    BLOCK_REGISTRY.Topic.style = FRAME_STYLES.topic || FRAME_STYLES_DEFAULTS.topic;
+    BLOCK_REGISTRY.SectionTitle.style = FRAME_STYLES.sectionTitle || FRAME_STYLES_DEFAULTS.sectionTitle;
+    BLOCK_REGISTRY.SubSectionTitle.style = FRAME_STYLES.subSectionTitle || FRAME_STYLES_DEFAULTS.subSectionTitle;
+    BLOCK_REGISTRY.FigureCaption.style = FRAME_STYLES.figureCaption || FRAME_STYLES_DEFAULTS.figureCaption;
+    BLOCK_REGISTRY.Text.style = FRAME_STYLES.text || FRAME_STYLES_DEFAULTS.text;
+    BLOCK_REGISTRY.Image.style = FRAME_STYLES.imageCaption || FRAME_STYLES_DEFAULTS.imageCaption;
+    BLOCK_REGISTRY.ChapterNumber.style = FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
+    BLOCK_REGISTRY.ChapterTitle.style = FRAME_STYLES.chapterTitle || FRAME_STYLES_DEFAULTS.chapterTitle;
+    BLOCK_REGISTRY.LessonOverview.style = FRAME_STYLES.lessonOverview || FRAME_STYLES_DEFAULTS.lessonOverview;
+    BLOCK_REGISTRY.ParagraphText.style = FRAME_STYLES.paragraphText || FRAME_STYLES_DEFAULTS.paragraphText;
+    BLOCK_REGISTRY.LearningObjectives.style = FRAME_STYLES.learningObjectives || FRAME_STYLES_DEFAULTS.learningObjectives;
+    BLOCK_REGISTRY.BulletList.style = FRAME_STYLES.bulletList || FRAME_STYLES_DEFAULTS.bulletList;
+    BLOCK_REGISTRY.LogoWithText.style = FRAME_STYLES.logoText || FRAME_STYLES_DEFAULTS.logoText;
+}
+
+// -----------------------------------------------------------------------------
 // Main
 // -----------------------------------------------------------------------------
 function main() {
@@ -2934,6 +3067,11 @@ function main() {
     appendRenderLog("Working folder: " + scriptFolderPath);
     appendRenderLog("Expected tree_output.json: " + dataFile.fsName);
     appendRenderLog("Expected template: " + autoTemplate.fsName);
+    
+    // Load typography configuration from shared config file
+    initializeStylesFromConfig(scriptFolderPath);
+    rebuildBlockRegistry();
+    
     flushRenderLog("started");
 
     if (!dataFile.exists) {
