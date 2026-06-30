@@ -2,6 +2,8 @@ const COMPONENT_TYPE_MAP = {
   heading: 'Heading',
   paragraph: 'Paragraph',
   image: 'ImageBlock',
+  learningObjective: 'LearningObjective',
+  iconLabel: 'IconLabel',
 };
 
 const slugify = (value) =>
@@ -73,6 +75,37 @@ const mapContentItem = (item, media, index, options = {}) => {
     };
   }
 
+  if (item.type === 'learningObjective') {
+    return {
+      id: `content-${index}`,
+      type: 'LearningObjective',
+      props: {
+        title: item.title || 'LEARNING OBJECTIVES',
+        introText: item.introText || '',
+        objectives: item.objectives || [],
+      },
+    };
+  }
+
+  if (item.type === 'iconLabel') {
+    const mediaItem = media?.[item.mediaId];
+    return {
+      id: `content-${index}`,
+      type: 'IconLabel',
+      props: {
+        text: item.text,
+        src: mediaItem
+          ? resolveMediaSrc(
+              mediaItem.fileName,
+              mediaItem.sourcePath,
+              options.mediaBaseUrl,
+              options.tenantId
+            )
+          : '',
+      },
+    };
+  }
+
   if (item.type === 'image') {
     const mediaItem = media?.[item.mediaId];
 
@@ -115,32 +148,7 @@ const mapSectionToLesson = (section, media, options = {}, sectionIndex = 0) => {
       ?.map((item, index) => mapContentItem(item, media, index, options))
       .filter(Boolean) ?? [];
 
-  const sectionHeading = [section.sectionNumber, section.title].filter(Boolean).join(' ').trim();
-  const components = [];
-
-  if (sectionHeading) {
-    components.push({
-      id: `${sectionId}-title`,
-      type: 'Heading',
-      props: {
-        text: sectionHeading,
-        level: 1,
-      },
-    });
-  }
-
-  if (section.learningObjectives?.length) {
-    components.push({
-      id: `${sectionId}-objectives`,
-      type: 'LearningObjective',
-      props: {
-        title: 'Learning Objectives',
-        objectives: section.learningObjectives,
-      },
-    });
-  }
-
-  components.push(...mappedContent);
+  const components = [...mappedContent];
 
   return {
     id: sectionId,
@@ -264,6 +272,17 @@ const normalizeText = (value) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const CLASS_TEMPLATE_TYPE_ALIASES = {
+  ChapterNumber: 'LessonNumber',
+  ChapterTitle: 'ChapterTitle',
+  LessonOverview: 'LessonOverview',
+  ParagraphText: 'Text',
+  LessonTitle: 'LessonTitle',
+  LearningObjectives: 'LearningObjectives',
+};
+
+const toCanonicalClassType = (rawType) => CLASS_TEMPLATE_TYPE_ALIASES[rawType] || rawType;
+
 const extractLearningObjectives = (text) => {
   const normalized = normalizeText(text);
 
@@ -304,7 +323,6 @@ const canUseAsChapterTitle = (text) => {
 const mapClassTemplateJson = (nodes, options = {}) => {
   const outline = [];
   const content = [];
-  const learningObjectives = [];
   const media = {};
 
   let chapterNumber = null;
@@ -312,11 +330,29 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   let sectionNumber = '';
   let sectionTitle = '';
   let mediaIndex = 1;
-  let captureLearningObjectives = false;
+  let captureLearningObjectives = null;
   let sawSectionTitle = false;
+  let sectionTitleAddedToContent = false;
+
+  const flushLearningObjectives = () => {
+    if (!captureLearningObjectives) return;
+    const hasContent =
+      Boolean(captureLearningObjectives.introText) || captureLearningObjectives.objectives.length > 0;
+
+    if (hasContent) {
+      content.push({
+        type: 'learningObjective',
+        title: captureLearningObjectives.title || 'LEARNING OBJECTIVES',
+        introText: captureLearningObjectives.introText,
+        objectives: captureLearningObjectives.objectives,
+      });
+    }
+    captureLearningObjectives = null;
+  };
 
   nodes.forEach((node) => {
-    const type = node?.type;
+    const type = toCanonicalClassType(node?.type);
+    const rawType = node?.type;
     const dataText = normalizeText(node?.data?.text);
 
     if (type === 'LessonNumber' && dataText) {
@@ -325,37 +361,50 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'SectionTitle' && dataText) {
+    if (type === 'ChapterTitle' && dataText) {
+      chapterTitle = dataText;
+      return;
+    }
+
+    if (type === 'LessonTitle' && dataText) {
+      flushLearningObjectives();
       const sectionMeta = parseSectionHeading(dataText);
       if (sectionMeta) {
         sectionNumber = sectionMeta.sectionNumber;
         sectionTitle = sectionMeta.sectionTitle;
+        sawSectionTitle = true;
+        content.push({ type: 'heading', text: dataText });
+        sectionTitleAddedToContent = true;
       } else {
-        sectionTitle = dataText;
+        content.push({ type: 'heading', text: dataText });
       }
-      sawSectionTitle = true;
       return;
     }
 
-    if (type === 'Topic' && dataText) {
+    if (type === 'SectionTitle' && dataText) {
+      flushLearningObjectives();
+      content.push({ type: 'heading', text: dataText });
+      return;
+    }
+
+    if (type === 'LessonOverview' && dataText) {
       const sectionMeta = parseSectionHeading(dataText);
       if (sectionMeta) {
         outline.push(dataText);
-      } else {
-        if (!chapterTitle && canUseAsChapterTitle(dataText)) {
-          chapterTitle = dataText;
-        } else {
-          content.push({ type: 'heading', text: dataText });
-        }
       }
       return;
     }
 
     if (type === 'ChapterOverview' && dataText) {
+      flushLearningObjectives();
       if (/chapter outline/i.test(dataText)) return;
 
       if (/learning objectives/i.test(dataText)) {
-        captureLearningObjectives = true;
+        captureLearningObjectives = {
+          title: dataText,
+          introText: '',
+          objectives: [],
+        };
         return;
       }
 
@@ -364,6 +413,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     }
 
     if (type === 'Image' && node?.data?.url) {
+      flushLearningObjectives();
       const mediaId = `tree-media-${mediaIndex++}`;
       const caption = normalizeText(node?.data?.caption);
       const urlPath = normalizePublicAssetPath(node.data.url);
@@ -378,27 +428,75 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
+    if (rawType === 'LogoWithText') {
+      flushLearningObjectives();
+      const logoUrl = normalizePublicAssetPath(node?.data?.url);
+      const logoText = normalizeText(node?.data?.text);
+      let logoMediaId = null;
+
+      if (logoUrl) {
+        const mediaId = `tree-media-${mediaIndex++}`;
+        media[mediaId] = {
+          fileName: basenameFromPath(logoUrl),
+          sourcePath: logoUrl,
+          caption: '',
+        };
+        logoMediaId = mediaId;
+      }
+
+      if (logoText) {
+        content.push({ type: 'iconLabel', mediaId: logoMediaId, text: logoText });
+      }
+      return;
+    }
+
+    if (rawType === 'BulletList') {
+      const items = Array.isArray(node?.data?.items)
+        ? node.data.items.map((item) => normalizeText(item)).filter(Boolean)
+        : [];
+
+      if (!items.length) return;
+
+      if (captureLearningObjectives) {
+        captureLearningObjectives.objectives.push(...items);
+        return;
+      }
+
+      items.forEach((item) => {
+        content.push({ type: 'paragraph', text: item });
+      });
+      return;
+    }
+
     if (type === 'Text' && dataText) {
       if (captureLearningObjectives) {
-        const objectives = extractLearningObjectives(dataText);
-        if (objectives.length) {
-          learningObjectives.push(...objectives);
-          captureLearningObjectives = false;
+        if (/^By the end of this section,?\s*/i.test(dataText)) {
+          captureLearningObjectives.introText = dataText;
           return;
         }
+
+        const objectives = extractLearningObjectives(dataText);
+        captureLearningObjectives.objectives.push(...objectives);
+        return;
       }
 
       content.push({ type: 'paragraph', text: dataText });
     }
   });
 
+  flushLearningObjectives();
+
+  if (!sectionTitleAddedToContent && sectionNumber && sectionTitle) {
+    content.unshift({ type: 'heading', text: `${sectionNumber} ${sectionTitle}` });
+  }
+
   const chapterSections =
-    sawSectionTitle || learningObjectives.length
+    sawSectionTitle || content.length
       ? [
           {
             sectionNumber,
             title: sectionTitle,
-            learningObjectives,
+            learningObjectives: [],
             content,
           },
         ]

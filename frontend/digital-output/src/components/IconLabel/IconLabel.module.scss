@@ -1,0 +1,17 @@
+.iconLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+.text {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
