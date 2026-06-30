@@ -31,8 +31,10 @@ const streamToBuffer = async (stream) => {
 
 const collectImageKeys = (data) => {
   if (!Array.isArray(data)) return [];
+  // Any block that carries a data.url needs its asset downloaded
+  // (Image, LogoWithText, and any future image-bearing block types).
   return data
-    .filter((item) => item?.type === 'Image' && item?.data?.url)
+    .filter((item) => item?.data?.url)
     .map((item) => item.data.url);
 };
 

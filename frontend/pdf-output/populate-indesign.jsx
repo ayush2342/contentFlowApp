@@ -28,7 +28,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v14";
+var POPULATE_SCRIPT_VERSION = "dynamic-v19";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 
@@ -351,7 +351,16 @@ var FRAME_STYLES = {
     topic: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
     text: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
     sectionTitle: { pointSize: 18, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
-    imageCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] }
+    imageCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
+    chapterNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [46, 116, 181] },
+    chapterTitle: { pointSize: 28, bold: true, italic: false, leftIndent: 0, color: [31, 31, 31] },
+    lessonOverview: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
+    paragraphText: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [31, 31, 31] },
+    learningObjectives: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
+    bulletList: { pointSize: 12, bold: false, italic: false, leftIndent: 12, color: [31, 31, 31] },
+    logoText: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
+    subSectionTitle: { pointSize: 14, bold: true, italic: false, leftIndent: 0, color: [46, 116, 181] },
+    figureCaption: { pointSize: 10, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] }
 };
 
 var BLOCK_REGISTRY = {
@@ -390,6 +399,20 @@ var BLOCK_REGISTRY = {
         prototype: "proto:sectionTitle",
         spacingAfter: 14
     },
+    SubSectionTitle: {
+        label: "subSectionTitle",
+        style: FRAME_STYLES.subSectionTitle,
+        kind: "text",
+        prototype: "proto:subSectionTitle",
+        spacingAfter: 10
+    },
+    FigureCaption: {
+        label: "figureCaption",
+        style: FRAME_STYLES.figureCaption,
+        kind: "text",
+        prototype: "proto:figureCaption",
+        spacingAfter: 12
+    },
     Text: {
         label: "text",
         style: FRAME_STYLES.text,
@@ -404,6 +427,57 @@ var BLOCK_REGISTRY = {
         captionPrototype: "proto:imageCaption",
         style: FRAME_STYLES.imageCaption,
         kind: "image",
+        spacingAfter: 14
+    },
+    ChapterNumber: {
+        label: "chapterNumber",
+        style: FRAME_STYLES.chapterNumber,
+        kind: "text",
+        prototype: "proto:chapterNumber",
+        spacingAfter: 8
+    },
+    ChapterTitle: {
+        label: "chapterTitle",
+        style: FRAME_STYLES.chapterTitle,
+        kind: "text",
+        prototype: "proto:chapterTitle",
+        spacingAfter: 16
+    },
+    LessonOverview: {
+        label: "lessonOverview",
+        style: FRAME_STYLES.lessonOverview,
+        kind: "text",
+        prototype: "proto:lessonOverview",
+        spacingAfter: 6
+    },
+    ParagraphText: {
+        label: "paragraphText",
+        style: FRAME_STYLES.paragraphText,
+        kind: "text",
+        prototype: "proto:paragraphText",
+        spacingAfter: 12
+    },
+    LearningObjectives: {
+        label: "learningObjectives",
+        style: FRAME_STYLES.learningObjectives,
+        kind: "text",
+        prototype: "proto:learningObjectives",
+        spacingAfter: 8
+    },
+    BulletList: {
+        label: "bulletList",
+        style: FRAME_STYLES.bulletList,
+        kind: "text",
+        prototype: "proto:bulletList",
+        spacingAfter: 6
+    },
+    LogoWithText: {
+        frameLabel: "logoFrame",
+        captionLabel: "logoText",
+        framePrototype: "proto:logoFrame",
+        captionPrototype: "proto:logoText",
+        style: FRAME_STYLES.logoText,
+        kind: "logo",
         spacingAfter: 14
     }
 };
@@ -1226,9 +1300,25 @@ function getBlockText(data) {
     var fields;
     var i;
     var value;
+    var bulletLines;
+    var bulletText;
 
     if (!data) {
         return "";
+    }
+
+    // BulletList blocks carry an "items" array instead of a text field.
+    if (data.items && data.items.length !== undefined) {
+        bulletLines = [];
+        for (i = 0; i < data.items.length; i++) {
+            bulletText = trimString(data.items[i]);
+            if (bulletText) {
+                bulletLines.push("\u2022 " + bulletText);
+            }
+        }
+        if (bulletLines.length > 0) {
+            return bulletLines.join("\r");
+        }
     }
 
     fields = ["text", "title", "label", "content", "value"];
@@ -1256,7 +1346,17 @@ function normalizeBlockType(itemType) {
         topic: "Topic",
         sectiontitle: "SectionTitle",
         text: "Text",
-        image: "Image"
+        image: "Image",
+        chapternumber: "ChapterNumber",
+        chaptertitle: "ChapterTitle",
+        lessonoverview: "LessonOverview",
+        paragraphtext: "ParagraphText",
+        learningobjectives: "LearningObjectives",
+        bulletlist: "BulletList",
+        logowithtext: "LogoWithText",
+        subsectiontitle: "SubSectionTitle",
+        caption: "FigureCaption",
+        figurecaption: "FigureCaption"
     };
 
     if (aliases[compact]) {
@@ -2022,6 +2122,16 @@ function addLayoutPage(layoutState) {
     layoutState.cursorY = getPageLayoutBounds(layoutState.page).top;
 }
 
+function resolveBlockSpacing(registryEntry) {
+    // Per-block-type spacing (in points) so spacing mirrors the source document's
+    // varying paragraph spacing. Falls back to the uniform blockGap when a block
+    // type does not define spacingAfter.
+    if (registryEntry && registryEntry.spacingAfter !== undefined && registryEntry.spacingAfter !== null) {
+        return registryEntry.spacingAfter;
+    }
+    return DYNAMIC_LAYOUT.blockGap;
+}
+
 function ensureLayoutSpace(layoutState, requiredHeight) {
     var bounds = getPageLayoutBounds(layoutState.page);
     var needed = requiredHeight || DYNAMIC_LAYOUT.minTextFrameHeight;
@@ -2091,16 +2201,19 @@ function advanceLayoutCursor(layoutState, frame, gapAfter) {
     }
 }
 
-function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame) {
+function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame, gapAfter) {
     var imageBottom;
     var captionBottom;
     var blockBottom;
-    var gap = layoutState.blockGap;
+    var gap = gapAfter;
 
     if (!imageFrame) {
         return;
     }
 
+    if (gap === undefined || gap === null) {
+        gap = layoutState.blockGap;
+    }
     if (gap === undefined || gap === null) {
         gap = DYNAMIC_LAYOUT.blockGap;
     }
@@ -2276,7 +2389,7 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
             DYNAMIC_LAYOUT.minTextFrameHeight,
             protoHeight
         );
-        advanceLayoutCursor(layoutState, frame, DYNAMIC_LAYOUT.blockGap);
+        advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
         populatedCount += 1;
         appendRenderLog("Status: populated (dynamic frame created on Content layer)");
     } catch (textError) {
@@ -2432,9 +2545,9 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         appendRenderLog("Resolved image file: " + imageFile.fsName);
         appendRenderLog("Image status: populated (dynamic frame created on Content layer)");
 
-        cleanCaption = trimString(data.caption || "");
+        cleanCaption = trimString(data.caption || data.text || "");
         if (!cleanCaption) {
-            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null, resolveBlockSpacing(registryEntry));
             return;
         }
 
@@ -2442,7 +2555,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         if (captionProtoResult === null) {
             appendRenderLog("Caption prototype found: no");
             warnings.push('Image #' + blockIndex + ' placed but no caption prototype or "' + PROTOTYPE_TEXT_FALLBACK + '" fallback found.');
-            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+            advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null, resolveBlockSpacing(registryEntry));
             return;
         }
 
@@ -2481,11 +2594,168 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         );
         populatedCount += 1;
         appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
-        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame);
+        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame, resolveBlockSpacing(registryEntry));
     } catch (captionError) {
         warnings.push('Could not create dynamic caption for Image #' + blockIndex + ": " + captionError.message);
-        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null);
+        advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null, resolveBlockSpacing(registryEntry));
     }
+}
+
+function createLogoGraphicFrame(page, proto, top, left, width, height) {
+    var frame = page.rectangles.add({
+        geometricBounds: [top, left, top + height, left + width]
+    });
+
+    if (proto) {
+        try {
+            if (proto.appliedObjectStyle) {
+                frame.applyObjectStyle(proto.appliedObjectStyle);
+            }
+        } catch (styleError) {}
+
+        try {
+            frame.strokeWeight = proto.strokeWeight;
+            frame.strokeColor = proto.strokeColor;
+            frame.strokeTint = proto.strokeTint;
+            frame.fillColor = proto.fillColor;
+            frame.fillTint = proto.fillTint;
+        } catch (strokeFillError) {}
+
+        try {
+            frame.frameFittingOptions.fittingOnEmptyFrame = proto.frameFittingOptions.fittingOnEmptyFrame;
+            frame.frameFittingOptions.fittingAlignment = proto.frameFittingOptions.fittingAlignment;
+            frame.frameFittingOptions.autoFit = proto.frameFittingOptions.autoFit;
+        } catch (fittingError) {}
+    }
+
+    assignFrameToContentLayer(frame);
+    clearRuntimeLabel(frame);
+    return frame;
+}
+
+// LogoWithText renders the logo and its label SIDE BY SIDE. The logo size and
+// styling come from proto:logoFrame when present (otherwise a small default so
+// it never balloons to full column width); the label is always placed to the
+// RIGHT of the logo, filling the rest of the column and vertically centered.
+// This is computed in code so the side-by-side result does not depend on the
+// exact positions of the two prototypes in the template.
+function populateDynamicLogoBlock(layoutState, document, registryEntry, data, blockIndex, scriptFolder) {
+    var frameProtoLabel = registryEntry.framePrototype;
+    var textProtoLabel = registryEntry.captionPrototype;
+    var logoProto;
+    var textProto;
+    var protoBounds;
+    var layoutBounds;
+    var logoLeft;
+    var logoWidth;
+    var logoHeight;
+    var textLeft;
+    var textWidth;
+    var textHeight;
+    var top;
+    var blockBottom;
+    var logoFrame;
+    var textFrame;
+    var imageFile;
+    var cleanText = trimString(data.text || data.caption || "");
+    var urlOrPath = data.url;
+    var DEFAULT_LOGO_SIZE = 24; // points, used only when proto:logoFrame is missing
+    var LOGO_TEXT_GAP = 8;      // points between the logo and its label
+
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: LogoWithText");
+    appendRenderLog("Occurrence: " + blockIndex);
+    appendRenderLog("Logo path: " + (urlOrPath ? urlOrPath : "(empty)"));
+    appendRenderLog("Logo text: " + (cleanText ? cleanText : "(empty)"));
+
+    logoProto = findPageItemByLabel(document, frameProtoLabel);
+    textProto = findPageItemByLabel(document, textProtoLabel);
+    layoutBounds = getPageLayoutBounds(layoutState.page);
+
+    if (logoProto !== null) {
+        protoBounds = logoProto.geometricBounds;
+        logoWidth = protoBounds[3] - protoBounds[1];
+        logoHeight = protoBounds[2] - protoBounds[0];
+        appendRenderLog("Logo size from proto:logoFrame: " + logoWidth + " x " + logoHeight);
+    } else {
+        logoWidth = DEFAULT_LOGO_SIZE;
+        logoHeight = DEFAULT_LOGO_SIZE;
+        appendRenderLog("proto:logoFrame not found; using default logo size " + DEFAULT_LOGO_SIZE);
+    }
+
+    logoLeft = layoutBounds.left;
+    textLeft = logoLeft + logoWidth + LOGO_TEXT_GAP;
+    textWidth = layoutBounds.right - textLeft;
+    if (textWidth < 1) {
+        textWidth = layoutBounds.right - layoutBounds.left;
+    }
+    textHeight = logoHeight;
+
+    imageFile = resolveImageFile(urlOrPath, scriptFolder, blockIndex);
+
+    compactCursorYBeforeImage(layoutState);
+    ensureLayoutSpace(layoutState, logoHeight);
+
+    top = layoutState.cursorY;
+    blockBottom = top;
+
+    if (imageFile !== null) {
+        try {
+            logoFrame = createLogoGraphicFrame(layoutState.page, logoProto, top, logoLeft, logoWidth, logoHeight);
+            if (placeImageContentInFrame(logoFrame, imageFile)) {
+                populatedCount += 1;
+                appendRenderLog("Logo image status: populated");
+                if (getFrameBottomY(logoFrame) > blockBottom) {
+                    blockBottom = getFrameBottomY(logoFrame);
+                }
+            } else {
+                appendRenderLog("Logo image not visible after place/fit");
+                try {
+                    logoFrame.remove();
+                } catch (removeLogoError) {}
+            }
+        } catch (logoError) {
+            warnings.push('Could not create logo frame #' + blockIndex + ": " + logoError.message);
+        }
+    } else {
+        appendRenderLog("Logo image file not found on disk; rendering text only.");
+        warnings.push('Logo image not found for "' + urlOrPath + '".');
+    }
+
+    if (cleanText) {
+        try {
+            textFrame = layoutState.page.textFrames.add({
+                geometricBounds: [top, textLeft, top + textHeight, textLeft + textWidth]
+            });
+            assignFrameToContentLayer(textFrame);
+            clearRuntimeLabel(textFrame);
+
+            // Vertically center the label against the logo. Prefer the text
+            // prototype's setting when present, otherwise force center alignment.
+            try {
+                if (textProto !== null) {
+                    textFrame.textFramePreferences.verticalJustification =
+                        textProto.textFramePreferences.verticalJustification;
+                } else {
+                    textFrame.textFramePreferences.verticalJustification =
+                        VerticalJustification.CENTER_ALIGN;
+                }
+            } catch (verticalJustifyError) {}
+
+            textFrame.contents = cleanText;
+            applyFrameStyle(textFrame, registryEntry.style);
+            populatedCount += 1;
+            appendRenderLog("Logo text status: populated");
+            if (getFrameBottomY(textFrame) > blockBottom) {
+                blockBottom = getFrameBottomY(textFrame);
+            }
+        } catch (textError) {
+            warnings.push('Could not create logo text #' + blockIndex + ": " + textError.message);
+        }
+    }
+
+    layoutState.cursorY = blockBottom + resolveBlockSpacing(registryEntry);
+    appendRenderLog("LogoWithText cursorY: " + layoutState.cursorY);
 }
 
 function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
@@ -2516,6 +2786,11 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
 
         if (registryEntry.kind === "image") {
             populateDynamicImageBlock(layoutState, document, registryEntry, data, blockIndex, scriptFolder);
+            continue;
+        }
+
+        if (registryEntry.kind === "logo") {
+            populateDynamicLogoBlock(layoutState, document, registryEntry, data, blockIndex, scriptFolder);
             continue;
         }
 

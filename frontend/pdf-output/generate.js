@@ -63,7 +63,9 @@ const downloadAssetIfNeeded = async (assetKey) => {
 };
 
 const syncAssets = async (contentItems) => {
-  const imageItems = contentItems.filter((item) => item?.type === "Image" && item?.data?.url);
+  // Any block that carries a data.url needs its asset downloaded
+  // (Image, LogoWithText, and any future image-bearing block types).
+  const imageItems = contentItems.filter((item) => item?.data?.url);
   for (const imageItem of imageItems) {
     const assetKey = imageItem.data.url;
     await downloadAssetIfNeeded(assetKey);
