@@ -279,6 +279,8 @@ const CLASS_TEMPLATE_TYPE_ALIASES = {
   ParagraphText: 'Text',
   LessonTitle: 'LessonTitle',
   LearningObjectives: 'LearningObjectives',
+  SubSectionTitle: 'SubSectionTitle',
+  FigureCaption: 'FigureCaption',
 };
 
 const toCanonicalClassType = (rawType) => CLASS_TEMPLATE_TYPE_ALIASES[rawType] || rawType;
@@ -331,8 +333,10 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   let sectionTitle = '';
   let mediaIndex = 1;
   let captureLearningObjectives = null;
+  let captureChapterOutline = false;
   let sawSectionTitle = false;
   let sectionTitleAddedToContent = false;
+  let pendingImageMediaId = null;
 
   const flushLearningObjectives = () => {
     if (!captureLearningObjectives) return;
@@ -354,6 +358,14 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     const type = toCanonicalClassType(node?.type);
     const rawType = node?.type;
     const dataText = normalizeText(node?.data?.text);
+
+    if (type !== 'FigureCaption' && type !== 'Image') {
+      pendingImageMediaId = null;
+    }
+
+    if (captureChapterOutline && type !== 'LessonOverview') {
+      captureChapterOutline = false;
+    }
 
     if (type === 'LessonNumber' && dataText) {
       const match = dataText.match(/chapter\s+(\d+)/i);
@@ -391,13 +403,20 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       const sectionMeta = parseSectionHeading(dataText);
       if (sectionMeta) {
         outline.push(dataText);
+        if (captureChapterOutline) {
+          content.push({ type: 'paragraph', text: dataText });
+        }
       }
       return;
     }
 
     if (type === 'ChapterOverview' && dataText) {
       flushLearningObjectives();
-      if (/chapter outline/i.test(dataText)) return;
+      if (/chapter outline/i.test(dataText)) {
+        captureChapterOutline = true;
+        content.push({ type: 'heading', text: dataText });
+        return;
+      }
 
       if (/learning objectives/i.test(dataText)) {
         captureLearningObjectives = {
@@ -409,6 +428,16 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       }
 
       content.push({ type: 'heading', text: dataText });
+      return;
+    }
+
+    if (type === 'LearningObjectives' && dataText) {
+      flushLearningObjectives();
+      captureLearningObjectives = {
+        title: dataText,
+        introText: '',
+        objectives: [],
+      };
       return;
     }
 
@@ -425,11 +454,23 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       };
 
       content.push({ type: 'image', mediaId });
+      pendingImageMediaId = mediaId;
+      return;
+    }
+
+    if (type === 'FigureCaption' && dataText) {
+      // Word flow may emit caption as a separate block after Image.
+      if (pendingImageMediaId && media[pendingImageMediaId]) {
+        media[pendingImageMediaId].caption = dataText;
+      } else {
+        content.push({ type: 'paragraph', text: dataText });
+      }
       return;
     }
 
     if (rawType === 'LogoWithText') {
       flushLearningObjectives();
+      pendingImageMediaId = null;
       const logoUrl = normalizePublicAssetPath(node?.data?.url);
       const logoText = normalizeText(node?.data?.text);
       let logoMediaId = null;
@@ -451,6 +492,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     }
 
     if (rawType === 'BulletList') {
+      pendingImageMediaId = null;
       const items = Array.isArray(node?.data?.items)
         ? node.data.items.map((item) => normalizeText(item)).filter(Boolean)
         : [];
@@ -469,6 +511,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     }
 
     if (type === 'Text' && dataText) {
+      pendingImageMediaId = null;
       if (captureLearningObjectives) {
         if (/^By the end of this section,?\s*/i.test(dataText)) {
           captureLearningObjectives.introText = dataText;
@@ -481,6 +524,13 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       }
 
       content.push({ type: 'paragraph', text: dataText });
+      return;
+    }
+
+    if (type === 'SubSectionTitle' && dataText) {
+      flushLearningObjectives();
+      pendingImageMediaId = null;
+      content.push({ type: 'heading', text: dataText });
     }
   });
 
