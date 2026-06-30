@@ -294,7 +294,8 @@ const extractLearningObjectives = (text) => {
     /\b(Identify|Describe|List|Explain|Define|Compare|Analyze|Discuss|Evaluate|Recognize|Differentiate|Summarize)\b/g;
 
   const starts = [...normalized.matchAll(objectiveStartRegex)].map((match) => match.index);
-  if (starts.length <= 1) return [normalized];
+  if (starts.length === 0) return [];
+  if (starts.length === 1) return [normalized];
 
   const objectives = [];
   starts.forEach((start, index) => {
@@ -519,8 +520,13 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         }
 
         const objectives = extractLearningObjectives(dataText);
-        captureLearningObjectives.objectives.push(...objectives);
-        return;
+        if (objectives.length) {
+          captureLearningObjectives.objectives.push(...objectives);
+          return;
+        }
+
+        // End objective capture when regular body text starts.
+        flushLearningObjectives();
       }
 
       content.push({ type: 'paragraph', text: dataText });
