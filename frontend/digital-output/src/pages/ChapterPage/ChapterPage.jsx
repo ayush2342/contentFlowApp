@@ -52,6 +52,7 @@ const ChapterPage = () => {
           </ul>
         </div>
       )}
+      <h2 className={styles.sectionTitle}>Chapter Content</h2>
       {chapter.lessons?.length ? (
         <div className={styles.contentStack}>
           {chapter.lessons.map((lesson) => (

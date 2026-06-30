@@ -9,7 +9,6 @@ import Quote from '../components/Quote';
 import TableBlock from '../components/TableBlock';
 import Activity from '../components/Activity';
 import Assessment from '../components/Assessment';
-import IconLabel from '../components/IconLabel';
 
 const componentRegistry = {
   Heading,
@@ -23,7 +22,6 @@ const componentRegistry = {
   TableBlock,
   Activity,
   Assessment,
-  IconLabel,
 };
 
 export default componentRegistry;
