@@ -218,7 +218,7 @@ router.get('/pdf/:tenantId/:documentId', async (req, res, next) => {
     });
 
     res.setHeader('Content-Type', pdf.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${pdf.fileName}"`);
     res.send(pdf.fileBuffer);
   } catch (error) {
     next(error);
@@ -244,7 +244,7 @@ router.get('/output/:outputId/pdf', async (req, res, next) => {
     });
 
     res.setHeader('Content-Type', pdf.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${pdf.fileName}"`);
     res.send(pdf.fileBuffer);
   } catch (error) {
     next(error);
