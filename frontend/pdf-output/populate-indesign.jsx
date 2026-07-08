@@ -28,7 +28,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v19";
+var POPULATE_SCRIPT_VERSION = "dynamic-v22";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 
@@ -361,6 +361,7 @@ function hexToRgb(hex) {
 
 function convertTypographyStyle(style) {
     return {
+        fontFamily: style.font || "",
         pointSize: style.size || 12,
         bold: style.bold === true,
         italic: style.italic === true,
@@ -369,21 +370,23 @@ function convertTypographyStyle(style) {
     };
 }
 
-function loadTypographyConfig(scriptFolder) {
+function loadTypographyConfig(scriptFolderPath) {
     var configPaths = [
-        scriptFolder + "/../../shared/typography-styles.json",
-        scriptFolder + "/../../../shared/typography-styles.json",
-        scriptFolder + "/typography-styles.json"
+        scriptFolderPath + "/typography-styles.json",
+        scriptFolderPath + "/../../shared/typography-styles.json",
+        scriptFolderPath + "/../../../shared/typography-styles.json"
     ];
     
     var configFile;
     var i;
     var rawJson;
     var config;
+    var loadedPath = "";
     
     for (i = 0; i < configPaths.length; i++) {
         configFile = File(configPaths[i]);
         if (configFile.exists) {
+            loadedPath = configFile.fsName;
             break;
         }
         configFile = null;
@@ -402,6 +405,7 @@ function loadTypographyConfig(scriptFolder) {
     
     try {
         config = parseJSON(rawJson);
+        config.__loadedFrom = loadedPath;
         return config;
     } catch (parseError) {
         return null;
@@ -417,7 +421,7 @@ function buildFrameStylesFromConfig(typographyConfig) {
     }
     
     for (key in typographyConfig) {
-        if (typographyConfig.hasOwnProperty(key)) {
+        if (typographyConfig.hasOwnProperty(key) && key !== "__loadedFrom") {
             styles[key] = convertTypographyStyle(typographyConfig[key]);
         }
     }
@@ -1299,6 +1303,45 @@ function applyFontStyleSafe(textRange, bold, italic) {
     }
 }
 
+function applyConfiguredFontFamily(textRange, style) {
+    var family;
+    var candidates = [];
+    var i;
+
+    if (!textRange || !style || !style.fontFamily) {
+        return false;
+    }
+
+    family = trimString(style.fontFamily);
+    if (!family) {
+        return false;
+    }
+
+    if (style.bold && style.italic) {
+        candidates = ["Bold Italic", "BoldItalic", "Bold Oblique", "BoldIt", "Demi Bold Italic"];
+    } else if (style.bold) {
+        candidates = ["Bold", "Semibold", "SemiBold", "Medium", "Demi Bold", "Black"];
+    } else if (style.italic) {
+        candidates = ["Italic", "Oblique", "It", "Slanted"];
+    } else {
+        candidates = ["Regular", "Roman", "Book", "Normal", "Light", "Plain"];
+    }
+
+    for (i = 0; i < candidates.length; i++) {
+        try {
+            textRange.appliedFont = app.fonts.item(family + "\t" + candidates[i]);
+            return true;
+        } catch (fontByStyleError) {}
+    }
+
+    try {
+        textRange.appliedFont = app.fonts.item(family);
+        return true;
+    } catch (fontFamilyError) {}
+
+    return false;
+}
+
 function applyFrameStyle(textFrame, style) {
     var story;
     var textRange;
@@ -1318,6 +1361,7 @@ function applyFrameStyle(textFrame, style) {
         }
     }
 
+    applyConfiguredFontFamily(textRange, style);
     applyFontStyleSafe(textRange, style.bold, style.italic);
     applyTextColor(textRange, style);
 
@@ -1328,6 +1372,73 @@ function applyFrameStyle(textFrame, style) {
             warnings.push("Could not set left indent.");
         }
     }
+}
+
+// Applies size/font/weight/color from a centralized style to a specific text
+// range (not the whole frame). Used to recolor the "FIGURE x.x" caption prefix.
+function applyTextRangeStyle(textRange, style) {
+    if (!textRange || !style) {
+        return;
+    }
+
+    if (style.pointSize) {
+        try {
+            textRange.pointSize = style.pointSize;
+        } catch (sizeError) {}
+    }
+
+    applyConfiguredFontFamily(textRange, style);
+    applyFontStyleSafe(textRange, style.bold, style.italic);
+    applyTextColor(textRange, style);
+}
+
+// Mirrors the web ImageBlock split: a leading "FIGURE 1.1" style prefix is
+// rendered with the imageFigureNumber style; the rest keeps the caption style.
+function parseFigureCaptionParts(caption) {
+    var text = trimString(caption || "");
+    var match;
+
+    if (!text) {
+        return null;
+    }
+
+    match = text.match(/^(FIGURE\s+\d+(?:\.\d+)?)([\s\S]*)$/i);
+    if (!match) {
+        return null;
+    }
+
+    return { prefix: match[1], rest: match[2] || "" };
+}
+
+function applyFigureCaptionPrefixStyle(textFrame, captionText) {
+    var parts = parseFigureCaptionParts(captionText);
+    var story;
+    var numberStyle;
+    var prefixRange;
+
+    if (!textFrame || !parts) {
+        return;
+    }
+
+    numberStyle = FRAME_STYLES.imageFigureNumber || FRAME_STYLES_DEFAULTS.imageFigureNumber;
+
+    try {
+        story = textFrame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+
+    if (!story) {
+        return;
+    }
+
+    try {
+        if (story.characters.length < parts.prefix.length) {
+            return;
+        }
+        prefixRange = story.characters.itemByRange(0, parts.prefix.length - 1);
+        applyTextRangeStyle(prefixRange, numberStyle);
+    } catch (prefixError) {}
 }
 
 function populateFrame(document, labelName, textContent, style, blockType) {
@@ -1358,6 +1469,9 @@ function populateFrame(document, labelName, textContent, style, blockType) {
 
     frame.contents = cleanText;
     applyFrameStyle(frame, style);
+    if (itemType === "ImageCaption") {
+        applyFigureCaptionPrefixStyle(frame, cleanText);
+    }
     markLabelUsed(labelName);
     populatedCount += 1;
     appendRenderLog("Status: populated");
@@ -2654,7 +2768,9 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         }
 
         syncLayoutPageFromFrame(layoutState, imageFrame);
-        layoutState.cursorY = getImageContentBottomY(imageFrame);
+        // Leave a small gap between the image and its caption so the caption
+        // does not sit flush against the image (spacing is config-driven).
+        layoutState.cursorY = getImageContentBottomY(imageFrame) + DYNAMIC_LAYOUT.imageCaptionGap;
     } catch (imageError) {
         appendRenderLog("Status: not populated — " + imageError.message);
         warnings.push('Could not create dynamic image frame #' + blockIndex + ": " + imageError.message);
@@ -2686,6 +2802,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
                 captionProtoResult.usedFallback ? captionProtoLabel : null
             )
         );
+        applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
         populatedCount += 1;
         appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
         advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame, resolveBlockSpacing(registryEntry));
@@ -3001,20 +3118,51 @@ function exportActiveDocumentToPdf(document, scriptFolderPath) {
 // Initialize FRAME_STYLES from typography config and rebuild BLOCK_REGISTRY
 // -----------------------------------------------------------------------------
 function initializeStylesFromConfig(scriptFolderPath) {
-    var typographyConfig = loadTypographyConfig(File(scriptFolderPath));
+    var typographyConfig = loadTypographyConfig(scriptFolderPath);
     var configStyles;
     
     if (typographyConfig) {
         configStyles = buildFrameStylesFromConfig(typographyConfig);
         if (configStyles) {
             FRAME_STYLES = configStyles;
-            appendRenderLog("Typography config loaded from shared/typography-styles.json");
+            appendRenderLog("Typography config loaded from: " + typographyConfig.__loadedFrom);
+            logResolvedTypographySample();
             return true;
         }
     }
     
     appendRenderLog("Using default FRAME_STYLES (typography config not found)");
+    logResolvedTypographySample();
     return false;
+}
+
+// Emits a compact snapshot of resolved styles so render.log can be used to
+// confirm the centralized typography values are the ones being applied.
+function logResolvedTypographySample() {
+    var keys = [
+        "chapterTitle", "sectionTitle", "paragraphText", "topic",
+        "imageCaption", "imageFigureNumber", "figureCaption", "logoText"
+    ];
+    var i;
+    var key;
+    var style;
+    var color;
+
+    for (i = 0; i < keys.length; i++) {
+        key = keys[i];
+        style = FRAME_STYLES[key];
+        if (!style) {
+            continue;
+        }
+        color = style.color ? ("[" + style.color.join(",") + "]") : "(none)";
+        appendRenderLog(
+            "  style " + key + ": font=" + (style.fontFamily || "(default)") +
+            " size=" + style.pointSize +
+            " bold=" + style.bold +
+            " italic=" + style.italic +
+            " color=" + color
+        );
+    }
 }
 
 function rebuildBlockRegistry() {

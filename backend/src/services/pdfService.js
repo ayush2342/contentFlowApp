@@ -7,6 +7,7 @@ import { getMediaStreamFromS3 } from './s3Service.js';
 
 const pdfCache = new Map();
 const defaultPdfSourceDir = path.resolve(process.cwd(), '..', 'frontend', 'pdf-output');
+const sharedSourceDir = path.resolve(process.cwd(), '..', 'shared');
 const runtimeRoot = path.resolve(process.cwd(), 'runtime', 'pdf-jobs');
 
 const getCacheRecord = (cacheKey) => {
@@ -123,11 +124,23 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   const runtimeTemplatePath = path.join(templatesDir, 'projectX.indd');
   const runtimeJsonPath = path.join(jobDir, 'tree_output.json');
   const runtimePdfPath = path.join(jobDir, 'output.pdf');
+  const sharedTypographyPath = path.join(sharedSourceDir, 'typography-styles.json');
+  const runtimeTypographyPath = path.join(jobDir, 'typography-styles.json');
 
   await fs.mkdir(assetsDir, { recursive: true });
   await fs.mkdir(templatesDir, { recursive: true });
   await fs.copyFile(scriptSourcePath, runtimeScriptPath);
   await fs.copyFile(templateSourcePath, runtimeTemplatePath);
+  // Non-fatal: the InDesign script falls back to shared/ paths or built-in
+  // defaults if this copy fails, so it must never abort the whole PDF job
+  // (which would also prevent render.log from being produced).
+  try {
+    await fs.copyFile(sharedTypographyPath, runtimeTypographyPath);
+  } catch (typographyCopyError) {
+    console.warn(
+      `Could not copy typography-styles.json into job folder: ${typographyCopyError.message}`
+    );
+  }
   await fs.writeFile(runtimeJsonPath, JSON.stringify(data ?? [], null, 2), 'utf8');
 
   const imageKeys = collectImageKeys(data);
