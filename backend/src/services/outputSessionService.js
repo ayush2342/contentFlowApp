@@ -7,7 +7,8 @@ const isExpired = (session) =>
   Date.now() - session.createdAt > env.outputSessionTtlSeconds * 1000;
 
 export const createOutputSession = (payload) => {
-  const outputId = crypto.randomBytes(8).toString('hex');
+  const prefix = (env.outputIdPrefix || 'main').trim().toLowerCase();
+  const outputId = `${prefix}-${crypto.randomBytes(8).toString('hex')}`;
   const session = {
     outputId,
     ...payload,

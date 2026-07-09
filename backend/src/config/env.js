@@ -19,6 +19,7 @@ if (missing.length) {
 
 export const env = {
   port: Number(process.env.PORT || 4000),
+  outputIdPrefix: (process.env.OUTPUT_ID_PREFIX || 'main').trim(),
   baseUrl: process.env.BASE_URL,
   digitalOutputBaseUrl: process.env.DIGITAL_OUTPUT_BASE_URL || process.env.BASE_URL,
   pdfOutputBaseUrl: process.env.PDF_OUTPUT_BASE_URL || process.env.BASE_URL,
