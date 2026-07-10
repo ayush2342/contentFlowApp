@@ -1,10 +1,11 @@
 .paragraph {
   font-family: var(--typography-paragraphText-font, var(--font-family));
   font-size: var(--typography-paragraphText-size, 9pt);
-  line-height: 1.7;
+  line-height: 1.55;
   color: var(--typography-paragraphText-color, var(--paragraph-color));
   font-weight: var(--typography-paragraphText-weight, 400);
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
+  text-align: left;
 }
 
 .link {

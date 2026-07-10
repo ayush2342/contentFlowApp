@@ -1,132 +1,124 @@
 /**
- * Centralized Typography Configuration
- * 
- * This is the single source of truth for text styling across both
- * digital output (web) and PDF generation (InDesign).
- * 
- * All block types that appear in the JSON content should have their
- * styling defined here. Changes here will automatically propagate to
- * both rendering outputs.
+ * Centralized typography presets supplied by plugin team.
+ * A normalized map is derived for web and PDF consumers.
  */
 
-export const typographyStyles = {
+export const OPENER_STYLES = {
+  chapterHeading: { font: "Arial", size: 15, color: "#0074BC", bold: false },
+  chapterTitle: { font: "Arial", size: 22, color: "#000000", bold: false },
+  chapterOverview: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  lessonOverview: { font: "Arial", size: 9, color: "#000000", bold: true },
+  lessonTitle: { font: "Arial", size: 12, color: "#0074BC", bold: false },
+  learningObjectives: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  sectionTitle: { font: "Arial", size: 11, color: "#0074BC", bold: false },
+  subSectionTitle: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  paragrapghText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  paragraphText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bullestList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bulletList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  imageFigureNumber: { font: "Arial", size: 7.5, color: "#C31427", bold: true },
+  imageFigureText: { font: "Arial", size: 7.5, color: "#000000", bold: false },
+};
+
+export const NON_OPENER_STYLES = {
+  partNumber: {
+    font: "Arial",
+    size: 24,
+    color: "#FFFFFF",
+    bold: false,
+    backgroundColor: "#CA5027",
+  },
   chapterHeading: {
     font: "Arial",
-    size: 15,
-    color: "#0074BC",
+    size: 36,
+    color: "#FFFFFF",
     bold: false,
+    backgroundColor: "#CA5027",
   },
-  chapterTitle: {
-    font: "Arial",
-    size: 22,
-    color: "#000000",
-    bold: false,
-  },
-  chapterOverview: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
-  },
-  lessonOverview: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: true,
-  },
-  lessonTitle: {
-    font: "Arial",
-    size: 12,
-    color: "#0074BC",
-    bold: false,
-  },
-  learningObjectives: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
+  lessonTitle: { font: "Arial", size: 44, color: "#214880", bold: false },
+  learningObjectives: { font: "Arial", size: 15, color: "#CA5027", bold: true },
+  paragraphText: { font: "Arial", size: 10, color: "#000000", bold: false },
+  subTitlesList: {
+    text: { font: "Arial", size: 11, color: "#000000", bold: false },
+    number: { font: "Arial", size: 11, color: "#CA5027", bold: true },
   },
   sectionTitle: {
-    font: "Arial",
-    size: 11,
-    color: "#0074BC",
-    bold: false,
+    text: { font: "Arial", size: 17, color: "#214880", bold: true },
+    number: { font: "Arial", size: 18, color: "#214880", bold: true },
   },
-  subSectionTitle: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
-  },
-  paragraphText: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: false,
-  },
-  bulletList: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: false,
-  },
-  imageFigureNumber: {
-    font: "Arial",
-    size: 7.5,
-    color: "#C31427",
-    bold: true,
-  },
-  imageFigureText: {
-    font: "Arial",
-    size: 7.5,
-    color: "#000000",
-    bold: false,
-  },
-  // Additional block types used in the system
-  lessonNumber: {
-    font: "Arial",
-    size: 14,
-    color: "#0074BC",
-    bold: false,
-  },
-  chapterNumber: {
-    font: "Arial",
-    size: 14,
-    color: "#0074BC",
-    bold: false,
-  },
-  topic: {
-    font: "Arial",
-    size: 11,
-    color: "#000000",
-    bold: true,
-  },
-  text: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: false,
-  },
-  imageCaption: {
-    font: "Arial",
-    size: 7.5,
-    color: "#000000",
-    bold: false,
-  },
-  figureCaption: {
-    font: "Arial",
-    size: 7.5,
-    color: "#404040",
-    bold: false,
-    italic: true,
-  },
-  logoText: {
-    font: "Arial",
-    size: 11,
-    color: "#0074BC",
-    bold: true,
-  },
+  subSectionTitle: { font: "Arial", size: 10, color: "#000000", bold: true },
+  greenSubSectionTitle: { font: "Arial", size: 15, color: "#00854A", bold: true },
+  subTitle: { font: "Arial", size: 12, color: "#CA5027", bold: false },
 };
+
+const pickStyle = (styleSet, keys) => {
+  for (const key of keys) {
+    const value = styleSet?.[key];
+    if (value && typeof value === "object") {
+      return value.text && typeof value.text === "object" ? value.text : value;
+    }
+  }
+  return null;
+};
+
+const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
+  const chapterHeading = pickStyle(styleSet, ["chapterHeading"]);
+  const chapterTitle = pickStyle(styleSet, ["chapterTitle"]);
+  const chapterOverview = pickStyle(styleSet, ["chapterOverview"]);
+  const lessonOverview = pickStyle(styleSet, ["lessonOverview", "topic"]);
+  const lessonTitle = pickStyle(styleSet, ["lessonTitle"]);
+  const learningObjectives = pickStyle(styleSet, ["learningObjectives"]);
+  const sectionTitle = pickStyle(styleSet, ["sectionTitle", "subTitlesList"]);
+  const subSectionTitle = pickStyle(styleSet, [
+    "subSectionTitle",
+    "greenSubSectionTitle",
+    "subTitle",
+  ]);
+  const paragraphText = pickStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
+  const bulletList = pickStyle(styleSet, ["bulletList", "bullestList"]);
+  const imageFigureNumber = pickStyle(styleSet, ["imageFigureNumber"]);
+  const imageFigureText = pickStyle(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
+
+  return {
+    chapterHeading,
+    chapterTitle,
+    chapterOverview,
+    lessonOverview,
+    lessonTitle,
+    learningObjectives,
+    sectionTitle,
+    subSectionTitle,
+    paragraphText,
+    bulletList,
+    imageFigureNumber,
+    imageFigureText,
+    // Backward-compatible keys currently used by renderers
+    chapterNumber: chapterHeading,
+    lessonNumber: chapterHeading,
+    topic: lessonOverview,
+    text: paragraphText,
+    imageCaption: imageFigureText,
+    figureCaption: imageFigureText,
+    logoText: subSectionTitle,
+  };
+};
+
+export const STYLE_PRESETS = {
+  opener: OPENER_STYLES,
+  nonOpener: NON_OPENER_STYLES,
+};
+
+export const resolveTypographyStyles = (mode = "opener") => {
+  const normalizedMode = String(mode || "opener").toLowerCase();
+  const preset =
+    normalizedMode === "nonopener" || normalizedMode === "non-opener"
+      ? STYLE_PRESETS.nonOpener
+      : STYLE_PRESETS.opener;
+
+  return normalizeStylePreset(preset);
+};
+
+export const typographyStyles = resolveTypographyStyles("opener");
 
 /**
  * Helper to convert hex color to RGB array for InDesign
@@ -164,6 +156,7 @@ export const toInDesignStyle = (style) => ({
  * @returns {object} Object with CSS variable names and values
  */
 export const toCssVariables = (key, style) => {
+  if (!style) return {};
   const prefix = `--typography-${key}`;
   return {
     [`${prefix}-font`]: `${style.font}, sans-serif`,
@@ -178,9 +171,9 @@ export const toCssVariables = (key, style) => {
  * Generate all CSS variables from typography config
  * @returns {object} Object with all CSS variable names and values
  */
-export const generateAllCssVariables = () => {
+export const generateAllCssVariables = (styles = typographyStyles) => {
   const variables = {};
-  Object.entries(typographyStyles).forEach(([key, style]) => {
+  Object.entries(styles).forEach(([key, style]) => {
     Object.assign(variables, toCssVariables(key, style));
   });
   return variables;

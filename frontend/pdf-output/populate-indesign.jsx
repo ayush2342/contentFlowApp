@@ -370,6 +370,91 @@ function convertTypographyStyle(style) {
     };
 }
 
+function normalizeTypographyEntry(value) {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+    if (value.text && typeof value.text === "object") {
+        return value.text;
+    }
+    return value;
+}
+
+function pickTypographyEntry(styleSet, keys) {
+    var i;
+    var key;
+    var candidate;
+    for (i = 0; i < keys.length; i++) {
+        key = keys[i];
+        if (styleSet.hasOwnProperty(key)) {
+            candidate = normalizeTypographyEntry(styleSet[key]);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+    return null;
+}
+
+function getTypographyMode(config) {
+    var rawMode = "";
+    if (config && config.ACTIVE_STYLE_MODE) {
+        rawMode = String(config.ACTIVE_STYLE_MODE);
+    } else if (config && config.styleMode) {
+        rawMode = String(config.styleMode);
+    } else {
+        rawMode = "opener";
+    }
+
+    rawMode = trimString(rawMode).toLowerCase();
+    if (rawMode === "non_opener" || rawMode === "non-opener" || rawMode === "nonopener") {
+        return "nonOpener";
+    }
+    return "opener";
+}
+
+function buildCanonicalStyleMap(styleSet) {
+    var chapterHeading = pickTypographyEntry(styleSet, ["chapterHeading"]);
+    var chapterTitle = pickTypographyEntry(styleSet, ["chapterTitle"]);
+    var chapterOverview = pickTypographyEntry(styleSet, ["chapterOverview"]);
+    var lessonOverview = pickTypographyEntry(styleSet, ["lessonOverview", "topic"]);
+    var lessonTitle = pickTypographyEntry(styleSet, ["lessonTitle"]);
+    var learningObjectives = pickTypographyEntry(styleSet, ["learningObjectives"]);
+    var sectionTitle = pickTypographyEntry(styleSet, ["sectionTitle", "subTitlesList"]);
+    var subSectionTitle = pickTypographyEntry(styleSet, [
+        "subSectionTitle",
+        "greenSubSectionTitle",
+        "subTitle"
+    ]);
+    var paragraphText = pickTypographyEntry(styleSet, ["paragraphText", "paragrapghText", "text"]);
+    var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList"]);
+    var imageFigureNumber = pickTypographyEntry(styleSet, ["imageFigureNumber"]);
+    var imageFigureText = pickTypographyEntry(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
+
+    return {
+        chapterHeading: chapterHeading,
+        chapterTitle: chapterTitle,
+        chapterOverview: chapterOverview,
+        lessonOverview: lessonOverview,
+        lessonTitle: lessonTitle,
+        learningObjectives: learningObjectives,
+        sectionTitle: sectionTitle,
+        subSectionTitle: subSectionTitle,
+        paragraphText: paragraphText,
+        bulletList: bulletList,
+        imageFigureNumber: imageFigureNumber,
+        imageFigureText: imageFigureText,
+        // Backward compatible aliases used by current script registry
+        chapterNumber: chapterHeading,
+        lessonNumber: chapterHeading,
+        topic: lessonOverview,
+        text: paragraphText,
+        imageCaption: imageFigureText,
+        figureCaption: imageFigureText,
+        logoText: subSectionTitle
+    };
+}
+
 function loadTypographyConfig(scriptFolderPath) {
     var configPaths = [
         scriptFolderPath + "/typography-styles.json",
@@ -414,15 +499,29 @@ function loadTypographyConfig(scriptFolderPath) {
 
 function buildFrameStylesFromConfig(typographyConfig) {
     var styles = {};
+    var mode = "opener";
+    var sourceMap = typographyConfig;
+    var canonicalMap;
     var key;
     
     if (!typographyConfig) {
         return null;
     }
+
+    if (typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES) {
+        mode = getTypographyMode(typographyConfig);
+        if (mode === "nonOpener" && typographyConfig.NON_OPENER_STYLES) {
+            sourceMap = typographyConfig.NON_OPENER_STYLES;
+        } else {
+            sourceMap = typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES;
+        }
+    }
+
+    canonicalMap = buildCanonicalStyleMap(sourceMap);
     
-    for (key in typographyConfig) {
-        if (typographyConfig.hasOwnProperty(key) && key !== "__loadedFrom") {
-            styles[key] = convertTypographyStyle(typographyConfig[key]);
+    for (key in canonicalMap) {
+        if (canonicalMap.hasOwnProperty(key) && canonicalMap[key]) {
+            styles[key] = convertTypographyStyle(canonicalMap[key]);
         }
     }
     
@@ -430,6 +529,8 @@ function buildFrameStylesFromConfig(typographyConfig) {
     if (styles.bulletList) {
         styles.bulletList.leftIndent = 12;
     }
+
+    styles.__mode = mode;
     
     return styles;
 }

@@ -1,12 +1,14 @@
 .imageBlock {
-  margin: 1.5rem 0;
-  text-align: center;
+  margin: 1rem 0 1.25rem;
+  text-align: left;
 }
 
 .image {
+  width: 100%;
   max-width: 100%;
   border-radius: var(--border-radius);
   border: 1px solid var(--border-color);
+  display: block;
 }
 
 .caption {
@@ -17,6 +19,7 @@
   font-weight: var(--typography-imageFigureText-weight, 400);
   font-style: normal;
   text-align: left;
+  line-height: 1.35;
 }
 
 .figurePrefix {

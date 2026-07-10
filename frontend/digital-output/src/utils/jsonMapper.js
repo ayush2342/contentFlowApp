@@ -272,14 +272,54 @@ const normalizeText = (value) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const NORMALIZED_CLASS_TYPE_MAP = {
+  chapternumber: 'ChapterNumber',
+  chaptertitle: 'ChapterTitle',
+  chapterheading: 'ChapterHeading',
+  chapteroverview: 'ChapterOverview',
+  lessonnumber: 'LessonNumber',
+  lessontitle: 'LessonTitle',
+  lessonoverview: 'LessonOverview',
+  learningobjectives: 'LearningObjectives',
+  sectiontitle: 'SectionTitle',
+  subsectiontitle: 'SubSectionTitle',
+  greensubsectiontitle: 'GreenSubSectionTitle',
+  subtitleslist: 'SubTitlesList',
+  subtitle: 'SubTitle',
+  partnumber: 'PartNumber',
+  paragraphtext: 'ParagraphText',
+  paragraph: 'ParagraphText',
+  paragrapghtext: 'ParagraphText',
+  bulletlist: 'BulletList',
+  bullestlist: 'BulletList',
+  text: 'Text',
+  image: 'Image',
+  figureimage: 'Image',
+  figurecaption: 'FigureCaption',
+  caption: 'FigureCaption',
+  logowithtext: 'LogoWithText',
+};
+
+const normalizeClassTemplateRawType = (rawType) => {
+  const value = normalizeText(rawType);
+  if (!value) return value;
+  const normalizedKey = value.toLowerCase().replace(/[\s_-]+/g, '');
+  return NORMALIZED_CLASS_TYPE_MAP[normalizedKey] || value;
+};
+
 const CLASS_TEMPLATE_TYPE_ALIASES = {
   ChapterNumber: 'LessonNumber',
   ChapterTitle: 'ChapterTitle',
+  ChapterHeading: 'SectionTitle',
   LessonOverview: 'LessonOverview',
   ParagraphText: 'Text',
   LessonTitle: 'LessonTitle',
   LearningObjectives: 'LearningObjectives',
   SubSectionTitle: 'SubSectionTitle',
+  GreenSubSectionTitle: 'SubSectionTitle',
+  SubTitlesList: 'SubSectionTitle',
+  SubTitle: 'SubSectionTitle',
+  PartNumber: 'SectionTitle',
   FigureCaption: 'FigureCaption',
 };
 
@@ -312,6 +352,82 @@ const parseSectionHeading = (text) => {
   const match = normalized.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);
   if (!match) return null;
   return { sectionNumber: match[1], sectionTitle: match[2] };
+};
+
+const findFirstTypeText = (pages, wantedType) => {
+  const normalizedWanted = normalizeClassTemplateRawType(wantedType);
+  for (const page of pages) {
+    const blocks = Array.isArray(page?.content) ? page.content : [];
+    for (const block of blocks) {
+      const normalizedType = normalizeClassTemplateRawType(block?.type);
+      if (normalizedType === normalizedWanted) {
+        const text = normalizeText(block?.data?.text);
+        if (text) return text;
+      }
+    }
+  }
+  return '';
+};
+
+const mapPagedTemplateJson = (pages, options = {}) => {
+  const normalizedPages = Array.isArray(pages) ? pages : [];
+  const chapterTitle = findFirstTypeText(normalizedPages, 'ChapterTitle');
+  const chapterNumberText = findFirstTypeText(normalizedPages, 'ChapterNumber');
+  const chapterNumberMatch = chapterNumberText.match(/(\d+)/);
+  const chapterNumber = chapterNumberMatch ? Number(chapterNumberMatch[1]) : null;
+
+  const lessons = normalizedPages.map((page, index) => {
+    const nodes = Array.isArray(page?.content) ? page.content : [];
+    const mapped = mapClassTemplateJson(nodes, options);
+    const mappedComponents =
+      mapped.books?.[0]?.chapters?.[0]?.lessons?.[0]?.pages?.[0]?.components ?? [];
+    const pageNo = page?.page_no ?? index + 1;
+    const pageType = normalizeText(page?.page_type).toLowerCase();
+    const layout = pageType === 'non-opener' ? 'two-column' : 'single-column';
+    const lessonKey = `page-${pageNo}`;
+
+    return {
+      id: `section-${slugify(lessonKey) || index + 1}`,
+      sectionNumber: String(pageNo),
+      title: '',
+      description: '',
+      learningObjectives: [],
+      pages: [
+        {
+          id: `page-${slugify(lessonKey) || index + 1}`,
+          title: `Page ${pageNo}`,
+          sectionNumber: String(pageNo),
+          layout,
+          components: mappedComponents,
+        },
+      ],
+    };
+  });
+
+  const resolvedTitle = chapterTitle || 'Chapter';
+  const chapterKey = chapterNumber || resolvedTitle || 'chapter-1';
+
+  return {
+    bookId: slugify(resolvedTitle) || 'course',
+    media: {},
+    books: [
+      {
+        id: slugify(resolvedTitle) || 'course',
+        title: resolvedTitle,
+        description: '',
+        chapters: [
+          {
+            id: `chapter-${slugify(String(chapterKey)) || 1}`,
+            chapterNumber,
+            title: resolvedTitle,
+            description: '',
+            outline: [],
+            lessons,
+          },
+        ],
+      },
+    ],
+  };
 };
 
 const NON_TITLE_TOPIC_REGEX = [/^link to learning$/i, /^chapter outline$/i, /^learning objectives$/i];
@@ -356,8 +472,8 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   };
 
   nodes.forEach((node) => {
-    const type = toCanonicalClassType(node?.type);
-    const rawType = node?.type;
+    const rawType = normalizeClassTemplateRawType(node?.type);
+    const type = toCanonicalClassType(rawType);
     const dataText = normalizeText(node?.data?.text);
 
     if (type !== 'FigureCaption' && type !== 'Image') {
@@ -592,11 +708,38 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   };
 };
 
+const extractPreferredNodes = (treeNodes) => {
+  // Priority 1: new final payload schema -> { pages: [{ content: [...] }] }
+  if (Array.isArray(treeNodes?.pages)) {
+    const pageNodes = treeNodes.pages.flatMap((page) =>
+      Array.isArray(page?.content) ? page.content : []
+    );
+    return { nodes: pageNodes, source: 'pages' };
+  }
+
+  // Priority 2: flat content payload -> { content: [...] }
+  if (Array.isArray(treeNodes?.content)) {
+    return { nodes: treeNodes.content, source: 'content' };
+  }
+
+  // Priority 3: previous array payloads
+  if (Array.isArray(treeNodes)) {
+    return { nodes: treeNodes, source: 'array' };
+  }
+
+  return { nodes: [], source: 'none' };
+};
+
 export const mapTreeOutputJson = (treeNodes, options = {}) => {
-  const nodes = Array.isArray(treeNodes) ? treeNodes : [];
+  if (Array.isArray(treeNodes?.pages)) {
+    return mapPagedTemplateJson(treeNodes.pages, options);
+  }
+
+  const { nodes, source } = extractPreferredNodes(treeNodes);
   const firstNode = nodes[0];
 
-  if (firstNode?.type && firstNode?.data) {
+  // New payloads and previous class-template payloads both use node.type + node.data.
+  if (source === 'pages' || source === 'content' || (firstNode?.type && firstNode?.data)) {
     return mapClassTemplateJson(nodes, options);
   }
 
