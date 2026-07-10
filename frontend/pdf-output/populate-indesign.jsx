@@ -28,9 +28,10 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v22";
+var POPULATE_SCRIPT_VERSION = "dynamic-v23";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
+var CURRENT_PAGE_TYPE = "opener";
 
 // -----------------------------------------------------------------------------
 // Run headless (no popups/dialogs on server)
@@ -366,12 +367,23 @@ function convertTypographyStyle(style) {
         bold: style.bold === true,
         italic: style.italic === true,
         leftIndent: style.leftIndent || 0,
-        color: hexToRgb(style.color)
+        color: hexToRgb(style.color),
+        backgroundColor: style.backgroundColor || null
     };
+}
+
+function isRawCompositeStyle(value) {
+    return value &&
+        typeof value === "object" &&
+        value.text && typeof value.text === "object" &&
+        value.number && typeof value.number === "object";
 }
 
 function normalizeTypographyEntry(value) {
     if (!value || typeof value !== "object") {
+        return null;
+    }
+    if (isRawCompositeStyle(value)) {
         return null;
     }
     if (value.text && typeof value.text === "object") {
@@ -396,7 +408,37 @@ function pickTypographyEntry(styleSet, keys) {
     return null;
 }
 
+function pickRawTypographyEntry(styleSet, keys) {
+    var i;
+    var key;
+    var candidate;
+
+    for (i = 0; i < keys.length; i++) {
+        key = keys[i];
+        if (styleSet.hasOwnProperty(key)) {
+            candidate = styleSet[key];
+            if (candidate && typeof candidate === "object") {
+                return candidate;
+            }
+        }
+    }
+    return null;
+}
+
+function normalizePageType(pageType) {
+    var rawMode = trimString(pageType || CURRENT_PAGE_TYPE || "opener").toLowerCase();
+
+    if (rawMode === "non_opener" || rawMode === "non-opener" || rawMode === "nonopener") {
+        return "nonOpener";
+    }
+    return "opener";
+}
+
 function getTypographyMode(config) {
+    if (CURRENT_PAGE_TYPE) {
+        return normalizePageType(CURRENT_PAGE_TYPE);
+    }
+
     var rawMode = "";
     if (config && config.ACTIVE_STYLE_MODE) {
         rawMode = String(config.ACTIVE_STYLE_MODE);
@@ -406,11 +448,35 @@ function getTypographyMode(config) {
         rawMode = "opener";
     }
 
-    rawMode = trimString(rawMode).toLowerCase();
-    if (rawMode === "non_opener" || rawMode === "non-opener" || rawMode === "nonopener") {
-        return "nonOpener";
+    return normalizePageType(rawMode);
+}
+
+function resolveConfigStyle(rawEntry) {
+    if (!rawEntry) {
+        return null;
     }
-    return "opener";
+    if (isRawCompositeStyle(rawEntry)) {
+        return {
+            text: convertTypographyStyle(rawEntry.text),
+            number: convertTypographyStyle(rawEntry.number)
+        };
+    }
+    return convertTypographyStyle(rawEntry);
+}
+
+function cloneFallbackStyle(key) {
+    var fallback = FRAME_STYLES_DEFAULTS[key];
+
+    if (!fallback) {
+        return null;
+    }
+    if (fallback.text && fallback.number) {
+        return {
+            text: convertTypographyStyle(fallback.text),
+            number: convertTypographyStyle(fallback.number)
+        };
+    }
+    return fallback;
 }
 
 function buildCanonicalStyleMap(styleSet) {
@@ -420,12 +486,12 @@ function buildCanonicalStyleMap(styleSet) {
     var lessonOverview = pickTypographyEntry(styleSet, ["lessonOverview", "topic"]);
     var lessonTitle = pickTypographyEntry(styleSet, ["lessonTitle"]);
     var learningObjectives = pickTypographyEntry(styleSet, ["learningObjectives"]);
-    var sectionTitle = pickTypographyEntry(styleSet, ["sectionTitle", "subTitlesList"]);
-    var subSectionTitle = pickTypographyEntry(styleSet, [
-        "subSectionTitle",
-        "greenSubSectionTitle",
-        "subTitle"
-    ]);
+    var sectionTitle = pickRawTypographyEntry(styleSet, ["sectionTitle"]);
+    var subTitlesList = pickRawTypographyEntry(styleSet, ["subTitlesList"]);
+    var subSectionTitle = pickTypographyEntry(styleSet, ["subSectionTitle"]);
+    var greenSubSectionTitle = pickTypographyEntry(styleSet, ["greenSubSectionTitle"]);
+    var subTitle = pickTypographyEntry(styleSet, ["subTitle"]);
+    var partNumber = pickTypographyEntry(styleSet, ["partNumber"]);
     var paragraphText = pickTypographyEntry(styleSet, ["paragraphText", "paragrapghText", "text"]);
     var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList"]);
     var imageFigureNumber = pickTypographyEntry(styleSet, ["imageFigureNumber"]);
@@ -439,7 +505,11 @@ function buildCanonicalStyleMap(styleSet) {
         lessonTitle: lessonTitle,
         learningObjectives: learningObjectives,
         sectionTitle: sectionTitle,
+        subTitlesList: subTitlesList,
         subSectionTitle: subSectionTitle,
+        greenSubSectionTitle: greenSubSectionTitle,
+        subTitle: subTitle,
+        partNumber: partNumber,
         paragraphText: paragraphText,
         bulletList: bulletList,
         imageFigureNumber: imageFigureNumber,
@@ -451,7 +521,7 @@ function buildCanonicalStyleMap(styleSet) {
         text: paragraphText,
         imageCaption: imageFigureText,
         figureCaption: imageFigureText,
-        logoText: subSectionTitle
+        logoText: subSectionTitle || greenSubSectionTitle
     };
 }
 
@@ -499,17 +569,17 @@ function loadTypographyConfig(scriptFolderPath) {
 
 function buildFrameStylesFromConfig(typographyConfig) {
     var styles = {};
-    var mode = "opener";
+    var mode = getTypographyMode(typographyConfig);
     var sourceMap = typographyConfig;
     var canonicalMap;
     var key;
+    var resolved;
     
     if (!typographyConfig) {
         return null;
     }
 
     if (typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES) {
-        mode = getTypographyMode(typographyConfig);
         if (mode === "nonOpener" && typographyConfig.NON_OPENER_STYLES) {
             sourceMap = typographyConfig.NON_OPENER_STYLES;
         } else {
@@ -520,8 +590,18 @@ function buildFrameStylesFromConfig(typographyConfig) {
     canonicalMap = buildCanonicalStyleMap(sourceMap);
     
     for (key in canonicalMap) {
-        if (canonicalMap.hasOwnProperty(key) && canonicalMap[key]) {
-            styles[key] = convertTypographyStyle(canonicalMap[key]);
+        if (canonicalMap.hasOwnProperty(key)) {
+            resolved = resolveConfigStyle(canonicalMap[key]);
+            if (resolved) {
+                styles[key] = resolved;
+            }
+        }
+    }
+
+    for (key in FRAME_STYLES_DEFAULTS) {
+        if (FRAME_STYLES_DEFAULTS.hasOwnProperty(key) && !styles[key]) {
+            styles[key] = cloneFallbackStyle(key);
+            appendRenderLog("  style " + key + " -> FALLBACK");
         }
     }
     
@@ -531,6 +611,10 @@ function buildFrameStylesFromConfig(typographyConfig) {
     }
 
     styles.__mode = mode;
+    appendRenderLog(
+        "Typography mode for page: " + mode +
+        " (page_type=" + (CURRENT_PAGE_TYPE || "opener") + ")"
+    );
     
     return styles;
 }
@@ -557,7 +641,14 @@ var FRAME_STYLES_DEFAULTS = {
     subSectionTitle: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
     figureCaption: { pointSize: 7.5, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
     imageFigureNumber: { pointSize: 7.5, bold: true, italic: false, leftIndent: 0, color: [195, 20, 39] },
-    imageFigureText: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] }
+    imageFigureText: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    partNumber: { font: "Arial", pointSize: 24, bold: false, italic: false, leftIndent: 0, color: [255, 255, 255], backgroundColor: "#CA5027" },
+    subTitlesList: {
+        text: { font: "Arial", size: 11, color: "#000000", bold: false },
+        number: { font: "Arial", size: 11, color: "#CA5027", bold: true }
+    },
+    greenSubSectionTitle: { font: "Arial", pointSize: 15, bold: true, italic: false, leftIndent: 0, color: [0, 133, 74] },
+    subTitle: { font: "Arial", pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [202, 80, 39] }
 };
 
 var FRAME_STYLES = FRAME_STYLES_DEFAULTS;
@@ -678,6 +769,34 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.logoText,
         kind: "logo",
         spacingAfter: 14
+    },
+    PartNumber: {
+        label: "partNumber",
+        style: FRAME_STYLES.partNumber,
+        kind: "text",
+        prototype: "proto:partNumber",
+        spacingAfter: 8
+    },
+    SubTitlesList: {
+        label: "subTitlesList",
+        style: FRAME_STYLES.subTitlesList,
+        kind: "text",
+        prototype: "proto:subTitlesList",
+        spacingAfter: 6
+    },
+    GreenSubSectionTitle: {
+        label: "greenSubSectionTitle",
+        style: FRAME_STYLES.greenSubSectionTitle,
+        kind: "text",
+        prototype: "proto:greenSubSectionTitle",
+        spacingAfter: 10
+    },
+    SubTitle: {
+        label: "subTitle",
+        style: FRAME_STYLES.subTitle,
+        kind: "text",
+        prototype: "proto:subTitle",
+        spacingAfter: 8
     }
 };
 
@@ -1179,58 +1298,84 @@ function ensureGraphicFrameVisible(frame) {
 }
 
 function fitPlacedImageInFrame(frame, savedBounds) {
-    var fitResults = [];
-    var bounds;
-    var frameHeight;
-    var minHeight = 48;
+
+    var graphic;
+    var imageBounds;
+    var imageWidth;
+    var imageHeight;
+    var ratio;
+
+    var frameBounds;
+    var targetWidth;
+    var targetHeight;
 
     try {
-        frame.fit(FitOptions.PROPORTIONALLY);
-        fitResults.push("PROPORTIONALLY:ok");
-    } catch (fitErrorA) {
+
+        graphic = frame.graphics[0];
+
+        imageBounds = graphic.geometricBounds;
+
+        imageWidth =
+            imageBounds[3] -
+            imageBounds[1];
+
+        imageHeight =
+            imageBounds[2] -
+            imageBounds[0];
+
+        ratio =
+            imageHeight /
+            imageWidth;
+
+        frameBounds =
+            frame.geometricBounds;
+
+        targetWidth =
+            frameBounds[3] -
+            frameBounds[1];
+
+        targetHeight =
+            targetWidth * ratio;
+
+        frame.geometricBounds = [
+            frameBounds[0],
+            frameBounds[1],
+            frameBounds[0] + targetHeight,
+            frameBounds[3]
+        ];
+
         try {
-            frame.fit(FitOptions.proportionally);
-            fitResults.push("PROPORTIONALLY:ok");
-        } catch (fitErrorA2) {
-            fitResults.push("PROPORTIONALLY:fail");
+            frame.fit(
+                FitOptions.FILL_PROPORTIONALLY
+            );
+        } catch(e) {
+            frame.fit(
+                FitOptions.FILL_PROPORTIONALLY
+            );
         }
-    }
-    logImagePlacementDiagnostics(frame, "after PROPORTIONALLY");
 
-    try {
-        frame.fit(FitOptions.CENTER_CONTENT);
-        fitResults.push("CENTER_CONTENT:ok");
-    } catch (fitErrorB) {
+        appendRenderLog(
+            "Dynamic image resize => width=" +
+            targetWidth +
+            " height=" +
+            targetHeight
+        );
+
+    } catch(error) {
+
+        appendRenderLog(
+            "Dynamic image sizing failed : " +
+            error
+        );
+
         try {
-            frame.fit(FitOptions.centerContent);
-            fitResults.push("CENTER_CONTENT:ok");
-        } catch (fitErrorB2) {
-            fitResults.push("CENTER_CONTENT:fail");
-        }
+            frame.fit(
+                FitOptions.PROPORTIONALLY
+            );
+        } catch(e){}
     }
-    logImagePlacementDiagnostics(frame, "after CENTER_CONTENT");
 
-    try {
-        bounds = frame.geometricBounds;
-        frameHeight = bounds[2] - bounds[0];
-        if (savedBounds && savedBounds.length === 4 && frameHeight < minHeight) {
-            frame.geometricBounds = savedBounds;
-            try {
-                frame.fit(FitOptions.PROPORTIONALLY);
-                fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:ok");
-            } catch (restoreFitError) {
-                try {
-                    frame.fit(FitOptions.proportionally);
-                    fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:ok");
-                } catch (restoreFitError2) {
-                    fitResults.push("RESTORE_BOUNDS+PROPORTIONALLY:fail");
-                }
-            }
-            logImagePlacementDiagnostics(frame, "after RESTORE_BOUNDS+PROPORTIONALLY");
-        }
-    } catch (collapseCheckError) {}
-
-    return fitResults.join(", ");
+    return "dynamic-image-sizing";
 }
 
 function placeImageContentInFrame(frame, imageFile) {
@@ -1443,6 +1588,98 @@ function applyConfiguredFontFamily(textRange, style) {
     return false;
 }
 
+function isCompositeStyle(style) {
+    return style &&
+        typeof style === "object" &&
+        style.text && typeof style.text === "object" &&
+        style.number && typeof style.number === "object";
+}
+
+function splitNumberAndText(text) {
+    var trimmed = trimString(text || "");
+    var match;
+
+    if (!trimmed) {
+        return { number: "", text: "" };
+    }
+
+    match = trimmed.match(/^(\d+(?:[.\-]\w*)*)\s+(.+)$/);
+    if (match) {
+        return { number: match[1], text: match[2] };
+    }
+
+    return { number: "", text: trimmed };
+}
+
+function applyFrameFillColor(textFrame, style) {
+    var doc;
+    var rgb;
+    var colorName;
+    var color;
+
+    if (!textFrame || !style || !style.backgroundColor) {
+        return;
+    }
+
+    rgb = hexToRgb(style.backgroundColor);
+    try {
+        doc = app.activeDocument;
+        colorName = "JSON_BG_" + rgb.join("_");
+        color = ensureDocumentColor(doc, colorName, rgb);
+        if (color !== null) {
+            textFrame.fillColor = color;
+        }
+    } catch (fillError) {
+        warnings.push("Could not apply frame background color.");
+    }
+}
+
+function applyCompositeStyle(textFrame, compositeStyle) {
+    var story;
+    var fullText;
+    var parts;
+    var numberEnd;
+    var numberRange;
+    var textRange;
+
+    if (!textFrame || !compositeStyle) {
+        return;
+    }
+
+    try {
+        story = textFrame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+
+    if (!story) {
+        return;
+    }
+
+    fullText = trimString(textFrame.contents || "");
+    parts = splitNumberAndText(fullText);
+
+    if (!parts.number) {
+        applyFrameStyle(textFrame, compositeStyle.text || compositeStyle);
+        return;
+    }
+
+    textFrame.contents = parts.number + " " + parts.text;
+    numberEnd = parts.number.length;
+
+    try {
+        numberRange = story.characters.itemByRange(0, numberEnd);
+        applyTextRangeStyle(numberRange, compositeStyle.number);
+    } catch (numberStyleError) {}
+
+    try {
+        if (story.characters.length > numberEnd + 1) {
+            textRange = story.characters.itemByRange(numberEnd + 1, story.characters.length - 1);
+            applyTextRangeStyle(textRange, compositeStyle.text);
+        }
+    } catch (textStyleError) {}
+}
+
 function applyFrameStyle(textFrame, style) {
     var story;
     var textRange;
@@ -1465,7 +1702,13 @@ function applyFrameStyle(textFrame, style) {
     applyConfiguredFontFamily(textRange, style);
     applyFontStyleSafe(textRange, style.bold, style.italic);
     applyTextColor(textRange, style);
-
+    appendRenderLog(
+    "Applied Style => " +
+    "font=" + style.font +
+    ", size=" + style.pointSize +
+    ", color=" + style.color +
+    ", bold=" + style.bold
+);
     if (style.leftIndent) {
         try {
             story.paragraphs[0].leftIndent = style.leftIndent;
@@ -1473,6 +1716,8 @@ function applyFrameStyle(textFrame, style) {
             warnings.push("Could not set left indent.");
         }
     }
+
+    applyFrameFillColor(textFrame, style);
 }
 
 // Applies size/font/weight/color from a centralized style to a specific text
@@ -1663,6 +1908,10 @@ function normalizeBlockType(itemType) {
         learningobjectives: "LearningObjectives",
         bulletlist: "BulletList",
         logowithtext: "LogoWithText",
+        partnumber: "PartNumber",
+        subtitleslist: "SubTitlesList",
+        greensubsectiontitle: "GreenSubSectionTitle",
+        subtitle: "SubTitle",
         subsectiontitle: "SubSectionTitle",
         caption: "FigureCaption",
         figurecaption: "FigureCaption"
@@ -1859,67 +2108,24 @@ function createTextFrameOnPage(page, layoutBounds, top, height) {
 
 function createGraphicFrameOnPage(page, layoutBounds, top, height) {
     var frame;
-    var document;
-    var imageProto;
-    var protoBounds;
-    var frameLeft;
-    var frameWidth;
-    var frameHeight;
 
-    try {
-        document = app.activeDocument;
-    } catch (docError) {
-        document = null;
-    }
-
-    if (document) {
-        imageProto = findPageItemByLabel(document, "proto:imageFrame");
-    }
-
-    if (imageProto !== null) {
-        protoBounds = imageProto.geometricBounds;
-        frameLeft = protoBounds[1];
-        frameWidth = protoBounds[3] - protoBounds[1];
-        frameHeight = protoBounds[2] - protoBounds[0];
-
-        frame = page.rectangles.add({
-            geometricBounds: [top, frameLeft, top + frameHeight, frameLeft + frameWidth]
-        });
-
-        try {
-            if (imageProto.appliedObjectStyle) {
-                frame.applyObjectStyle(imageProto.appliedObjectStyle);
-            }
-        } catch (styleError) {}
-
-        try {
-            frame.strokeWeight = imageProto.strokeWeight;
-            frame.strokeColor = imageProto.strokeColor;
-            frame.strokeTint = imageProto.strokeTint;
-            frame.fillColor = imageProto.fillColor;
-            frame.fillTint = imageProto.fillTint;
-        } catch (strokeFillError) {}
-
-        try {
-            frame.frameFittingOptions.fittingOnEmptyFrame = imageProto.frameFittingOptions.fittingOnEmptyFrame;
-            frame.frameFittingOptions.fittingAlignment = imageProto.frameFittingOptions.fittingAlignment;
-            frame.frameFittingOptions.autoFit = imageProto.frameFittingOptions.autoFit;
-        } catch (fittingError) {}
-
-        appendRenderLog(
-            "Created image frame from proto:imageFrame " + frameWidth + " x " + frameHeight
-        );
-    } else {
-        frame = page.rectangles.add({
-            geometricBounds: [top, layoutBounds.left, top + height, layoutBounds.right]
-        });
-        appendRenderLog(
-            "Created image frame width=" + (layoutBounds.right - layoutBounds.left)
-        );
-    }
+    frame = page.rectangles.add({
+        geometricBounds: [
+            top,
+            layoutBounds.left,
+            top + 100,
+            layoutBounds.right
+        ]
+    });
 
     assignFrameToContentLayer(frame);
     clearRuntimeLabel(frame);
+
+    appendRenderLog(
+        "Dynamic image frame created width=" +
+        (layoutBounds.right - layoutBounds.left)
+    );
+
     return frame;
 }
 
@@ -2120,7 +2326,11 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     frameTop = layoutState.cursorY;
     frame = createTextFrameOnPage(layoutState.page, layoutBounds, frameTop, frameHeight);
     frame.contents = cleanText;
-    applyFrameStyle(frame, style);
+    if (isCompositeStyle(style)) {
+        applyCompositeStyle(frame, style);
+    } else {
+        applyFrameStyle(frame, style);
+    }
 
     // Force story reflow before any overflow or bounds reads.
     try {
@@ -2159,8 +2369,36 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
 
     while (textFrameOverflows(lastFrame) && safety < maxOverflowPages) {
         safety += 1;
-        addLayoutPage(layoutState);
-        layoutBounds = getPageLayoutBounds(layoutState.page);
+        if (
+            layoutState.columnCount === 2 &&
+            layoutState.currentColumn === 0
+        ) {
+            layoutState.currentColumn = 1;
+            layoutState.cursorY =
+                getPageLayoutBounds(layoutState.page).top;
+
+            appendRenderLog(
+                "Switching to column 2 on page " +
+                layoutState.page.name
+            );
+        } else {
+            addLayoutPage(layoutState);
+
+            layoutState.currentColumn = 0;
+
+            layoutState.cursorY =
+                getPageLayoutBounds(layoutState.page).top;
+
+            appendRenderLog(
+                "Moving to next page " +
+                layoutState.page.name
+            );
+        }
+
+        layoutBounds =
+            getPageLayoutBounds(
+                layoutState.page
+            );
         frameHeight = layoutBounds.bottom - layoutBounds.top;
         if (frameHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
             warnings.push("Layout page has no usable height; stopping text overflow.");
@@ -2282,6 +2520,10 @@ function getPageLayoutBounds(page) {
     var bottomMargin;
     var rightMargin;
 
+    var columnCount = 1;
+    var currentColumn = 0;
+    var gutter = 18;
+
     try {
         bounds = page.bounds;
     } catch (boundsError) {
@@ -2301,20 +2543,39 @@ function getPageLayoutBounds(page) {
         rightMargin = 72;
     }
 
+    if (layoutState) {
+        columnCount = layoutState.columnCount || 1;
+        currentColumn = layoutState.currentColumn || 0;
+        gutter = layoutState.gutter || 18;
+    }
+
+    var usableLeft = bounds[1] + leftMargin;
+    var usableRight = bounds[3] - rightMargin;
+    var usableWidth = usableRight - usableLeft;
+
+    var columnWidth =
+        (usableWidth - ((columnCount - 1) * gutter)) /
+        columnCount;
+
+    var left =
+        usableLeft +
+        (currentColumn * (columnWidth + gutter));
+
+    var right =
+        left + columnWidth;
+
     appendRenderLog(
-    "Layout Bounds => left=" + leftMargin +
-    ", right=" + rightMargin +
-    ", page=[" + bounds.join(",") + "]" +
-    ", usable=[" +
-    (bounds[1] + leftMargin) + "," +
-    (bounds[3] - rightMargin) + "]"
-);
+        "Layout Bounds => columns=" + columnCount +
+        ", currentColumn=" + currentColumn +
+        ", left=" + left +
+        ", right=" + right
+    );
 
     return {
         top: bounds[0] + topMargin,
-        left: bounds[1] + leftMargin,
+        left: left,
         bottom: bounds[2] - bottomMargin,
-        right: bounds[3] - rightMargin
+        right: right
     };
 }
 
@@ -2422,12 +2683,17 @@ function createLayoutState(document, page) {
         document: document,
         page: page,
         cursorY: bounds.top,
-        blockGap: DYNAMIC_LAYOUT.blockGap
+        blockGap: DYNAMIC_LAYOUT.blockGap,
+        columnCount:1,
+        currentColumn:0,
+        gutter:18,
+        pageType: "opener"
     };
 }
 
 function addLayoutPage(layoutState) {
     layoutState.page = layoutState.document.pages.add();
+    layoutState.currentColumn = 0;
     layoutState.cursorY = getPageLayoutBounds(layoutState.page).top;
 }
 
@@ -2444,21 +2710,29 @@ function resolveBlockSpacing(registryEntry) {
 function ensureLayoutSpace(layoutState, requiredHeight) {
     var bounds = getPageLayoutBounds(layoutState.page);
     var needed = requiredHeight || DYNAMIC_LAYOUT.minTextFrameHeight;
-    var pageBreak;
 
-    pageBreak = layoutState.cursorY >= bounds.bottom || layoutState.cursorY + needed > bounds.bottom;
-    appendRenderLog(
-        "ensureLayoutSpace: cursorY=" + layoutState.cursorY +
-        ", needed=" + needed +
-        ", bounds.top=" + bounds.top +
-        ", bounds.bottom=" + bounds.bottom +
-        ", cursorY+needed=" + (layoutState.cursorY + needed) +
-        ", pageBreak=" + pageBreak
-    );
+    if (layoutState.cursorY + needed > bounds.bottom) {
 
-    // Add one page at a time; multi-page text flow is handled in flowDynamicText().
-    if (pageBreak) {
+        // move to second column first
+        if (
+            layoutState.columnCount === 2 &&
+            layoutState.currentColumn === 0
+        ) {
+            layoutState.currentColumn = 1;
+            layoutState.cursorY =
+                getPageLayoutBounds(layoutState.page).top;
+
+            appendRenderLog(
+                "Switching to column 2 on page " +
+                layoutState.page.name
+            );
+
+            return getPageLayoutBounds(layoutState.page);
+        }
+
+        // second column also full -> next page
         addLayoutPage(layoutState);
+        layoutState.currentColumn = 0;
         bounds = getPageLayoutBounds(layoutState.page);
     }
 
@@ -2530,6 +2804,7 @@ function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFram
     syncLayoutPageFromFrame(layoutState, captionFrame || imageFrame);
 
     imageBottom = getImageContentBottomY(imageFrame);
+    // imageBottom = imageFrame.geometricBounds[2];
     blockBottom = imageBottom;
 
     if (captionFrame) {
@@ -2893,6 +3168,9 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     layoutBounds = ensureLayoutSpace(layoutState, DYNAMIC_LAYOUT.minTextFrameHeight);
 
     try {
+        layoutState.cursorY =
+            imageFrame.geometricBounds[2] +
+            DYNAMIC_LAYOUT.imageCaptionGap;
         captionFrame = flowDynamicText(
             layoutState,
             cleanCaption,
@@ -3078,6 +3356,8 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
     var registryEntry;
     var typeCounts = {};
     var blockIndex;
+    var p;
+    var jsonPage;
 
     if (!layoutState) {
         layoutState = createLayoutState(document, document.pages[0]);
@@ -3242,7 +3522,8 @@ function initializeStylesFromConfig(scriptFolderPath) {
 function logResolvedTypographySample() {
     var keys = [
         "chapterTitle", "sectionTitle", "paragraphText", "topic",
-        "imageCaption", "imageFigureNumber", "figureCaption", "logoText"
+        "imageCaption", "imageFigureNumber", "figureCaption", "logoText",
+        "partNumber", "subTitlesList", "greenSubSectionTitle", "subTitle"
     ];
     var i;
     var key;
@@ -3253,6 +3534,10 @@ function logResolvedTypographySample() {
         key = keys[i];
         style = FRAME_STYLES[key];
         if (!style) {
+            continue;
+        }
+        if (isCompositeStyle(style)) {
+            appendRenderLog("  style " + key + ": composite text/number");
             continue;
         }
         color = style.color ? ("[" + style.color.join(",") + "]") : "(none)";
@@ -3283,6 +3568,10 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.LearningObjectives.style = FRAME_STYLES.learningObjectives || FRAME_STYLES_DEFAULTS.learningObjectives;
     BLOCK_REGISTRY.BulletList.style = FRAME_STYLES.bulletList || FRAME_STYLES_DEFAULTS.bulletList;
     BLOCK_REGISTRY.LogoWithText.style = FRAME_STYLES.logoText || FRAME_STYLES_DEFAULTS.logoText;
+    BLOCK_REGISTRY.PartNumber.style = FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber;
+    BLOCK_REGISTRY.SubTitlesList.style = FRAME_STYLES.subTitlesList || FRAME_STYLES_DEFAULTS.subTitlesList;
+    BLOCK_REGISTRY.GreenSubSectionTitle.style = FRAME_STYLES.greenSubSectionTitle || FRAME_STYLES_DEFAULTS.greenSubSectionTitle;
+    BLOCK_REGISTRY.SubTitle.style = FRAME_STYLES.subTitle || FRAME_STYLES_DEFAULTS.subTitle;
 }
 
 // -----------------------------------------------------------------------------
@@ -3296,10 +3585,12 @@ function main() {
     var autoTemplate = File(scriptFolder + "/templates/projectX.indd");
 
     var rawJson;
-    var contentItems;
+    var parsedJson;
+    var contentItems = [];
     var doc;
     var pdfFile;
     var w;
+    var p;
     var warningText = "";
     var logText;
 
@@ -3316,11 +3607,12 @@ function main() {
     appendRenderLog("Working folder: " + scriptFolderPath);
     appendRenderLog("Expected tree_output.json: " + dataFile.fsName);
     appendRenderLog("Expected template: " + autoTemplate.fsName);
-    
+    appendRenderLog("LOCAL DEV MODE: Edit tree_output.json and re-run this script to see changes");
+
     // Load typography configuration from shared config file
     initializeStylesFromConfig(scriptFolderPath);
     rebuildBlockRegistry();
-    
+
     flushRenderLog("started");
 
     if (!dataFile.exists) {
@@ -3330,12 +3622,44 @@ function main() {
     if (!dataFile.open("r")) {
         throw new Error("Could not open tree_output.json for reading.");
     }
+
     rawJson = dataFile.read();
     dataFile.close();
 
-    contentItems = parseJSON(rawJson);
-    if (!contentItems || !contentItems.length) {
+    parsedJson = parseJSON(rawJson);
+
+    if (!parsedJson) {
         throw new Error("tree_output.json is empty or invalid.");
+    }
+    if (parsedJson.length !== undefined) {
+        contentItems = parsedJson;
+    }
+    else if (parsedJson.pages && parsedJson.pages.length) {
+
+        for (p = 0; p < parsedJson.pages.length; p++) {
+
+            appendRenderLog(
+                "Processing page " +
+                parsedJson.pages[p].page_no +
+                " (" +
+                parsedJson.pages[p].page_type +
+                ")"
+            );
+
+            if (
+                parsedJson.pages[p].content &&
+                parsedJson.pages[p].content.length
+            ) {
+                contentItems =
+                    contentItems.concat(
+                        parsedJson.pages[p].content
+                    );
+            }
+        }
+    }
+
+    if (!contentItems.length) {
+        throw new Error("No content blocks found in tree_output.json");
     }
 
     doc = openTemplateDocument(autoTemplate);
@@ -3348,7 +3672,66 @@ function main() {
     if (USE_DYNAMIC_LAYOUT) {
         prepareTemplateForDynamicLayout(doc);
         flushRenderLog("template-prepared");
-        populateInJsonOrderDynamic(doc, contentItems, scriptFolderPath);
+
+        var p;
+        var jsonPage;
+        var pages = parsedJson.pages;
+
+        if (!pages || !pages.length) {
+            pages = [{
+                page_type: "non-opener",
+                page_no: 1,
+                content: contentItems
+            }];
+        }
+
+        for (p = 0; p < pages.length; p++) {
+
+            jsonPage = pages[p];
+
+            // first page already exists
+            if (p > 0) {
+                addLayoutPage(layoutState);
+            }
+
+            layoutState.pageType =
+                jsonPage.page_type || "non-opener";
+
+            CURRENT_PAGE_TYPE = layoutState.pageType;
+
+            initializeStylesFromConfig(scriptFolderPath);
+
+            rebuildBlockRegistry();
+
+            layoutState.columnCount =
+                layoutState.pageType === "opener"
+                    ? 1
+                    : 2;
+
+            layoutState.currentColumn = 0;
+
+            layoutState.cursorY =
+                getPageLayoutBounds(
+                    layoutState.page
+                ).top;
+
+            appendRenderLog(
+                "Rendering JSON Page " +
+                jsonPage.page_no +
+                " as " +
+                layoutState.pageType +
+                " with " +
+                layoutState.columnCount +
+                " columns"
+            );
+
+            populateInJsonOrderDynamic(
+                doc,
+                jsonPage.content,
+                scriptFolderPath
+            );
+        }
+
         removeAllEmptyPages(doc);
         appendRenderLog("Pages in document before PDF export: " + doc.pages.length);
         flushRenderLog("populated");
