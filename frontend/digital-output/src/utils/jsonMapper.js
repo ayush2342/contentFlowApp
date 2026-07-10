@@ -709,6 +709,21 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 };
 
 const extractPreferredNodes = (treeNodes) => {
+  if (Array.isArray(treeNodes?.data?.pages)) {
+    const pageNodes = treeNodes.data.pages.flatMap((page) =>
+      Array.isArray(page?.content) ? page.content : []
+    );
+    return { nodes: pageNodes, source: 'pages' };
+  }
+
+  if (Array.isArray(treeNodes?.data?.content)) {
+    return { nodes: treeNodes.data.content, source: 'content' };
+  }
+
+  if (Array.isArray(treeNodes?.data)) {
+    return { nodes: treeNodes.data, source: 'array' };
+  }
+
   // Priority 1: new final payload schema -> { pages: [{ content: [...] }] }
   if (Array.isArray(treeNodes?.pages)) {
     const pageNodes = treeNodes.pages.flatMap((page) =>
@@ -731,11 +746,24 @@ const extractPreferredNodes = (treeNodes) => {
 };
 
 export const mapTreeOutputJson = (treeNodes, options = {}) => {
-  if (Array.isArray(treeNodes?.pages)) {
-    return mapPagedTemplateJson(treeNodes.pages, options);
+  let normalizedTreeNodes = treeNodes;
+  if (typeof normalizedTreeNodes === 'string') {
+    try {
+      normalizedTreeNodes = JSON.parse(normalizedTreeNodes);
+    } catch {
+      normalizedTreeNodes = treeNodes;
+    }
   }
 
-  const { nodes, source } = extractPreferredNodes(treeNodes);
+  if (Array.isArray(normalizedTreeNodes?.data?.pages)) {
+    return mapPagedTemplateJson(normalizedTreeNodes.data.pages, options);
+  }
+
+  if (Array.isArray(normalizedTreeNodes?.pages)) {
+    return mapPagedTemplateJson(normalizedTreeNodes.pages, options);
+  }
+
+  const { nodes, source } = extractPreferredNodes(normalizedTreeNodes);
   const firstNode = nodes[0];
 
   // New payloads and previous class-template payloads both use node.type + node.data.
