@@ -745,15 +745,47 @@ const extractPreferredNodes = (treeNodes) => {
   return { nodes: [], source: 'none' };
 };
 
-export const mapTreeOutputJson = (treeNodes, options = {}) => {
-  let normalizedTreeNodes = treeNodes;
-  if (typeof normalizedTreeNodes === 'string') {
-    try {
-      normalizedTreeNodes = JSON.parse(normalizedTreeNodes);
-    } catch {
-      normalizedTreeNodes = treeNodes;
-    }
+const parseJsonSafely = (value) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
   }
+};
+
+const normalizeTreePayload = (value) => {
+  let current = parseJsonSafely(value);
+
+  for (let depth = 0; depth < 6; depth += 1) {
+    const parsedCurrent = parseJsonSafely(current);
+    if (parsedCurrent !== current) {
+      current = parsedCurrent;
+      continue;
+    }
+
+    if (!current || typeof current !== 'object') break;
+
+    if (Array.isArray(current.pages) || Array.isArray(current.content) || Array.isArray(current)) {
+      break;
+    }
+
+    const next =
+      current.data ??
+      current.document ??
+      current.output ??
+      current.payload ??
+      null;
+
+    if (!next) break;
+    current = next;
+  }
+
+  return current;
+};
+
+export const mapTreeOutputJson = (treeNodes, options = {}) => {
+  const normalizedTreeNodes = normalizeTreePayload(treeNodes);
 
   if (Array.isArray(normalizedTreeNodes?.data?.pages)) {
     return mapPagedTemplateJson(normalizedTreeNodes.data.pages, options);
