@@ -9,7 +9,7 @@ const DEFAULT_CONTEXT = {
 };
 
 const getApiBaseUrl = () =>
-  (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000').replace(/\/+$/, '');
+  (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
 
 const CONTEXT_STORAGE_KEY = 'contentflow-output-context';
 
@@ -132,8 +132,8 @@ export const getCourseData = async (inputContext = null) => {
   const queryText = query.toString();
 
   const endpoint = context.outputId
-    ? `${getApiBaseUrl()}/api/output/${context.outputId}/document`
-    : `${getApiBaseUrl()}/api/document/${context.tenantId}/${context.documentId}${
+    ? `${getApiBaseUrl()}/output/${context.outputId}/document`
+    : `${getApiBaseUrl()}/document/${context.tenantId}/${context.documentId}${
         queryText ? `?${queryText}` : ''
       }`;
 
@@ -164,7 +164,7 @@ export const getCourseData = async (inputContext = null) => {
     payload;
 
   const mapped = mapTreeOutputJson(sourceData, {
-    mediaBaseUrl: `${getApiBaseUrl()}/api/media`,
+    mediaBaseUrl: `${getApiBaseUrl()}/media`,
     tenantId: resolvedTenantId,
   });
   const resilientMapped = ensureChapterFallback(mapped, sourceData, context);
