@@ -38,7 +38,7 @@ const buildOutputUrlPayload = async ({
   });
 
   const webUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}`;
-  const pdfUrl = `${env.pdfOutputBaseUrl}/api/output/${session.outputId}/pdf`;
+  const pdfUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}/pdf`;
 
   return {
     outputId: session.outputId,
