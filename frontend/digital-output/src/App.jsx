@@ -12,7 +12,7 @@ const App = () => {
 
   return (
     <Provider store={store}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.VITE_ROUTER_BASENAME || '/api'}>
         <AppRoutes />
       </BrowserRouter>
     </Provider>
