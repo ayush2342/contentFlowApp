@@ -3679,7 +3679,7 @@ function main() {
 
         if (!pages || !pages.length) {
             pages = [{
-                page_type: "non-opener",
+                page_type: "opener",
                 page_no: 1,
                 content: contentItems
             }];
@@ -3695,7 +3695,7 @@ function main() {
             }
 
             layoutState.pageType =
-                jsonPage.page_type || "non-opener";
+                jsonPage.page_type || "opener";
 
             CURRENT_PAGE_TYPE = layoutState.pageType;
 
