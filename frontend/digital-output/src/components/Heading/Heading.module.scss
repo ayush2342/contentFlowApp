@@ -1,125 +1,127 @@
-/* Base: layout only — typography comes from the variant (PDF-style key → style). */
-.heading {
-  margin: 0 0 1rem;
-  line-height: 1.2;
-}
-
-.partNumber {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 0.2rem;
-  font-family: var(--typography-partNumber-font, Arial, sans-serif);
-  font-size: var(--typography-partNumber-size, 24pt);
-  font-weight: var(--typography-partNumber-weight, 400);
-  color: var(--typography-partNumber-color, #ffffff);
-  background-color: var(--typography-partNumber-bg, #ca5027);
-}
-
-.chapterNumber {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 0.2rem;
-  font-family: var(--typography-chapterNumber-font, var(--typography-chapterHeading-font, Arial, sans-serif));
-  font-size: var(--typography-chapterNumber-size, var(--typography-chapterHeading-size, 15pt));
-  font-weight: var(--typography-chapterNumber-weight, var(--typography-chapterHeading-weight, 400));
-  color: var(--typography-chapterNumber-color, var(--typography-chapterHeading-color, #0074bc));
-  background-color: var(--typography-chapterNumber-bg, var(--typography-chapterHeading-bg, transparent));
-}
-
-.chapterTitle {
-  font-family: var(--typography-chapterTitle-font, Arial, sans-serif);
-  font-size: var(--typography-chapterTitle-size, 22pt);
-  font-weight: var(--typography-chapterTitle-weight, 400);
-  color: var(--typography-chapterTitle-color, #000000);
-}
-
-.chapterHeading {
-  font-family: var(--typography-chapterHeading-font, Arial, sans-serif);
-  font-size: var(--typography-chapterHeading-size, 15pt);
-  font-weight: var(--typography-chapterHeading-weight, 400);
-  color: var(--typography-chapterHeading-color, #0074bc);
-  background-color: var(--typography-chapterHeading-bg, transparent);
-}
-
-.lessonTitle {
-  font-family: var(--typography-lessonTitle-font, Arial, sans-serif);
-  font-size: var(--typography-lessonTitle-size, 12pt);
-  font-weight: var(--typography-lessonTitle-weight, 400);
-  color: var(--typography-lessonTitle-color, #0074bc);
-}
-
-.sectionTitle {
-  font-family: var(--typography-sectionTitle-font, Arial, sans-serif);
-  font-size: var(--typography-sectionTitle-size, 11pt);
-  font-weight: var(--typography-sectionTitle-weight, 400);
-  color: var(--typography-sectionTitle-color, #0074bc);
-
-  .compositeNumber {
-    font-family: var(--typography-sectionTitleNumber-font, var(--typography-sectionTitle-font, Arial, sans-serif));
-    font-size: var(--typography-sectionTitleNumber-size, var(--typography-sectionTitle-size, 11pt));
-    font-weight: var(--typography-sectionTitleNumber-weight, var(--typography-sectionTitle-weight, 400));
-    color: var(--typography-sectionTitleNumber-color, var(--typography-sectionTitle-color, #0074bc));
-  }
-
-  .compositeText {
-    font-family: var(--typography-sectionTitle-font, Arial, sans-serif);
-    font-size: var(--typography-sectionTitle-size, 11pt);
-    font-weight: var(--typography-sectionTitle-weight, 400);
-    color: var(--typography-sectionTitle-color, #0074bc);
-  }
-}
-
-.subSectionTitle {
-  font-family: var(--typography-subSectionTitle-font, Arial, sans-serif);
-  font-size: var(--typography-subSectionTitle-size, 9pt);
-  font-weight: var(--typography-subSectionTitle-weight, 700);
-  color: var(--typography-subSectionTitle-color, #0074bc);
-}
-
-.greenSubSectionTitle {
-  font-family: var(--typography-greenSubSectionTitle-font, Arial, sans-serif);
-  font-size: var(--typography-greenSubSectionTitle-size, 15pt);
-  font-weight: var(--typography-greenSubSectionTitle-weight, 700);
-  color: var(--typography-greenSubSectionTitle-color, #00854a);
-}
-
-.subTitle {
-  font-family: var(--typography-subTitle-font, Arial, sans-serif);
-  font-size: var(--typography-subTitle-size, 12pt);
-  font-weight: var(--typography-subTitle-weight, 400);
-  color: var(--typography-subTitle-color, #ca5027);
-}
-
-.subTitlesList {
-  font-family: var(--typography-subTitlesList-font, Arial, sans-serif);
-  font-size: var(--typography-subTitlesList-size, 11pt);
-  font-weight: var(--typography-subTitlesList-weight, 400);
-  color: var(--typography-subTitlesList-color, #000000);
-
-  .compositeNumber {
-    font-family: var(--typography-subTitlesListNumber-font, Arial, sans-serif);
-    font-size: var(--typography-subTitlesListNumber-size, 11pt);
-    font-weight: var(--typography-subTitlesListNumber-weight, 700);
-    color: var(--typography-subTitlesListNumber-color, #ca5027);
-  }
-
-  .compositeText {
-    font-family: var(--typography-subTitlesList-font, Arial, sans-serif);
-    font-size: var(--typography-subTitlesList-size, 11pt);
-    font-weight: var(--typography-subTitlesList-weight, 400);
-    color: var(--typography-subTitlesList-color, #000000);
-  }
-}
-
-.chapterOverview {
-  font-family: var(--typography-chapterOverview-font, Arial, sans-serif);
-  font-size: var(--typography-chapterOverview-size, 9pt);
-  font-weight: var(--typography-chapterOverview-weight, 700);
-  color: var(--typography-chapterOverview-color, #0074bc);
-}
-
-.compositeNumber,
-.compositeText {
-  display: inline;
-}
-
+/* Typography comes from CSS vars set by resolveTypographyStyles (page sheet). */
+.heading {
+  margin: 0 0 1rem;
+  line-height: 1.2;
+}
+
+.partNumber {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.2rem;
+  font-family: var(--typography-partNumber-font);
+  font-size: var(--typography-partNumber-size);
+  font-weight: var(--typography-partNumber-weight);
+  color: var(--typography-partNumber-color);
+  background-color: var(--typography-partNumber-bg, transparent);
+}
+
+.chapterNumber {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.2rem;
+  font-family: var(--typography-chapterNumber-font, var(--typography-chapterHeading-font));
+  font-size: var(--typography-chapterNumber-size, var(--typography-chapterHeading-size));
+  font-weight: var(--typography-chapterNumber-weight, var(--typography-chapterHeading-weight));
+  color: var(--typography-chapterNumber-color, var(--typography-chapterHeading-color));
+  background-color: var(--typography-chapterNumber-bg, var(--typography-chapterHeading-bg, transparent));
+}
+
+.chapterTitle {
+  font-family: var(--typography-chapterTitle-font);
+  font-size: var(--typography-chapterTitle-size);
+  font-weight: var(--typography-chapterTitle-weight);
+  color: var(--typography-chapterTitle-color);
+}
+
+.chapterHeading {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.2rem;
+  font-family: var(--typography-chapterHeading-font);
+  font-size: var(--typography-chapterHeading-size);
+  font-weight: var(--typography-chapterHeading-weight);
+  color: var(--typography-chapterHeading-color);
+  background-color: var(--typography-chapterHeading-bg, transparent);
+}
+
+.lessonTitle {
+  font-family: var(--typography-lessonTitle-font);
+  font-size: var(--typography-lessonTitle-size);
+  font-weight: var(--typography-lessonTitle-weight);
+  color: var(--typography-lessonTitle-color);
+}
+
+.sectionTitle {
+  font-family: var(--typography-sectionTitle-font);
+  font-size: var(--typography-sectionTitle-size);
+  font-weight: var(--typography-sectionTitle-weight);
+  color: var(--typography-sectionTitle-color);
+
+  .compositeNumber {
+    font-family: var(--typography-sectionTitleNumber-font, var(--typography-sectionTitle-font));
+    font-size: var(--typography-sectionTitleNumber-size, var(--typography-sectionTitle-size));
+    font-weight: var(--typography-sectionTitleNumber-weight, var(--typography-sectionTitle-weight));
+    color: var(--typography-sectionTitleNumber-color, var(--typography-sectionTitle-color));
+  }
+
+  .compositeText {
+    font-family: var(--typography-sectionTitle-font);
+    font-size: var(--typography-sectionTitle-size);
+    font-weight: var(--typography-sectionTitle-weight);
+    color: var(--typography-sectionTitle-color);
+  }
+}
+
+.subSectionTitle {
+  font-family: var(--typography-subSectionTitle-font);
+  font-size: var(--typography-subSectionTitle-size);
+  font-weight: var(--typography-subSectionTitle-weight);
+  color: var(--typography-subSectionTitle-color);
+}
+
+.greenSubSectionTitle {
+  font-family: var(--typography-greenSubSectionTitle-font);
+  font-size: var(--typography-greenSubSectionTitle-size);
+  font-weight: var(--typography-greenSubSectionTitle-weight);
+  color: var(--typography-greenSubSectionTitle-color);
+}
+
+.subTitle {
+  font-family: var(--typography-subTitle-font);
+  font-size: var(--typography-subTitle-size);
+  font-weight: var(--typography-subTitle-weight);
+  color: var(--typography-subTitle-color);
+}
+
+.subTitlesList {
+  font-family: var(--typography-subTitlesList-font);
+  font-size: var(--typography-subTitlesList-size);
+  font-weight: var(--typography-subTitlesList-weight);
+  color: var(--typography-subTitlesList-color);
+
+  .compositeNumber {
+    font-family: var(--typography-subTitlesListNumber-font, var(--typography-subTitlesList-font));
+    font-size: var(--typography-subTitlesListNumber-size, var(--typography-subTitlesList-size));
+    font-weight: var(--typography-subTitlesListNumber-weight, var(--typography-subTitlesList-weight));
+    color: var(--typography-subTitlesListNumber-color, var(--typography-subTitlesList-color));
+  }
+
+  .compositeText {
+    font-family: var(--typography-subTitlesList-font);
+    font-size: var(--typography-subTitlesList-size);
+    font-weight: var(--typography-subTitlesList-weight);
+    color: var(--typography-subTitlesList-color);
+  }
+}
+
+.chapterOverview {
+  font-family: var(--typography-chapterOverview-font);
+  font-size: var(--typography-chapterOverview-size);
+  font-weight: var(--typography-chapterOverview-weight);
+  color: var(--typography-chapterOverview-color);
+}
+
+.compositeNumber,
+.compositeText {
+  display: inline;
+}
