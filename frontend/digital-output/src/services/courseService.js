@@ -13,6 +13,68 @@ const getApiBaseUrl = () =>
 
 const CONTEXT_STORAGE_KEY = 'contentflow-output-context';
 
+const hasMappedChapters = (mapped) =>
+  Array.isArray(mapped?.books) &&
+  mapped.books.some((book) => Array.isArray(book?.chapters) && book.chapters.length > 0);
+
+const normalizeText = (value) =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const slugify = (value) =>
+  String(value ?? '')
+    .toLowerCase()
+    .replace(/[^\w]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+const ensureChapterFallback = (mapped, sourceData, context) => {
+  if (hasMappedChapters(mapped)) return mapped;
+
+  const pages = Array.isArray(sourceData?.pages) ? sourceData.pages : [];
+  if (!pages.length) return mapped;
+
+  const chapterTitle =
+    normalizeText(
+      pages
+        .flatMap((page) => (Array.isArray(page?.content) ? page.content : []))
+        .find((block) => String(block?.type || '').toLowerCase() === 'chaptertitle')?.data?.text
+    ) || 'Chapter';
+
+  const chapterNumberText = normalizeText(
+    pages
+      .flatMap((page) => (Array.isArray(page?.content) ? page.content : []))
+      .find((block) => String(block?.type || '').toLowerCase() === 'chapternumber')?.data?.text
+  );
+  const chapterNumberMatch = chapterNumberText.match(/(\d+)/);
+  const chapterNumber = chapterNumberMatch ? Number(chapterNumberMatch[1]) : null;
+
+  const chapterId = `chapter-${slugify(chapterTitle || chapterNumber || context.documentId || '1') || '1'}`;
+  const bookId = slugify(chapterTitle || context.documentId || context.outputId || 'course') || 'course';
+
+  return {
+    ...mapped,
+    bookId,
+    books: [
+      {
+        id: bookId,
+        title: chapterTitle,
+        description: '',
+        chapters: [
+          {
+            id: chapterId,
+            chapterNumber,
+            title: chapterTitle,
+            description: '',
+            outline: [],
+            lessons: [],
+          },
+        ],
+      },
+    ],
+  };
+};
+
 const readStoredContext = () => {
   try {
     const raw = window.sessionStorage.getItem(CONTEXT_STORAGE_KEY);
@@ -105,9 +167,10 @@ export const getCourseData = async (inputContext = null) => {
     mediaBaseUrl: `${getApiBaseUrl()}/media`,
     tenantId: resolvedTenantId,
   });
+  const resilientMapped = ensureChapterFallback(mapped, sourceData, context);
 
   return {
-    ...mapped,
+    ...resilientMapped,
     // TODO(phase-2): use etag/lastModified in client-side cache key if we add local caching.
     templateId: payload.templateId,
     etag: payload.etag,
