@@ -570,11 +570,8 @@ function loadTypographyConfig(scriptFolderPath) {
 function buildFrameStylesFromConfig(typographyConfig) {
     var styles = {};
     var mode = getTypographyMode(typographyConfig);
-    var primaryMap = typographyConfig;
-    var secondaryMap = null;
+    var sourceMap = typographyConfig;
     var canonicalMap;
-    var secondaryCanonical;
-    var defaultsCanonical;
     var key;
     var resolved;
     
@@ -584,25 +581,13 @@ function buildFrameStylesFromConfig(typographyConfig) {
 
     if (typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES) {
         if (mode === "nonOpener" && typographyConfig.NON_OPENER_STYLES) {
-            primaryMap = typographyConfig.NON_OPENER_STYLES;
-            secondaryMap = typographyConfig.OPENER_STYLES || null;
+            sourceMap = typographyConfig.NON_OPENER_STYLES;
         } else {
-            primaryMap = typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES;
-            secondaryMap = typographyConfig.NON_OPENER_STYLES || null;
+            sourceMap = typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES;
         }
     }
 
-    canonicalMap = buildCanonicalStyleMap(primaryMap);
-
-    // Fill missing keys from the other sheet, then FRAME_STYLES_DEFAULTS (same as web).
-    if (secondaryMap) {
-        secondaryCanonical = buildCanonicalStyleMap(secondaryMap);
-        for (key in secondaryCanonical) {
-            if (secondaryCanonical.hasOwnProperty(key) && !canonicalMap[key]) {
-                canonicalMap[key] = secondaryCanonical[key];
-            }
-        }
-    }
+    canonicalMap = buildCanonicalStyleMap(sourceMap);
     
     for (key in canonicalMap) {
         if (canonicalMap.hasOwnProperty(key)) {

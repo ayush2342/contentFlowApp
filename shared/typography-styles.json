@@ -55,7 +55,19 @@
       "color": "#000000",
       "bold": false
     },
+    "paragraphText": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": false
+    },
     "bullestList": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": false
+    },
+    "bulletList": {
       "font": "Arial",
       "size": 9,
       "color": "#000000",

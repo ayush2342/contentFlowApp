@@ -1,82 +1,23 @@
 /**
- * Centralized typography presets from plugin team.
- * Per key: active page sheet → other sheet (only if key is missing).
- * Never override a key that already exists on the active page sheet.
+ * Centralized typography presets supplied by plugin team.
+ * Web mirrors PDF: page mode styles first, then STYLE_DEFAULTS for missing keys.
  */
 
 export const OPENER_STYLES = {
-  chapterHeading: {
-    font: "Arial",
-    size: 15,
-    color: "#0074BC",
-    bold: false,
-  },
-  chapterTitle: {
-    font: "Arial",
-    size: 22,
-    color: "#000000",
-    bold: false,
-  },
-  chapterOverview: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
-  },
-  lessonOverview: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: true,
-  },
-  lessonTitle: {
-    font: "Arial",
-    size: 12,
-    color: "#0074BC",
-    bold: false,
-  },
-  learningObjectives: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
-  },
-  sectionTitle: {
-    font: "Arial",
-    size: 11,
-    color: "#0074BC",
-    bold: false,
-  },
-  subSectionTitle: {
-    font: "Arial",
-    size: 9,
-    color: "#0074BC",
-    bold: true,
-  },
-  paragrapghText: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: false,
-  },
-  bullestList: {
-    font: "Arial",
-    size: 9,
-    color: "#000000",
-    bold: false,
-  },
-  imageFigureNumber: {
-    font: "Arial",
-    size: 7.5,
-    color: "#C31427",
-    bold: true,
-  },
-  imageFigureText: {
-    font: "Arial",
-    size: 7.5,
-    color: "#000000",
-    bold: false,
-  },
+  chapterHeading: { font: "Arial", size: 15, color: "#0074BC", bold: false },
+  chapterTitle: { font: "Arial", size: 22, color: "#000000", bold: false },
+  chapterOverview: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  lessonOverview: { font: "Arial", size: 9, color: "#000000", bold: true },
+  lessonTitle: { font: "Arial", size: 12, color: "#0074BC", bold: false },
+  learningObjectives: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  sectionTitle: { font: "Arial", size: 11, color: "#0074BC", bold: false },
+  subSectionTitle: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  paragrapghText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  paragraphText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bullestList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bulletList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  imageFigureNumber: { font: "Arial", size: 7.5, color: "#C31427", bold: true },
+  imageFigureText: { font: "Arial", size: 7.5, color: "#000000", bold: false },
 };
 
 export const NON_OPENER_STYLES = {
@@ -94,70 +35,49 @@ export const NON_OPENER_STYLES = {
     bold: false,
     backgroundColor: "#CA5027",
   },
-  lessonTitle: {
-    font: "Arial",
-    size: 44,
-    color: "#214880",
-    bold: false,
-  },
-  learningObjectives: {
-    font: "Arial",
-    size: 15,
-    color: "#CA5027",
-    bold: true,
-  },
-  paragraphText: {
-    font: "Arial",
-    size: 10,
-    color: "#000000",
-    bold: false,
-  },
+  lessonTitle: { font: "Arial", size: 44, color: "#214880", bold: false },
+  learningObjectives: { font: "Arial", size: 15, color: "#CA5027", bold: true },
+  paragraphText: { font: "Arial", size: 10, color: "#000000", bold: false },
   subTitlesList: {
-    text: {
-      font: "Arial",
-      size: 11,
-      color: "#000000",
-      bold: false,
-    },
-    number: {
-      font: "Arial",
-      size: 11,
-      color: "#CA5027",
-      bold: true,
-    },
+    text: { font: "Arial", size: 11, color: "#000000", bold: false },
+    number: { font: "Arial", size: 11, color: "#CA5027", bold: true },
   },
   sectionTitle: {
-    text: {
-      font: "Arial",
-      size: 17,
-      color: "#214880",
-      bold: true,
-    },
-    number: {
-      font: "Arial",
-      size: 18,
-      color: "#214880",
-      bold: true,
-    },
+    text: { font: "Arial", size: 17, color: "#214880", bold: true },
+    number: { font: "Arial", size: 18, color: "#214880", bold: true },
   },
-  subSectionTitle: {
+  subSectionTitle: { font: "Arial", size: 10, color: "#000000", bold: true },
+  greenSubSectionTitle: { font: "Arial", size: 15, color: "#00854A", bold: true },
+  subTitle: { font: "Arial", size: 12, color: "#CA5027", bold: false },
+};
+
+/** Same role as PDF FRAME_STYLES_DEFAULTS — fill keys missing from the active page preset. */
+export const STYLE_DEFAULTS = {
+  chapterHeading: { font: "Arial", size: 15, color: "#0074BC", bold: false },
+  chapterTitle: { font: "Arial", size: 22, color: "#000000", bold: false },
+  chapterOverview: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  lessonOverview: { font: "Arial", size: 9, color: "#000000", bold: true },
+  lessonTitle: { font: "Arial", size: 12, color: "#0074BC", bold: false },
+  learningObjectives: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  sectionTitle: { font: "Arial", size: 11, color: "#0074BC", bold: false },
+  subSectionTitle: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  paragraphText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bulletList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  imageFigureNumber: { font: "Arial", size: 7.5, color: "#C31427", bold: true },
+  imageFigureText: { font: "Arial", size: 7.5, color: "#000000", bold: false },
+  partNumber: {
     font: "Arial",
-    size: 10,
-    color: "#000000",
-    bold: true,
-  },
-  greenSubSectionTitle: {
-    font: "Arial",
-    size: 15,
-    color: "#00854A",
-    bold: true,
-  },
-  subTitle: {
-    font: "Arial",
-    size: 12,
-    color: "#CA5027",
+    size: 24,
+    color: "#FFFFFF",
     bold: false,
+    backgroundColor: "#CA5027",
   },
+  subTitlesList: {
+    text: { font: "Arial", size: 11, color: "#000000", bold: false },
+    number: { font: "Arial", size: 11, color: "#CA5027", bold: true },
+  },
+  greenSubSectionTitle: { font: "Arial", size: 15, color: "#00854A", bold: true },
+  subTitle: { font: "Arial", size: 12, color: "#CA5027", bold: false },
 };
 
 const isCompositeStyle = (value) =>
@@ -202,11 +122,7 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
   const paragraphText = pickFlatStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
   const bulletList = pickFlatStyle(styleSet, ["bulletList", "bullestList"]);
   const imageFigureNumber = pickFlatStyle(styleSet, ["imageFigureNumber"]);
-  const imageFigureText = pickFlatStyle(styleSet, [
-    "imageFigureText",
-    "imageCaption",
-    "figureCaption",
-  ]);
+  const imageFigureText = pickFlatStyle(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
 
   return {
     chapterHeading,
@@ -235,11 +151,11 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
   };
 };
 
-const fillMissingStyles = (resolved, fallback) => {
+const fillMissingStyles = (resolved, defaults) => {
   const filled = { ...resolved };
-  Object.keys(fallback).forEach((key) => {
+  Object.keys(defaults).forEach((key) => {
     if (!filled[key]) {
-      filled[key] = fallback[key];
+      filled[key] = defaults[key];
     }
   });
   return filled;
@@ -250,28 +166,26 @@ export const STYLE_PRESETS = {
   nonOpener: NON_OPENER_STYLES,
 };
 
-/**
- * Resolve styles per key:
- * 1) active page sheet (opener | non-opener) — use as-is when key exists
- * 2) the other sheet — only for keys missing from the active sheet
- */
 export const resolveTypographyStyles = (mode = "opener") => {
   const normalizedMode = String(mode || "opener").toLowerCase();
-  const isNonOpener =
-    normalizedMode === "nonopener" || normalizedMode === "non-opener";
+  const preset =
+    normalizedMode === "nonopener" || normalizedMode === "non-opener"
+      ? STYLE_PRESETS.nonOpener
+      : STYLE_PRESETS.opener;
 
-  const primary = normalizeStylePreset(
-    isNonOpener ? STYLE_PRESETS.nonOpener : STYLE_PRESETS.opener
+  return fillMissingStyles(
+    normalizeStylePreset(preset),
+    normalizeStylePreset(STYLE_DEFAULTS)
   );
-  const secondary = normalizeStylePreset(
-    isNonOpener ? STYLE_PRESETS.opener : STYLE_PRESETS.nonOpener
-  );
-
-  return fillMissingStyles(primary, secondary);
 };
 
 export const typographyStyles = resolveTypographyStyles("opener");
 
+/**
+ * Helper to convert hex color to RGB array for InDesign
+ * @param {string} hex - Hex color string (e.g., "#0074BC")
+ * @returns {number[]} RGB array [r, g, b]
+ */
 export const hexToRgb = (hex) => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
@@ -283,6 +197,11 @@ export const hexToRgb = (hex) => {
     : [0, 0, 0];
 };
 
+/**
+ * Convert typography style to InDesign FRAME_STYLES format
+ * @param {object} style - Typography style object
+ * @returns {object} InDesign-compatible style object
+ */
 export const toInDesignStyle = (style) => ({
   pointSize: style.size,
   bold: style.bold ?? false,
@@ -291,6 +210,12 @@ export const toInDesignStyle = (style) => ({
   color: hexToRgb(style.color),
 });
 
+/**
+ * Convert typography style to CSS custom properties
+ * @param {string} key - Style key (e.g., "chapterTitle")
+ * @param {object} style - Typography style object
+ * @returns {object} Object with CSS variable names and values
+ */
 export const toCssVariables = (key, style) => {
   if (!style) return {};
 
@@ -312,6 +237,10 @@ export const toCssVariables = (key, style) => {
   };
 };
 
+/**
+ * Generate all CSS variables from typography config
+ * @returns {object} Object with all CSS variable names and values
+ */
 export const generateAllCssVariables = (styles = typographyStyles) => {
   const variables = {};
   Object.entries(styles).forEach(([key, style]) => {
@@ -320,30 +249,38 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
   return variables;
 };
 
+/**
+ * Map JSON block types to typography style keys
+ */
 export const blockTypeToStyleKey = {
-  ChapterNumber: "chapterNumber",
-  PartNumber: "partNumber",
-  ChapterHeading: "chapterHeading",
-  ChapterTitle: "chapterTitle",
-  ChapterOverview: "chapterOverview",
-  LessonNumber: "lessonNumber",
-  LessonTitle: "lessonTitle",
-  LessonOverview: "lessonOverview",
-  SectionTitle: "sectionTitle",
-  SubSectionTitle: "subSectionTitle",
-  GreenSubSectionTitle: "greenSubSectionTitle",
-  SubTitle: "subTitle",
-  SubTitlesList: "subTitlesList",
-  LearningObjectives: "learningObjectives",
-  ParagraphText: "paragraphText",
-  Text: "text",
-  BulletList: "bulletList",
-  Image: "imageCaption",
-  FigureCaption: "figureCaption",
-  LogoWithText: "logoText",
-  Topic: "topic",
+  ChapterNumber: 'chapterNumber',
+  PartNumber: 'partNumber',
+  ChapterHeading: 'chapterHeading',
+  ChapterTitle: 'chapterTitle',
+  ChapterOverview: 'chapterOverview',
+  LessonNumber: 'lessonNumber',
+  LessonTitle: 'lessonTitle',
+  LessonOverview: 'lessonOverview',
+  SectionTitle: 'sectionTitle',
+  SubSectionTitle: 'subSectionTitle',
+  GreenSubSectionTitle: 'greenSubSectionTitle',
+  SubTitle: 'subTitle',
+  SubTitlesList: 'subTitlesList',
+  LearningObjectives: 'learningObjectives',
+  ParagraphText: 'paragraphText',
+  Text: 'text',
+  BulletList: 'bulletList',
+  Image: 'imageCaption',
+  FigureCaption: 'figureCaption',
+  LogoWithText: 'logoText',
+  Topic: 'topic',
 };
 
+/**
+ * Get the style for a given block type
+ * @param {string} blockType - The JSON block type
+ * @returns {object|null} The typography style or null if not found
+ */
 export const getStyleForBlockType = (blockType) => {
   const styleKey = blockTypeToStyleKey[blockType];
   return styleKey ? typographyStyles[styleKey] : null;
