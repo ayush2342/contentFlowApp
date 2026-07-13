@@ -8,10 +8,10 @@
 
 .title {
   margin: 0 0 0.75rem;
-  font-family: var(--typography-learningObjectives-font, var(--font-family));
-  font-size: var(--typography-learningObjectives-size, 9pt);
-  color: var(--typography-learningObjectives-color, var(--heading-color));
-  font-weight: var(--typography-learningObjectives-weight, 700);
+  font-family: var(--typography-learningObjectives-font);
+  font-size: var(--typography-learningObjectives-size);
+  color: var(--typography-learningObjectives-color);
+  font-weight: var(--typography-learningObjectives-weight);
 }
 
 .intro {
