@@ -63,7 +63,7 @@ const mapContentItem = (item, media, index, options = {}) => {
     return {
       id: `content-${index}`,
       type: 'Heading',
-      props: { text: item.text, level: 2 },
+      props: { text: item.text, level: item.level || 2, variant: item.variant || '' },
     };
   }
 
@@ -307,23 +307,7 @@ const normalizeClassTemplateRawType = (rawType) => {
   return NORMALIZED_CLASS_TYPE_MAP[normalizedKey] || value;
 };
 
-const CLASS_TEMPLATE_TYPE_ALIASES = {
-  ChapterNumber: 'LessonNumber',
-  ChapterTitle: 'ChapterTitle',
-  ChapterHeading: 'SectionTitle',
-  LessonOverview: 'LessonOverview',
-  ParagraphText: 'Text',
-  LessonTitle: 'LessonTitle',
-  LearningObjectives: 'LearningObjectives',
-  SubSectionTitle: 'SubSectionTitle',
-  GreenSubSectionTitle: 'SubSectionTitle',
-  SubTitlesList: 'SubSectionTitle',
-  SubTitle: 'SubSectionTitle',
-  PartNumber: 'SectionTitle',
-  FigureCaption: 'FigureCaption',
-};
-
-const toCanonicalClassType = (rawType) => CLASS_TEMPLATE_TYPE_ALIASES[rawType] || rawType;
+const toCanonicalClassType = (rawType) => rawType;
 
 const extractLearningObjectives = (text) => {
   const normalized = normalizeText(text);
@@ -369,18 +353,179 @@ const findFirstTypeText = (pages, wantedType) => {
   return '';
 };
 
+const mapPagedBlockToComponent = (block, index, ctx) => {
+  const rawType = normalizeClassTemplateRawType(block?.type);
+  const type = toCanonicalClassType(rawType);
+  const text = normalizeText(block?.data?.text);
+
+  const headingVariantMap = {
+    ChapterNumber: 'chapterNumber',
+    PartNumber: 'partNumber',
+    ChapterHeading: 'chapterHeading',
+    ChapterTitle: 'chapterTitle',
+    ChapterOverview: 'chapterOverview',
+    LessonTitle: 'lessonTitle',
+    LessonOverview: 'lessonOverview',
+    SectionTitle: 'sectionTitle',
+    SubSectionTitle: 'subSectionTitle',
+    GreenSubSectionTitle: 'greenSubSectionTitle',
+    SubTitle: 'subTitle',
+    SubTitlesList: 'subTitlesList',
+  };
+
+  const headingVariant = headingVariantMap[type];
+  if (headingVariant && text) {
+    return {
+      id: `content-${index}`,
+      type: 'Heading',
+      props: { text, level: 2, variant: headingVariant },
+    };
+  }
+
+  if ((type === 'ParagraphText' || type === 'Text') && text) {
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text },
+    };
+  }
+
+  if (type === 'LearningObjectives' && text) {
+    return {
+      id: `content-${index}`,
+      type: 'LearningObjective',
+      props: {
+        title: text,
+        introText: '',
+        objectives: [],
+      },
+    };
+  }
+
+  if (type === 'BulletList') {
+    const items = Array.isArray(block?.data?.items)
+      ? block.data.items.map((item) => normalizeText(item)).filter(Boolean)
+      : [];
+    if (!items.length) return null;
+
+    const lastComponent = ctx.components[ctx.components.length - 1];
+    if (lastComponent?.type === 'LearningObjective') {
+      lastComponent.props.objectives = [...(lastComponent.props.objectives || []), ...items];
+      return null;
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text: items.join(' ') },
+    };
+  }
+
+  if (type === 'Image' && block?.data?.url) {
+    const urlPath = normalizePublicAssetPath(block.data.url);
+    const caption = normalizeText(block?.data?.caption);
+    const mediaId = `tree-media-${ctx.mediaIndex++}`;
+    ctx.media[mediaId] = {
+      fileName: basenameFromPath(urlPath),
+      sourcePath: urlPath,
+      caption,
+    };
+    ctx.pendingImageMediaId = mediaId;
+    return {
+      id: `content-${index}`,
+      type: 'ImageBlock',
+      props: {
+        src: resolveMediaSrc(
+          ctx.media[mediaId].fileName,
+          ctx.media[mediaId].sourcePath,
+          ctx.options.mediaBaseUrl,
+          ctx.options.tenantId
+        ),
+        alt: caption || ctx.media[mediaId].fileName || 'Course image',
+        caption,
+      },
+    };
+  }
+
+  if (type === 'FigureCaption' && text) {
+    if (ctx.pendingImageMediaId && ctx.media[ctx.pendingImageMediaId]) {
+      ctx.media[ctx.pendingImageMediaId].caption = text;
+      const lastComponent = ctx.components[ctx.components.length - 1];
+      if (lastComponent?.type === 'ImageBlock') {
+        lastComponent.props.caption = text;
+        lastComponent.props.alt = text;
+      }
+      return null;
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text },
+    };
+  }
+
+  if (type === 'LogoWithText') {
+    const logoUrl = normalizePublicAssetPath(block?.data?.url);
+    const logoText = normalizeText(block?.data?.text);
+    if (!logoText) return null;
+
+    let src = '';
+    if (logoUrl) {
+      const mediaId = `tree-media-${ctx.mediaIndex++}`;
+      ctx.media[mediaId] = {
+        fileName: basenameFromPath(logoUrl),
+        sourcePath: logoUrl,
+        caption: '',
+      };
+      src = resolveMediaSrc(
+        ctx.media[mediaId].fileName,
+        ctx.media[mediaId].sourcePath,
+        ctx.options.mediaBaseUrl,
+        ctx.options.tenantId
+      );
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'IconLabel',
+      props: { text: logoText, src },
+    };
+  }
+
+  return {
+    id: `content-${index}`,
+    type: '__unsupported__',
+    props: { originalType: block?.type, payload: block },
+  };
+};
+
 const mapPagedTemplateJson = (pages, options = {}) => {
   const normalizedPages = Array.isArray(pages) ? pages : [];
   const chapterTitle = findFirstTypeText(normalizedPages, 'ChapterTitle');
   const chapterNumberText = findFirstTypeText(normalizedPages, 'ChapterNumber');
   const chapterNumberMatch = chapterNumberText.match(/(\d+)/);
   const chapterNumber = chapterNumberMatch ? Number(chapterNumberMatch[1]) : null;
+  const media = {};
+  let mediaIndex = 1;
 
   const lessons = normalizedPages.map((page, index) => {
-    const nodes = Array.isArray(page?.content) ? page.content : [];
-    const mapped = mapClassTemplateJson(nodes, options);
-    const mappedComponents =
-      mapped.books?.[0]?.chapters?.[0]?.lessons?.[0]?.pages?.[0]?.components ?? [];
+    const blocks = Array.isArray(page?.content) ? page.content : [];
+    const components = [];
+    const ctx = {
+      media,
+      options,
+      mediaIndex,
+      pendingImageMediaId: null,
+      components,
+    };
+
+    blocks.forEach((block, blockIndex) => {
+      const component = mapPagedBlockToComponent(block, blockIndex, ctx);
+      if (component) components.push(component);
+    });
+
+    mediaIndex = ctx.mediaIndex;
     const pageNo = page?.page_no ?? index + 1;
     const pageType = normalizeText(page?.page_type).toLowerCase();
     const layout = pageType === 'non-opener' ? 'two-column' : 'single-column';
@@ -397,19 +542,20 @@ const mapPagedTemplateJson = (pages, options = {}) => {
           id: `page-${slugify(lessonKey) || index + 1}`,
           title: `Page ${pageNo}`,
           sectionNumber: String(pageNo),
+          pageType: pageType || 'opener',
           layout,
-          components: mappedComponents,
+          components,
         },
       ],
     };
   });
 
-  const resolvedTitle = chapterTitle || 'Chapter';
+  const resolvedTitle = chapterTitle || findFirstTypeText(normalizedPages, 'LessonTitle') || 'Chapter';
   const chapterKey = chapterNumber || resolvedTitle || 'chapter-1';
 
   return {
     bookId: slugify(resolvedTitle) || 'course',
-    media: {},
+    media,
     books: [
       {
         id: slugify(resolvedTitle) || 'course',
@@ -458,7 +604,9 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   const flushLearningObjectives = () => {
     if (!captureLearningObjectives) return;
     const hasContent =
-      Boolean(captureLearningObjectives.introText) || captureLearningObjectives.objectives.length > 0;
+      Boolean(captureLearningObjectives.title) ||
+      Boolean(captureLearningObjectives.introText) ||
+      captureLearningObjectives.objectives.length > 0;
 
     if (hasContent) {
       content.push({
@@ -490,6 +638,19 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
+    if (type === 'ChapterNumber' && dataText) {
+      const match = dataText.match(/(\d+)/);
+      if (match) chapterNumber = Number(match[1]);
+      content.push({ type: 'heading', variant: 'chapterNumber', text: dataText, level: 2 });
+      return;
+    }
+
+    if (type === 'PartNumber' && dataText) {
+      flushLearningObjectives();
+      content.push({ type: 'heading', variant: 'partNumber', text: dataText, level: 2 });
+      return;
+    }
+
     if (type === 'ChapterTitle' && dataText) {
       chapterTitle = dataText;
       return;
@@ -502,17 +663,17 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         sectionNumber = sectionMeta.sectionNumber;
         sectionTitle = sectionMeta.sectionTitle;
         sawSectionTitle = true;
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'lessonTitle', text: dataText, level: 2 });
         sectionTitleAddedToContent = true;
       } else {
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'lessonTitle', text: dataText, level: 2 });
       }
       return;
     }
 
     if (type === 'SectionTitle' && dataText) {
       flushLearningObjectives();
-      content.push({ type: 'heading', text: dataText });
+      content.push({ type: 'heading', variant: 'sectionTitle', text: dataText, level: 2 });
       return;
     }
 
@@ -531,7 +692,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       flushLearningObjectives();
       if (/chapter outline/i.test(dataText)) {
         captureChapterOutline = true;
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'chapterOverview', text: dataText, level: 2 });
         return;
       }
 
@@ -544,7 +705,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         return;
       }
 
-      content.push({ type: 'heading', text: dataText });
+      content.push({ type: 'heading', variant: 'chapterOverview', text: dataText, level: 2 });
       return;
     }
 
@@ -627,7 +788,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'Text' && dataText) {
+    if ((type === 'Text' || type === 'ParagraphText') && dataText) {
       pendingImageMediaId = null;
       if (captureLearningObjectives) {
         if (/^By the end of this section,?\s*/i.test(dataText)) {
@@ -649,10 +810,30 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'SubSectionTitle' && dataText) {
+    if (
+      (type === 'SubSectionTitle' ||
+        type === 'GreenSubSectionTitle' ||
+        type === 'SubTitle' ||
+        type === 'SubTitlesList') &&
+      dataText
+    ) {
       flushLearningObjectives();
       pendingImageMediaId = null;
-      content.push({ type: 'heading', text: dataText });
+      const variantMap = {
+        SubSectionTitle: 'subSectionTitle',
+        GreenSubSectionTitle: 'greenSubSectionTitle',
+        SubTitle: 'subTitle',
+        SubTitlesList: 'subTitlesList',
+      };
+      content.push({ type: 'heading', variant: variantMap[type], text: dataText, level: 2 });
+      return;
+    }
+
+    if (type === 'ChapterHeading' && dataText) {
+      flushLearningObjectives();
+      pendingImageMediaId = null;
+      content.push({ type: 'heading', variant: 'chapterHeading', text: dataText, level: 2 });
+      return;
     }
   });
 
@@ -745,15 +926,47 @@ const extractPreferredNodes = (treeNodes) => {
   return { nodes: [], source: 'none' };
 };
 
-export const mapTreeOutputJson = (treeNodes, options = {}) => {
-  let normalizedTreeNodes = treeNodes;
-  if (typeof normalizedTreeNodes === 'string') {
-    try {
-      normalizedTreeNodes = JSON.parse(normalizedTreeNodes);
-    } catch {
-      normalizedTreeNodes = treeNodes;
-    }
+const parseJsonSafely = (value) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
   }
+};
+
+const normalizeTreePayload = (value) => {
+  let current = parseJsonSafely(value);
+
+  for (let depth = 0; depth < 6; depth += 1) {
+    const parsedCurrent = parseJsonSafely(current);
+    if (parsedCurrent !== current) {
+      current = parsedCurrent;
+      continue;
+    }
+
+    if (!current || typeof current !== 'object') break;
+
+    if (Array.isArray(current.pages) || Array.isArray(current.content) || Array.isArray(current)) {
+      break;
+    }
+
+    const next =
+      current.data ??
+      current.document ??
+      current.output ??
+      current.payload ??
+      null;
+
+    if (!next) break;
+    current = next;
+  }
+
+  return current;
+};
+
+export const mapTreeOutputJson = (treeNodes, options = {}) => {
+  const normalizedTreeNodes = normalizeTreePayload(treeNodes);
 
   if (Array.isArray(normalizedTreeNodes?.data?.pages)) {
     return mapPagedTemplateJson(normalizedTreeNodes.data.pages, options);

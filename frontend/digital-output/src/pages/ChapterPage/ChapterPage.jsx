@@ -40,10 +40,6 @@ const ChapterPage = () => {
       </div>
 
       <div className={styles.chapter}>
-        {chapter.chapterNumber != null && (
-          <p className={styles.meta}>Chapter {chapter.chapterNumber}</p>
-        )}
-        {chapter.title ? <h1 className={styles.title}>{chapter.title}</h1> : null}
         {chapter.lessons?.length ? (
           <div className={styles.contentStack}>
             {chapter.lessons.map((lesson) => (
