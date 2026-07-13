@@ -1,6 +1,6 @@
 /**
  * Centralized typography presets supplied by plugin team.
- * A normalized map is derived for web and PDF consumers.
+ * Web mirrors PDF: page mode styles first, then STYLE_DEFAULTS for missing keys.
  */
 
 export const OPENER_STYLES = {
@@ -51,34 +51,78 @@ export const NON_OPENER_STYLES = {
   subTitle: { font: "Arial", size: 12, color: "#CA5027", bold: false },
 };
 
-const pickStyle = (styleSet, keys) => {
+/** Same role as PDF FRAME_STYLES_DEFAULTS — fill keys missing from the active page preset. */
+export const STYLE_DEFAULTS = {
+  chapterHeading: { font: "Arial", size: 15, color: "#0074BC", bold: false },
+  chapterTitle: { font: "Arial", size: 22, color: "#000000", bold: false },
+  chapterOverview: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  lessonOverview: { font: "Arial", size: 9, color: "#000000", bold: true },
+  lessonTitle: { font: "Arial", size: 12, color: "#0074BC", bold: false },
+  learningObjectives: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  sectionTitle: { font: "Arial", size: 11, color: "#0074BC", bold: false },
+  subSectionTitle: { font: "Arial", size: 9, color: "#0074BC", bold: true },
+  paragraphText: { font: "Arial", size: 9, color: "#000000", bold: false },
+  bulletList: { font: "Arial", size: 9, color: "#000000", bold: false },
+  imageFigureNumber: { font: "Arial", size: 7.5, color: "#C31427", bold: true },
+  imageFigureText: { font: "Arial", size: 7.5, color: "#000000", bold: false },
+  partNumber: {
+    font: "Arial",
+    size: 24,
+    color: "#FFFFFF",
+    bold: false,
+    backgroundColor: "#CA5027",
+  },
+  subTitlesList: {
+    text: { font: "Arial", size: 11, color: "#000000", bold: false },
+    number: { font: "Arial", size: 11, color: "#CA5027", bold: true },
+  },
+  greenSubSectionTitle: { font: "Arial", size: 15, color: "#00854A", bold: true },
+  subTitle: { font: "Arial", size: 12, color: "#CA5027", bold: false },
+};
+
+const isCompositeStyle = (value) =>
+  Boolean(value && typeof value === "object" && value.text && value.number);
+
+const pickRawStyle = (styleSet, keys) => {
   for (const key of keys) {
     const value = styleSet?.[key];
     if (value && typeof value === "object") {
-      return value.text && typeof value.text === "object" ? value.text : value;
+      return value;
     }
   }
   return null;
 };
 
+const pickFlatStyle = (styleSet, keys) => {
+  const raw = pickRawStyle(styleSet, keys);
+  if (!raw) return null;
+  return isCompositeStyle(raw) ? raw.text : raw;
+};
+
 const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
-  const partNumber = pickStyle(styleSet, ["partNumber"]);
-  const chapterNumber = pickStyle(styleSet, ["chapterNumber", "chapterHeading"]);
-  const chapterHeading = pickStyle(styleSet, ["chapterHeading"]);
-  const chapterTitle = pickStyle(styleSet, ["chapterTitle"]);
-  const chapterOverview = pickStyle(styleSet, ["chapterOverview"]);
-  const lessonOverview = pickStyle(styleSet, ["lessonOverview", "topic"]);
-  const lessonTitle = pickStyle(styleSet, ["lessonTitle"]);
-  const learningObjectives = pickStyle(styleSet, ["learningObjectives"]);
-  const sectionTitle = pickStyle(styleSet, ["sectionTitle"]);
-  const subSectionTitle = pickStyle(styleSet, ["subSectionTitle"]);
-  const greenSubSectionTitle = pickStyle(styleSet, ["greenSubSectionTitle"]);
-  const subTitle = pickStyle(styleSet, ["subTitle"]);
-  const subTitlesList = pickStyle(styleSet, ["subTitlesList"]);
-  const paragraphText = pickStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
-  const bulletList = pickStyle(styleSet, ["bulletList", "bullestList"]);
-  const imageFigureNumber = pickStyle(styleSet, ["imageFigureNumber"]);
-  const imageFigureText = pickStyle(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
+  const partNumber = pickFlatStyle(styleSet, ["partNumber"]);
+  const chapterNumber = pickFlatStyle(styleSet, ["chapterNumber", "chapterHeading"]);
+  const chapterHeading = pickFlatStyle(styleSet, ["chapterHeading"]);
+  const chapterTitle = pickFlatStyle(styleSet, ["chapterTitle"]);
+  const chapterOverview = pickFlatStyle(styleSet, ["chapterOverview"]);
+  const lessonOverview = pickFlatStyle(styleSet, ["lessonOverview", "topic"]);
+  const lessonTitle = pickFlatStyle(styleSet, ["lessonTitle"]);
+  const learningObjectives = pickFlatStyle(styleSet, ["learningObjectives"]);
+  const sectionTitleRaw = pickRawStyle(styleSet, ["sectionTitle"]);
+  const sectionTitle = isCompositeStyle(sectionTitleRaw)
+    ? sectionTitleRaw
+    : pickFlatStyle(styleSet, ["sectionTitle"]);
+  const subSectionTitle = pickFlatStyle(styleSet, ["subSectionTitle"]);
+  const greenSubSectionTitle = pickFlatStyle(styleSet, ["greenSubSectionTitle"]);
+  const subTitle = pickFlatStyle(styleSet, ["subTitle"]);
+  const subTitlesListRaw = pickRawStyle(styleSet, ["subTitlesList"]);
+  const subTitlesList = isCompositeStyle(subTitlesListRaw)
+    ? subTitlesListRaw
+    : pickFlatStyle(styleSet, ["subTitlesList"]);
+  const paragraphText = pickFlatStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
+  const bulletList = pickFlatStyle(styleSet, ["bulletList", "bullestList"]);
+  const imageFigureNumber = pickFlatStyle(styleSet, ["imageFigureNumber"]);
+  const imageFigureText = pickFlatStyle(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
 
   return {
     chapterHeading,
@@ -96,7 +140,6 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
     bulletList,
     imageFigureNumber,
     imageFigureText,
-    // Backward-compatible keys currently used by renderers
     chapterNumber,
     lessonNumber: chapterHeading,
     topic: lessonOverview,
@@ -106,6 +149,16 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
     logoText: subSectionTitle,
     partNumber,
   };
+};
+
+const fillMissingStyles = (resolved, defaults) => {
+  const filled = { ...resolved };
+  Object.keys(defaults).forEach((key) => {
+    if (!filled[key]) {
+      filled[key] = defaults[key];
+    }
+  });
+  return filled;
 };
 
 export const STYLE_PRESETS = {
@@ -120,7 +173,10 @@ export const resolveTypographyStyles = (mode = "opener") => {
       ? STYLE_PRESETS.nonOpener
       : STYLE_PRESETS.opener;
 
-  return normalizeStylePreset(preset);
+  return fillMissingStyles(
+    normalizeStylePreset(preset),
+    normalizeStylePreset(STYLE_DEFAULTS)
+  );
 };
 
 export const typographyStyles = resolveTypographyStyles("opener");
@@ -162,9 +218,17 @@ export const toInDesignStyle = (style) => ({
  */
 export const toCssVariables = (key, style) => {
   if (!style) return {};
+
+  if (isCompositeStyle(style)) {
+    return {
+      ...toCssVariables(key, style.text),
+      ...toCssVariables(`${key}Number`, style.number),
+    };
+  }
+
   const prefix = `--typography-${key}`;
   return {
-    [`${prefix}-font`]: `${style.font}, sans-serif`,
+    [`${prefix}-font`]: `${style.font || "Arial"}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,
     [`${prefix}-color`]: style.color,
     ...(style.backgroundColor ? { [`${prefix}-bg`]: style.backgroundColor } : {}),

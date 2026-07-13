@@ -243,12 +243,19 @@ const LessonRenderer = ({ page }) => {
   const pageStyleMode =
     String(page.pageType || (page.layout === 'two-column' ? 'non-opener' : 'opener')).toLowerCase();
   const scopedTypography = resolveTypographyStyles(pageStyleMode);
+  const sectionColor =
+    scopedTypography.sectionTitle?.color ||
+    scopedTypography.sectionTitle?.text?.color ||
+    undefined;
+  const paragraphColor = scopedTypography.paragraphText?.color;
   const pageStyleVars = {
     ...generateAllCssVariables(scopedTypography),
-    '--heading-color': scopedTypography.sectionTitle?.color || 'var(--heading-color)',
-    '--paragraph-color': scopedTypography.paragraphText?.color || 'var(--paragraph-color)',
-    '--body-color': scopedTypography.paragraphText?.color || 'var(--body-color)',
-    '--primary-color': scopedTypography.sectionTitle?.color || 'var(--primary-color)',
+    ...(sectionColor
+      ? { '--heading-color': sectionColor, '--primary-color': sectionColor }
+      : {}),
+    ...(paragraphColor
+      ? { '--paragraph-color': paragraphColor, '--body-color': paragraphColor }
+      : {}),
   };
 
   const twoColumnRows =
