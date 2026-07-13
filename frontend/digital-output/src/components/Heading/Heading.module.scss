@@ -11,10 +11,10 @@
   padding: 0.2rem 0.6rem;
   border-radius: 0.2rem;
   font-family: var(--typography-partNumber-font, var(--font-family));
-  font-size: var(--typography-partNumber-size, 16pt);
-  font-weight: var(--typography-partNumber-weight, 400);
-  color: var(--typography-partNumber-color, #ffffff);
-  background-color: var(--typography-partNumber-bg, #ca5027);
+  font-size: var(--typography-partNumber-size, var(--typography-sectionTitle-size, 11pt));
+  font-weight: var(--typography-partNumber-weight, var(--typography-sectionTitle-weight, 400));
+  color: var(--typography-partNumber-color, var(--typography-sectionTitle-color, var(--heading-color)));
+  background-color: var(--typography-partNumber-bg, transparent);
 }
 
 .chapterNumber {
@@ -22,10 +22,10 @@
   padding: 0.2rem 0.6rem;
   border-radius: 0.2rem;
   font-family: var(--typography-chapterNumber-font, var(--font-family));
-  font-size: var(--typography-chapterNumber-size, 18pt);
-  font-weight: var(--typography-chapterNumber-weight, 700);
-  color: var(--typography-chapterNumber-color, #ffffff);
-  background-color: var(--typography-chapterNumber-bg, #ca5027);
+  font-size: var(--typography-chapterNumber-size, var(--typography-chapterHeading-size, 15pt));
+  font-weight: var(--typography-chapterNumber-weight, var(--typography-chapterHeading-weight, 700));
+  color: var(--typography-chapterNumber-color, var(--typography-chapterHeading-color, var(--heading-color)));
+  background-color: var(--typography-chapterNumber-bg, transparent);
 }
 
 .chapterTitle {

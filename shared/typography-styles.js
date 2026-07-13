@@ -89,22 +89,22 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
     learningObjectives,
     sectionTitle,
     subSectionTitle,
-    greenSubSectionTitle: greenSubSectionTitle || subSectionTitle,
-    subTitle: subTitle || subSectionTitle,
-    subTitlesList: subTitlesList || sectionTitle,
+    greenSubSectionTitle,
+    subTitle,
+    subTitlesList,
     paragraphText,
     bulletList,
     imageFigureNumber,
     imageFigureText,
     // Backward-compatible keys currently used by renderers
-    chapterNumber: chapterNumber || chapterHeading,
+    chapterNumber,
     lessonNumber: chapterHeading,
     topic: lessonOverview,
     text: paragraphText,
     imageCaption: imageFigureText,
     figureCaption: imageFigureText,
     logoText: subSectionTitle,
-    partNumber: partNumber || chapterHeading,
+    partNumber,
   };
 };
 
