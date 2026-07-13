@@ -62,18 +62,19 @@ const pickStyle = (styleSet, keys) => {
 };
 
 const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
+  const partNumber = pickStyle(styleSet, ["partNumber"]);
+  const chapterNumber = pickStyle(styleSet, ["chapterNumber", "chapterHeading"]);
   const chapterHeading = pickStyle(styleSet, ["chapterHeading"]);
   const chapterTitle = pickStyle(styleSet, ["chapterTitle"]);
   const chapterOverview = pickStyle(styleSet, ["chapterOverview"]);
   const lessonOverview = pickStyle(styleSet, ["lessonOverview", "topic"]);
   const lessonTitle = pickStyle(styleSet, ["lessonTitle"]);
   const learningObjectives = pickStyle(styleSet, ["learningObjectives"]);
-  const sectionTitle = pickStyle(styleSet, ["sectionTitle", "subTitlesList"]);
-  const subSectionTitle = pickStyle(styleSet, [
-    "subSectionTitle",
-    "greenSubSectionTitle",
-    "subTitle",
-  ]);
+  const sectionTitle = pickStyle(styleSet, ["sectionTitle"]);
+  const subSectionTitle = pickStyle(styleSet, ["subSectionTitle"]);
+  const greenSubSectionTitle = pickStyle(styleSet, ["greenSubSectionTitle"]);
+  const subTitle = pickStyle(styleSet, ["subTitle"]);
+  const subTitlesList = pickStyle(styleSet, ["subTitlesList"]);
   const paragraphText = pickStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
   const bulletList = pickStyle(styleSet, ["bulletList", "bullestList"]);
   const imageFigureNumber = pickStyle(styleSet, ["imageFigureNumber"]);
@@ -88,18 +89,22 @@ const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
     learningObjectives,
     sectionTitle,
     subSectionTitle,
+    greenSubSectionTitle: greenSubSectionTitle || subSectionTitle,
+    subTitle: subTitle || subSectionTitle,
+    subTitlesList: subTitlesList || sectionTitle,
     paragraphText,
     bulletList,
     imageFigureNumber,
     imageFigureText,
     // Backward-compatible keys currently used by renderers
-    chapterNumber: chapterHeading,
+    chapterNumber: chapterNumber || chapterHeading,
     lessonNumber: chapterHeading,
     topic: lessonOverview,
     text: paragraphText,
     imageCaption: imageFigureText,
     figureCaption: imageFigureText,
     logoText: subSectionTitle,
+    partNumber: partNumber || chapterHeading,
   };
 };
 
@@ -162,6 +167,7 @@ export const toCssVariables = (key, style) => {
     [`${prefix}-font`]: `${style.font}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,
     [`${prefix}-color`]: style.color,
+    ...(style.backgroundColor ? { [`${prefix}-bg`]: style.backgroundColor } : {}),
     [`${prefix}-weight`]: style.bold ? "700" : "400",
     [`${prefix}-style`]: style.italic ? "italic" : "normal",
   };
@@ -184,6 +190,8 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
  */
 export const blockTypeToStyleKey = {
   ChapterNumber: 'chapterNumber',
+  PartNumber: 'partNumber',
+  ChapterHeading: 'chapterHeading',
   ChapterTitle: 'chapterTitle',
   ChapterOverview: 'chapterOverview',
   LessonNumber: 'lessonNumber',
@@ -191,6 +199,9 @@ export const blockTypeToStyleKey = {
   LessonOverview: 'lessonOverview',
   SectionTitle: 'sectionTitle',
   SubSectionTitle: 'subSectionTitle',
+  GreenSubSectionTitle: 'greenSubSectionTitle',
+  SubTitle: 'subTitle',
+  SubTitlesList: 'subTitlesList',
   LearningObjectives: 'learningObjectives',
   ParagraphText: 'paragraphText',
   Text: 'text',

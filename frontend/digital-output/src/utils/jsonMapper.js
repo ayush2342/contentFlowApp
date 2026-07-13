@@ -63,7 +63,7 @@ const mapContentItem = (item, media, index, options = {}) => {
     return {
       id: `content-${index}`,
       type: 'Heading',
-      props: { text: item.text, level: 2 },
+      props: { text: item.text, level: item.level || 2, variant: item.variant || '' },
     };
   }
 
@@ -307,23 +307,7 @@ const normalizeClassTemplateRawType = (rawType) => {
   return NORMALIZED_CLASS_TYPE_MAP[normalizedKey] || value;
 };
 
-const CLASS_TEMPLATE_TYPE_ALIASES = {
-  ChapterNumber: 'LessonNumber',
-  ChapterTitle: 'ChapterTitle',
-  ChapterHeading: 'SectionTitle',
-  LessonOverview: 'LessonOverview',
-  ParagraphText: 'Text',
-  LessonTitle: 'LessonTitle',
-  LearningObjectives: 'LearningObjectives',
-  SubSectionTitle: 'SubSectionTitle',
-  GreenSubSectionTitle: 'SubSectionTitle',
-  SubTitlesList: 'SubSectionTitle',
-  SubTitle: 'SubSectionTitle',
-  PartNumber: 'SectionTitle',
-  FigureCaption: 'FigureCaption',
-};
-
-const toCanonicalClassType = (rawType) => CLASS_TEMPLATE_TYPE_ALIASES[rawType] || rawType;
+const toCanonicalClassType = (rawType) => rawType;
 
 const extractLearningObjectives = (text) => {
   const normalized = normalizeText(text);
@@ -458,7 +442,9 @@ const mapClassTemplateJson = (nodes, options = {}) => {
   const flushLearningObjectives = () => {
     if (!captureLearningObjectives) return;
     const hasContent =
-      Boolean(captureLearningObjectives.introText) || captureLearningObjectives.objectives.length > 0;
+      Boolean(captureLearningObjectives.title) ||
+      Boolean(captureLearningObjectives.introText) ||
+      captureLearningObjectives.objectives.length > 0;
 
     if (hasContent) {
       content.push({
@@ -490,6 +476,19 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
+    if (type === 'ChapterNumber' && dataText) {
+      const match = dataText.match(/(\d+)/);
+      if (match) chapterNumber = Number(match[1]);
+      content.push({ type: 'heading', variant: 'chapterNumber', text: dataText, level: 2 });
+      return;
+    }
+
+    if (type === 'PartNumber' && dataText) {
+      flushLearningObjectives();
+      content.push({ type: 'heading', variant: 'partNumber', text: dataText, level: 2 });
+      return;
+    }
+
     if (type === 'ChapterTitle' && dataText) {
       chapterTitle = dataText;
       return;
@@ -502,17 +501,17 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         sectionNumber = sectionMeta.sectionNumber;
         sectionTitle = sectionMeta.sectionTitle;
         sawSectionTitle = true;
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'lessonTitle', text: dataText, level: 2 });
         sectionTitleAddedToContent = true;
       } else {
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'lessonTitle', text: dataText, level: 2 });
       }
       return;
     }
 
     if (type === 'SectionTitle' && dataText) {
       flushLearningObjectives();
-      content.push({ type: 'heading', text: dataText });
+      content.push({ type: 'heading', variant: 'sectionTitle', text: dataText, level: 2 });
       return;
     }
 
@@ -531,7 +530,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       flushLearningObjectives();
       if (/chapter outline/i.test(dataText)) {
         captureChapterOutline = true;
-        content.push({ type: 'heading', text: dataText });
+        content.push({ type: 'heading', variant: 'chapterOverview', text: dataText, level: 2 });
         return;
       }
 
@@ -544,7 +543,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         return;
       }
 
-      content.push({ type: 'heading', text: dataText });
+      content.push({ type: 'heading', variant: 'chapterOverview', text: dataText, level: 2 });
       return;
     }
 
@@ -627,7 +626,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'Text' && dataText) {
+    if ((type === 'Text' || type === 'ParagraphText') && dataText) {
       pendingImageMediaId = null;
       if (captureLearningObjectives) {
         if (/^By the end of this section,?\s*/i.test(dataText)) {
@@ -649,10 +648,30 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'SubSectionTitle' && dataText) {
+    if (
+      (type === 'SubSectionTitle' ||
+        type === 'GreenSubSectionTitle' ||
+        type === 'SubTitle' ||
+        type === 'SubTitlesList') &&
+      dataText
+    ) {
       flushLearningObjectives();
       pendingImageMediaId = null;
-      content.push({ type: 'heading', text: dataText });
+      const variantMap = {
+        SubSectionTitle: 'subSectionTitle',
+        GreenSubSectionTitle: 'greenSubSectionTitle',
+        SubTitle: 'subTitle',
+        SubTitlesList: 'subTitlesList',
+      };
+      content.push({ type: 'heading', variant: variantMap[type], text: dataText, level: 2 });
+      return;
+    }
+
+    if (type === 'ChapterHeading' && dataText) {
+      flushLearningObjectives();
+      pendingImageMediaId = null;
+      content.push({ type: 'heading', variant: 'chapterHeading', text: dataText, level: 2 });
+      return;
     }
   });
 

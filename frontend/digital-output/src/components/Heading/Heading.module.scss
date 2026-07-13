@@ -6,11 +6,40 @@
   line-height: 1.2;
 }
 
+.partNumber {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.2rem;
+  font-family: var(--typography-partNumber-font, var(--font-family));
+  font-size: var(--typography-partNumber-size, 16pt);
+  font-weight: var(--typography-partNumber-weight, 400);
+  color: var(--typography-partNumber-color, #ffffff);
+  background-color: var(--typography-partNumber-bg, #ca5027);
+}
+
+.chapterNumber {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.2rem;
+  font-family: var(--typography-chapterNumber-font, var(--font-family));
+  font-size: var(--typography-chapterNumber-size, 18pt);
+  font-weight: var(--typography-chapterNumber-weight, 700);
+  color: var(--typography-chapterNumber-color, #ffffff);
+  background-color: var(--typography-chapterNumber-bg, #ca5027);
+}
+
 .chapterTitle {
   font-family: var(--typography-chapterTitle-font, var(--font-family));
   font-size: var(--typography-chapterTitle-size, 22pt);
   font-weight: var(--typography-chapterTitle-weight, 400);
   color: var(--typography-chapterTitle-color, #000000);
+}
+
+.chapterHeading {
+  font-family: var(--typography-chapterHeading-font, var(--font-family));
+  font-size: var(--typography-chapterHeading-size, 15pt);
+  font-weight: var(--typography-chapterHeading-weight, 700);
+  color: var(--typography-chapterHeading-color, var(--heading-color));
 }
 
 .lessonTitle {
@@ -32,6 +61,27 @@
   font-size: var(--typography-subSectionTitle-size, 9pt);
   font-weight: var(--typography-subSectionTitle-weight, 700);
   color: var(--typography-subSectionTitle-color, var(--heading-color));
+}
+
+.greenSubSectionTitle {
+  font-family: var(--typography-greenSubSectionTitle-font, var(--font-family));
+  font-size: var(--typography-greenSubSectionTitle-size, 9pt);
+  font-weight: var(--typography-greenSubSectionTitle-weight, 700);
+  color: var(--typography-greenSubSectionTitle-color, var(--heading-color));
+}
+
+.subTitle {
+  font-family: var(--typography-subTitle-font, var(--font-family));
+  font-size: var(--typography-subTitle-size, 9pt);
+  font-weight: var(--typography-subTitle-weight, 700);
+  color: var(--typography-subTitle-color, var(--heading-color));
+}
+
+.subTitlesList {
+  font-family: var(--typography-subTitlesList-font, var(--font-family));
+  font-size: var(--typography-subTitlesList-size, 9pt);
+  font-weight: var(--typography-subTitlesList-weight, 700);
+  color: var(--typography-subTitlesList-color, var(--heading-color));
 }
 
 .chapterOverview {

@@ -1,10 +1,16 @@
 import styles from './Heading.module.scss';
 
 const variantClassMap = {
+  partNumber: styles.partNumber,
+  chapterNumber: styles.chapterNumber,
+  chapterHeading: styles.chapterHeading,
   chapterTitle: styles.chapterTitle,
   lessonTitle: styles.lessonTitle,
   sectionTitle: styles.sectionTitle,
   subSectionTitle: styles.subSectionTitle,
+  greenSubSectionTitle: styles.greenSubSectionTitle,
+  subTitle: styles.subTitle,
+  subTitlesList: styles.subTitlesList,
   chapterOverview: styles.chapterOverview,
 };
 
