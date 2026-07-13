@@ -353,18 +353,179 @@ const findFirstTypeText = (pages, wantedType) => {
   return '';
 };
 
+const mapPagedBlockToComponent = (block, index, ctx) => {
+  const rawType = normalizeClassTemplateRawType(block?.type);
+  const type = toCanonicalClassType(rawType);
+  const text = normalizeText(block?.data?.text);
+
+  const headingVariantMap = {
+    ChapterNumber: 'chapterNumber',
+    PartNumber: 'partNumber',
+    ChapterHeading: 'chapterHeading',
+    ChapterTitle: 'chapterTitle',
+    ChapterOverview: 'chapterOverview',
+    LessonTitle: 'lessonTitle',
+    LessonOverview: 'lessonOverview',
+    SectionTitle: 'sectionTitle',
+    SubSectionTitle: 'subSectionTitle',
+    GreenSubSectionTitle: 'greenSubSectionTitle',
+    SubTitle: 'subTitle',
+    SubTitlesList: 'subTitlesList',
+  };
+
+  const headingVariant = headingVariantMap[type];
+  if (headingVariant && text) {
+    return {
+      id: `content-${index}`,
+      type: 'Heading',
+      props: { text, level: 2, variant: headingVariant },
+    };
+  }
+
+  if ((type === 'ParagraphText' || type === 'Text') && text) {
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text },
+    };
+  }
+
+  if (type === 'LearningObjectives' && text) {
+    return {
+      id: `content-${index}`,
+      type: 'LearningObjective',
+      props: {
+        title: text,
+        introText: '',
+        objectives: [],
+      },
+    };
+  }
+
+  if (type === 'BulletList') {
+    const items = Array.isArray(block?.data?.items)
+      ? block.data.items.map((item) => normalizeText(item)).filter(Boolean)
+      : [];
+    if (!items.length) return null;
+
+    const lastComponent = ctx.components[ctx.components.length - 1];
+    if (lastComponent?.type === 'LearningObjective') {
+      lastComponent.props.objectives = [...(lastComponent.props.objectives || []), ...items];
+      return null;
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text: items.join(' ') },
+    };
+  }
+
+  if (type === 'Image' && block?.data?.url) {
+    const urlPath = normalizePublicAssetPath(block.data.url);
+    const caption = normalizeText(block?.data?.caption);
+    const mediaId = `tree-media-${ctx.mediaIndex++}`;
+    ctx.media[mediaId] = {
+      fileName: basenameFromPath(urlPath),
+      sourcePath: urlPath,
+      caption,
+    };
+    ctx.pendingImageMediaId = mediaId;
+    return {
+      id: `content-${index}`,
+      type: 'ImageBlock',
+      props: {
+        src: resolveMediaSrc(
+          ctx.media[mediaId].fileName,
+          ctx.media[mediaId].sourcePath,
+          ctx.options.mediaBaseUrl,
+          ctx.options.tenantId
+        ),
+        alt: caption || ctx.media[mediaId].fileName || 'Course image',
+        caption,
+      },
+    };
+  }
+
+  if (type === 'FigureCaption' && text) {
+    if (ctx.pendingImageMediaId && ctx.media[ctx.pendingImageMediaId]) {
+      ctx.media[ctx.pendingImageMediaId].caption = text;
+      const lastComponent = ctx.components[ctx.components.length - 1];
+      if (lastComponent?.type === 'ImageBlock') {
+        lastComponent.props.caption = text;
+        lastComponent.props.alt = text;
+      }
+      return null;
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'Paragraph',
+      props: { text },
+    };
+  }
+
+  if (type === 'LogoWithText') {
+    const logoUrl = normalizePublicAssetPath(block?.data?.url);
+    const logoText = normalizeText(block?.data?.text);
+    if (!logoText) return null;
+
+    let src = '';
+    if (logoUrl) {
+      const mediaId = `tree-media-${ctx.mediaIndex++}`;
+      ctx.media[mediaId] = {
+        fileName: basenameFromPath(logoUrl),
+        sourcePath: logoUrl,
+        caption: '',
+      };
+      src = resolveMediaSrc(
+        ctx.media[mediaId].fileName,
+        ctx.media[mediaId].sourcePath,
+        ctx.options.mediaBaseUrl,
+        ctx.options.tenantId
+      );
+    }
+
+    return {
+      id: `content-${index}`,
+      type: 'IconLabel',
+      props: { text: logoText, src },
+    };
+  }
+
+  return {
+    id: `content-${index}`,
+    type: '__unsupported__',
+    props: { originalType: block?.type, payload: block },
+  };
+};
+
 const mapPagedTemplateJson = (pages, options = {}) => {
   const normalizedPages = Array.isArray(pages) ? pages : [];
   const chapterTitle = findFirstTypeText(normalizedPages, 'ChapterTitle');
   const chapterNumberText = findFirstTypeText(normalizedPages, 'ChapterNumber');
   const chapterNumberMatch = chapterNumberText.match(/(\d+)/);
   const chapterNumber = chapterNumberMatch ? Number(chapterNumberMatch[1]) : null;
+  const media = {};
+  let mediaIndex = 1;
 
   const lessons = normalizedPages.map((page, index) => {
-    const nodes = Array.isArray(page?.content) ? page.content : [];
-    const mapped = mapClassTemplateJson(nodes, options);
-    const mappedComponents =
-      mapped.books?.[0]?.chapters?.[0]?.lessons?.[0]?.pages?.[0]?.components ?? [];
+    const blocks = Array.isArray(page?.content) ? page.content : [];
+    const components = [];
+    const ctx = {
+      media,
+      options,
+      mediaIndex,
+      pendingImageMediaId: null,
+      components,
+    };
+
+    blocks.forEach((block, blockIndex) => {
+      const component = mapPagedBlockToComponent(block, blockIndex, ctx);
+      if (component) components.push(component);
+    });
+
+    mediaIndex = ctx.mediaIndex;
     const pageNo = page?.page_no ?? index + 1;
     const pageType = normalizeText(page?.page_type).toLowerCase();
     const layout = pageType === 'non-opener' ? 'two-column' : 'single-column';
@@ -381,19 +542,20 @@ const mapPagedTemplateJson = (pages, options = {}) => {
           id: `page-${slugify(lessonKey) || index + 1}`,
           title: `Page ${pageNo}`,
           sectionNumber: String(pageNo),
+          pageType: pageType || 'opener',
           layout,
-          components: mappedComponents,
+          components,
         },
       ],
     };
   });
 
-  const resolvedTitle = chapterTitle || 'Chapter';
+  const resolvedTitle = chapterTitle || findFirstTypeText(normalizedPages, 'LessonTitle') || 'Chapter';
   const chapterKey = chapterNumber || resolvedTitle || 'chapter-1';
 
   return {
     bookId: slugify(resolvedTitle) || 'course',
-    media: {},
+    media,
     books: [
       {
         id: slugify(resolvedTitle) || 'course',

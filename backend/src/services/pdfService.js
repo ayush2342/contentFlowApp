@@ -30,13 +30,34 @@ const streamToBuffer = async (stream) => {
   return Buffer.concat(chunks);
 };
 
+const collectUrlsFromBlocks = (blocks, keys) => {
+  if (!Array.isArray(blocks)) return;
+  for (const item of blocks) {
+    const url = item?.data?.url;
+    if (url && !keys.includes(url)) {
+      keys.push(url);
+    }
+  }
+};
+
 const collectImageKeys = (data) => {
-  if (!Array.isArray(data)) return [];
-  // Any block that carries a data.url needs its asset downloaded
-  // (Image, LogoWithText, and any future image-bearing block types).
-  return data
-    .filter((item) => item?.data?.url)
-    .map((item) => item.data.url);
+  const keys = [];
+  if (!data) return keys;
+
+  // Flat block array: [{ type, data: { url } }, ...]
+  if (Array.isArray(data)) {
+    collectUrlsFromBlocks(data, keys);
+    return keys;
+  }
+
+  // Paged shape: { pages: [{ content: [...] }, ...] }
+  if (Array.isArray(data.pages)) {
+    for (const page of data.pages) {
+      collectUrlsFromBlocks(page?.content, keys);
+    }
+  }
+
+  return keys;
 };
 
 const resolveInDesignPaths = () => {

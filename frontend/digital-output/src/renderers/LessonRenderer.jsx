@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
+import { generateAllCssVariables, resolveTypographyStyles } from '../../../../shared/typography-styles.js';
 
 const DynamicComponent = ({ component }) => {
   if (component.type === '__unsupported__') {
@@ -239,6 +240,17 @@ const LessonRenderer = ({ page }) => {
     return null;
   }
 
+  const pageStyleMode =
+    String(page.pageType || (page.layout === 'two-column' ? 'non-opener' : 'opener')).toLowerCase();
+  const scopedTypography = resolveTypographyStyles(pageStyleMode);
+  const pageStyleVars = {
+    ...generateAllCssVariables(scopedTypography),
+    '--heading-color': scopedTypography.sectionTitle?.color || 'var(--heading-color)',
+    '--paragraph-color': scopedTypography.paragraphText?.color || 'var(--paragraph-color)',
+    '--body-color': scopedTypography.paragraphText?.color || 'var(--body-color)',
+    '--primary-color': scopedTypography.sectionTitle?.color || 'var(--primary-color)',
+  };
+
   const twoColumnRows =
     page.layout === 'two-column'
       ? buildTwoColumnRows(page.components || [], computeLineBudgetFromViewport(viewportHeight))
@@ -247,7 +259,7 @@ const LessonRenderer = ({ page }) => {
   if (page.layout === 'two-column') {
 
     return (
-      <article className={`${styles.lesson} ${styles.twoColumnLesson}`}>
+      <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
         {twoColumnRows.map((row, rowIndex) => (
           <div key={`row-${rowIndex}`} className={styles.rowBlock}>
             {row.kind === 'full' ? (
@@ -277,7 +289,7 @@ const LessonRenderer = ({ page }) => {
   }
 
   return (
-    <article className={styles.lesson}>
+    <article className={styles.lesson} style={pageStyleVars}>
       {page.components?.map((component, index) => (
         <DynamicComponent key={component.id || index} component={component} />
       ))}
