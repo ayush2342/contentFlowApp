@@ -421,7 +421,10 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     };
   }
 
-  if (type === 'Image' && block?.data?.url) {
+  if (type === 'Image') {
+    if (!block?.data?.url) {
+      return null;
+    }
     const urlPath = normalizePublicAssetPath(block.data.url);
     const caption = normalizeText(block?.data?.caption);
     const mediaId = `tree-media-${ctx.mediaIndex++}`;
@@ -719,7 +722,10 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'Image' && node?.data?.url) {
+    if (type === 'Image') {
+      if (!node?.data?.url) {
+        return;
+      }
       flushLearningObjectives();
       const mediaId = `tree-media-${mediaIndex++}`;
       const caption = normalizeText(node?.data?.caption);
