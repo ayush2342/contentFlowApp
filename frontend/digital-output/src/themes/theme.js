@@ -3,7 +3,7 @@ import { typographyStyles, generateAllCssVariables } from '../../../../shared/ty
 const sectionTitleColor =
   typographyStyles.sectionTitle?.color ||
   typographyStyles.sectionTitle?.text?.color ||
-  '#0074BC';
+  '#214880';
 
 export const theme = {
   primaryColor: typographyStyles.chapterTitle?.color === '#000000'

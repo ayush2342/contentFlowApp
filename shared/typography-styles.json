@@ -1,80 +1,5 @@
 {
-  "ACTIVE_STYLE_MODE": "opener",
-  "OPENER_STYLES": {
-    "chapterHeading": {
-      "font": "Arial",
-      "size": 15,
-      "color": "#0074BC",
-      "bold": false
-    },
-    "chapterTitle": {
-      "font": "Arial",
-      "size": 22,
-      "color": "#000000",
-      "bold": false
-    },
-    "chapterOverview": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#0074BC",
-      "bold": true
-    },
-    "lessonOverview": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#000000",
-      "bold": true
-    },
-    "lessonTitle": {
-      "font": "Arial",
-      "size": 12,
-      "color": "#0074BC",
-      "bold": false
-    },
-    "learningObjectives": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#0074BC",
-      "bold": true
-    },
-    "sectionTitle": {
-      "font": "Arial",
-      "size": 11,
-      "color": "#0074BC",
-      "bold": false
-    },
-    "subSectionTitle": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#0074BC",
-      "bold": true
-    },
-    "paragrapghText": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#000000",
-      "bold": false
-    },
-    "bullestList": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#000000",
-      "bold": false
-    },
-    "imageFigureNumber": {
-      "font": "Arial",
-      "size": 7.5,
-      "color": "#C31427",
-      "bold": true
-    },
-    "imageFigureText": {
-      "font": "Arial",
-      "size": 7.5,
-      "color": "#000000",
-      "bold": false
-    }
-  },
-  "NON_OPENER_STYLES": {
+  "STYLES": {
     "partNumber": {
       "font": "Arial",
       "size": 24,
@@ -83,6 +8,13 @@
       "backgroundColor": "#CA5027"
     },
     "chapterHeading": {
+      "font": "Arial",
+      "size": 36,
+      "color": "#FFFFFF",
+      "bold": false,
+      "backgroundColor": "#CA5027"
+    },
+    "chapterNumber": {
       "font": "Arial",
       "size": 36,
       "color": "#FFFFFF",
@@ -100,6 +32,30 @@
       "size": 15,
       "color": "#CA5027",
       "bold": true
+    },
+    "sectionTitle": {
+      "font": "Arial",
+      "size": 18,
+      "color": "#214880",
+      "bold": true
+    },
+    "subSectionTitle": {
+      "font": "Arial",
+      "size": 10,
+      "color": "#000000",
+      "bold": true
+    },
+    "greenSubSectionTitle": {
+      "font": "Arial",
+      "size": 15,
+      "color": "#00854A",
+      "bold": true
+    },
+    "subTitle": {
+      "font": "Arial",
+      "size": 12,
+      "color": "#CA5027",
+      "bold": false
     },
     "paragraphText": {
       "font": "Arial",
@@ -120,38 +76,6 @@
         "color": "#CA5027",
         "bold": true
       }
-    },
-    "sectionTitle": {
-      "text": {
-        "font": "Arial",
-        "size": 17,
-        "color": "#214880",
-        "bold": true
-      },
-      "number": {
-        "font": "Arial",
-        "size": 18,
-        "color": "#214880",
-        "bold": true
-      }
-    },
-    "subSectionTitle": {
-      "font": "Arial",
-      "size": 10,
-      "color": "#000000",
-      "bold": true
-    },
-    "greenSubSectionTitle": {
-      "font": "Arial",
-      "size": 15,
-      "color": "#00854A",
-      "bold": true
-    },
-    "subTitle": {
-      "font": "Arial",
-      "size": 12,
-      "color": "#CA5027",
-      "bold": false
     }
   }
 }
