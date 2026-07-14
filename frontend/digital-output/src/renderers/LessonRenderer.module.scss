@@ -12,20 +12,22 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.fullWidthRow {
-  width: 100%;
-}
+/* One visual sheet ≈ one PDF page body (column 1 then column 2). */
+.pageSheet {
+  min-height: var(--page-column-height, 720px);
+  margin-bottom: 1.5rem;
 
-.rowBlock {
-  margin-bottom: 1.1rem;
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   column-gap: 2.75rem;
-  row-gap: 0.75rem;
   align-items: start;
+  min-height: inherit;
 }
 
 .column {
@@ -33,10 +35,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.singleColumnSpread {
-  grid-template-columns: 1fr;
 }
 
 .unsupported {
@@ -54,6 +52,10 @@
     padding: 1rem 1.1rem 1.5rem;
     box-shadow: none;
     border-radius: 0;
+  }
+
+  .pageSheet {
+    min-height: 0;
   }
 
   .columns {
