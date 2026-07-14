@@ -240,7 +240,9 @@ const LessonRenderer = ({ page }) => {
     return null;
   }
 
-  const scopedTypography = resolveTypographyStyles();
+  const pageStyleMode =
+    String(page.pageType || (page.layout === 'two-column' ? 'non-opener' : 'opener')).toLowerCase();
+  const scopedTypography = resolveTypographyStyles(pageStyleMode);
   const sectionColor =
     scopedTypography.sectionTitle?.color ||
     scopedTypography.sectionTitle?.text?.color ||

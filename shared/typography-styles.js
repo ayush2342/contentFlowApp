@@ -1,9 +1,85 @@
 /**
- * Final typography styles for web + PDF.
- * page_type (opener | non-opener) controls layout only (1-col vs 2-col), not styles.
+ * Centralized typography presets from plugin team.
+ * Per key: active page sheet → other sheet (only if key is missing).
+ * Never override a key that already exists on the active page sheet.
  */
 
-export const TYPOGRAPHY_STYLES = {
+export const OPENER_STYLES = {
+  chapterHeading: {
+    font: "Arial",
+    size: 15,
+    color: "#0074BC",
+    bold: false,
+  },
+  chapterTitle: {
+    font: "Arial",
+    size: 22,
+    color: "#000000",
+    bold: false,
+  },
+  chapterOverview: {
+    font: "Arial",
+    size: 9,
+    color: "#0074BC",
+    bold: true,
+  },
+  lessonOverview: {
+    font: "Arial",
+    size: 9,
+    color: "#000000",
+    bold: true,
+  },
+  lessonTitle: {
+    font: "Arial",
+    size: 12,
+    color: "#0074BC",
+    bold: false,
+  },
+  learningObjectives: {
+    font: "Arial",
+    size: 9,
+    color: "#0074BC",
+    bold: true,
+  },
+  sectionTitle: {
+    font: "Arial",
+    size: 11,
+    color: "#0074BC",
+    bold: false,
+  },
+  subSectionTitle: {
+    font: "Arial",
+    size: 9,
+    color: "#0074BC",
+    bold: true,
+  },
+  paragrapghText: {
+    font: "Arial",
+    size: 9,
+    color: "#000000",
+    bold: false,
+  },
+  bullestList: {
+    font: "Arial",
+    size: 9,
+    color: "#000000",
+    bold: false,
+  },
+  imageFigureNumber: {
+    font: "Arial",
+    size: 7.5,
+    color: "#C31427",
+    bold: true,
+  },
+  imageFigureText: {
+    font: "Arial",
+    size: 7.5,
+    color: "#000000",
+    bold: false,
+  },
+};
+
+export const NON_OPENER_STYLES = {
   partNumber: {
     font: "Arial",
     size: 24,
@@ -11,15 +87,7 @@ export const TYPOGRAPHY_STYLES = {
     bold: false,
     backgroundColor: "#CA5027",
   },
-  // Chapter Number ("Chapter 1")
   chapterHeading: {
-    font: "Arial",
-    size: 36,
-    color: "#FFFFFF",
-    bold: false,
-    backgroundColor: "#CA5027",
-  },
-  chapterNumber: {
     font: "Arial",
     size: 36,
     color: "#FFFFFF",
@@ -37,30 +105,6 @@ export const TYPOGRAPHY_STYLES = {
     size: 15,
     color: "#CA5027",
     bold: true,
-  },
-  sectionTitle: {
-    font: "Arial",
-    size: 18,
-    color: "#214880",
-    bold: true,
-  },
-  subSectionTitle: {
-    font: "Arial",
-    size: 10,
-    color: "#000000",
-    bold: true,
-  },
-  greenSubSectionTitle: {
-    font: "Arial",
-    size: 15,
-    color: "#00854A",
-    bold: true,
-  },
-  subTitle: {
-    font: "Arial",
-    size: 12,
-    color: "#CA5027",
-    bold: false,
   },
   paragraphText: {
     font: "Arial",
@@ -82,12 +126,39 @@ export const TYPOGRAPHY_STYLES = {
       bold: true,
     },
   },
+  sectionTitle: {
+    text: {
+      font: "Arial",
+      size: 17,
+      color: "#214880",
+      bold: true,
+    },
+    number: {
+      font: "Arial",
+      size: 18,
+      color: "#214880",
+      bold: true,
+    },
+  },
+  subSectionTitle: {
+    font: "Arial",
+    size: 10,
+    color: "#000000",
+    bold: true,
+  },
+  greenSubSectionTitle: {
+    font: "Arial",
+    size: 15,
+    color: "#00854A",
+    bold: true,
+  },
+  subTitle: {
+    font: "Arial",
+    size: 12,
+    color: "#CA5027",
+    bold: false,
+  },
 };
-
-/** @deprecated Use TYPOGRAPHY_STYLES — kept identical for older callers. */
-export const OPENER_STYLES = TYPOGRAPHY_STYLES;
-/** @deprecated Use TYPOGRAPHY_STYLES — kept identical for older callers. */
-export const NON_OPENER_STYLES = TYPOGRAPHY_STYLES;
 
 const isCompositeStyle = (value) =>
   Boolean(value && typeof value === "object" && value.text && value.number);
@@ -108,10 +179,10 @@ const pickFlatStyle = (styleSet, keys) => {
   return isCompositeStyle(raw) ? raw.text : raw;
 };
 
-const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
+const normalizeStylePreset = (styleSet = OPENER_STYLES) => {
   const partNumber = pickFlatStyle(styleSet, ["partNumber"]);
   const chapterNumber = pickFlatStyle(styleSet, ["chapterNumber", "chapterHeading"]);
-  const chapterHeading = pickFlatStyle(styleSet, ["chapterHeading", "chapterNumber"]);
+  const chapterHeading = pickFlatStyle(styleSet, ["chapterHeading"]);
   const chapterTitle = pickFlatStyle(styleSet, ["chapterTitle"]);
   const chapterOverview = pickFlatStyle(styleSet, ["chapterOverview"]);
   const lessonOverview = pickFlatStyle(styleSet, ["lessonOverview", "topic"]);
@@ -129,7 +200,7 @@ const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
     ? subTitlesListRaw
     : pickFlatStyle(styleSet, ["subTitlesList"]);
   const paragraphText = pickFlatStyle(styleSet, ["paragraphText", "paragrapghText", "text"]);
-  const bulletList = pickFlatStyle(styleSet, ["bulletList", "bullestList", "paragraphText"]);
+  const bulletList = pickFlatStyle(styleSet, ["bulletList", "bullestList"]);
   const imageFigureNumber = pickFlatStyle(styleSet, ["imageFigureNumber"]);
   const imageFigureText = pickFlatStyle(styleSet, [
     "imageFigureText",
@@ -164,16 +235,42 @@ const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
   };
 };
 
-export const STYLE_PRESETS = {
-  opener: TYPOGRAPHY_STYLES,
-  nonOpener: TYPOGRAPHY_STYLES,
+const fillMissingStyles = (resolved, fallback) => {
+  const filled = { ...resolved };
+  Object.keys(fallback).forEach((key) => {
+    if (!filled[key]) {
+      filled[key] = fallback[key];
+    }
+  });
+  return filled;
 };
 
-/** Always returns the final stylesheet. mode is ignored (layout-only elsewhere). */
-export const resolveTypographyStyles = (_mode) =>
-  normalizeStylePreset(TYPOGRAPHY_STYLES);
+export const STYLE_PRESETS = {
+  opener: OPENER_STYLES,
+  nonOpener: NON_OPENER_STYLES,
+};
 
-export const typographyStyles = resolveTypographyStyles();
+/**
+ * Resolve styles per key:
+ * 1) active page sheet (opener | non-opener) — use as-is when key exists
+ * 2) the other sheet — only for keys missing from the active sheet
+ */
+export const resolveTypographyStyles = (mode = "opener") => {
+  const normalizedMode = String(mode || "opener").toLowerCase();
+  const isNonOpener =
+    normalizedMode === "nonopener" || normalizedMode === "non-opener";
+
+  const primary = normalizeStylePreset(
+    isNonOpener ? STYLE_PRESETS.nonOpener : STYLE_PRESETS.opener
+  );
+  const secondary = normalizeStylePreset(
+    isNonOpener ? STYLE_PRESETS.opener : STYLE_PRESETS.nonOpener
+  );
+
+  return fillMissingStyles(primary, secondary);
+};
+
+export const typographyStyles = resolveTypographyStyles("opener");
 
 export const hexToRgb = (hex) => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

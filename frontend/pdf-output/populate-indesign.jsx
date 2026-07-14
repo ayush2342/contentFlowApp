@@ -480,8 +480,7 @@ function cloneFallbackStyle(key) {
 }
 
 function buildCanonicalStyleMap(styleSet) {
-    var chapterHeading = pickTypographyEntry(styleSet, ["chapterHeading", "chapterNumber"]);
-    var chapterNumber = pickTypographyEntry(styleSet, ["chapterNumber", "chapterHeading"]);
+    var chapterHeading = pickTypographyEntry(styleSet, ["chapterHeading"]);
     var chapterTitle = pickTypographyEntry(styleSet, ["chapterTitle"]);
     var chapterOverview = pickTypographyEntry(styleSet, ["chapterOverview"]);
     var lessonOverview = pickTypographyEntry(styleSet, ["lessonOverview", "topic"]);
@@ -494,7 +493,7 @@ function buildCanonicalStyleMap(styleSet) {
     var subTitle = pickTypographyEntry(styleSet, ["subTitle"]);
     var partNumber = pickTypographyEntry(styleSet, ["partNumber"]);
     var paragraphText = pickTypographyEntry(styleSet, ["paragraphText", "paragrapghText", "text"]);
-    var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList", "paragraphText"]);
+    var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList"]);
     var imageFigureNumber = pickTypographyEntry(styleSet, ["imageFigureNumber"]);
     var imageFigureText = pickTypographyEntry(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
 
@@ -515,7 +514,8 @@ function buildCanonicalStyleMap(styleSet) {
         bulletList: bulletList,
         imageFigureNumber: imageFigureNumber,
         imageFigureText: imageFigureText,
-        chapterNumber: chapterNumber || chapterHeading,
+        // Backward compatible aliases used by current script registry
+        chapterNumber: chapterHeading,
         lessonNumber: chapterHeading,
         topic: lessonOverview,
         text: paragraphText,
@@ -570,8 +570,11 @@ function loadTypographyConfig(scriptFolderPath) {
 function buildFrameStylesFromConfig(typographyConfig) {
     var styles = {};
     var mode = getTypographyMode(typographyConfig);
-    var sourceMap = typographyConfig;
+    var primaryMap = typographyConfig;
+    var secondaryMap = null;
     var canonicalMap;
+    var secondaryCanonical;
+    var defaultsCanonical;
     var key;
     var resolved;
     
@@ -579,15 +582,27 @@ function buildFrameStylesFromConfig(typographyConfig) {
         return null;
     }
 
-    // Final stylesheet: one shared map for all pages.
-    // page_type only affects layout (1-col vs 2-col), not typography.
-    if (typographyConfig.STYLES) {
-        sourceMap = typographyConfig.STYLES;
-    } else if (typographyConfig.NON_OPENER_STYLES || typographyConfig.OPENER_STYLES) {
-        sourceMap = typographyConfig.NON_OPENER_STYLES || typographyConfig.OPENER_STYLES;
+    if (typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES) {
+        if (mode === "nonOpener" && typographyConfig.NON_OPENER_STYLES) {
+            primaryMap = typographyConfig.NON_OPENER_STYLES;
+            secondaryMap = typographyConfig.OPENER_STYLES || null;
+        } else {
+            primaryMap = typographyConfig.OPENER_STYLES || typographyConfig.NON_OPENER_STYLES;
+            secondaryMap = typographyConfig.NON_OPENER_STYLES || null;
+        }
     }
 
-    canonicalMap = buildCanonicalStyleMap(sourceMap);
+    canonicalMap = buildCanonicalStyleMap(primaryMap);
+
+    // Fill missing keys from the other sheet, then FRAME_STYLES_DEFAULTS (same as web).
+    if (secondaryMap) {
+        secondaryCanonical = buildCanonicalStyleMap(secondaryMap);
+        for (key in secondaryCanonical) {
+            if (secondaryCanonical.hasOwnProperty(key) && !canonicalMap[key]) {
+                canonicalMap[key] = secondaryCanonical[key];
+            }
+        }
+    }
     
     for (key in canonicalMap) {
         if (canonicalMap.hasOwnProperty(key)) {
@@ -612,7 +627,8 @@ function buildFrameStylesFromConfig(typographyConfig) {
 
     styles.__mode = mode;
     appendRenderLog(
-        "Typography from STYLES (layout page_type=" + (CURRENT_PAGE_TYPE || "opener") + ")"
+        "Typography mode for page: " + mode +
+        " (page_type=" + (CURRENT_PAGE_TYPE || "opener") + ")"
     );
     
     return styles;
@@ -622,22 +638,22 @@ function buildFrameStylesFromConfig(typographyConfig) {
 // Styling maps - defaults (will be overridden by typography config if available)
 // -----------------------------------------------------------------------------
 var FRAME_STYLES_DEFAULTS = {
-    lessonNumber: { pointSize: 36, bold: false, italic: false, leftIndent: 0, color: [255, 255, 255], backgroundColor: "#CA5027" },
-    lessonTitle: { pointSize: 44, bold: false, italic: false, leftIndent: 0, color: [33, 72, 128] },
+    lessonNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    lessonTitle: { pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
     chapterOverview: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
-    chapterHeading: { pointSize: 36, bold: false, italic: false, leftIndent: 0, color: [255, 255, 255], backgroundColor: "#CA5027" },
+    chapterHeading: { pointSize: 15, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
     topic: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    text: { pointSize: 10, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    sectionTitle: { pointSize: 18, bold: true, italic: false, leftIndent: 0, color: [33, 72, 128] },
+    text: { pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    sectionTitle: { pointSize: 11, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
     imageCaption: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    chapterNumber: { pointSize: 36, bold: false, italic: false, leftIndent: 0, color: [255, 255, 255], backgroundColor: "#CA5027" },
+    chapterNumber: { pointSize: 14, bold: false, italic: false, leftIndent: 0, color: [0, 116, 188] },
     chapterTitle: { pointSize: 22, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
     lessonOverview: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    paragraphText: { pointSize: 10, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    learningObjectives: { pointSize: 15, bold: true, italic: false, leftIndent: 0, color: [202, 80, 39] },
-    bulletList: { pointSize: 10, bold: false, italic: false, leftIndent: 12, color: [0, 0, 0] },
-    logoText: { pointSize: 10, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
-    subSectionTitle: { pointSize: 10, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    paragraphText: { pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    learningObjectives: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    bulletList: { pointSize: 9, bold: false, italic: false, leftIndent: 12, color: [0, 0, 0] },
+    logoText: { pointSize: 11, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
+    subSectionTitle: { pointSize: 9, bold: true, italic: false, leftIndent: 0, color: [0, 116, 188] },
     figureCaption: { pointSize: 7.5, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
     imageFigureNumber: { pointSize: 7.5, bold: true, italic: false, leftIndent: 0, color: [195, 20, 39] },
     imageFigureText: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
