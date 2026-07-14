@@ -1747,7 +1747,7 @@ function parseFigureCaptionParts(caption) {
         return null;
     }
 
-    match = text.match(/^(FIGURE\s+\d+(?:\.\d+)?)([\s\S]*)$/i);
+    match = text.match(/^((?:FIGURE|EXHIBIT)\s+\d+(?:\.\d+)?)([\s\S]*)$/i);
     if (!match) {
         return null;
     }

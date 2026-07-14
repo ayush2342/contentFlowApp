@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
 import { generateAllCssVariables, resolveTypographyStyles } from '../../../../shared/typography-styles.js';
@@ -6,232 +7,131 @@ const DynamicComponent = ({ component }) => {
   if (component.type === '__unsupported__') {
     return (
       <div className={styles.unsupported} role="note">
-        {/* TODO: Add renderer support when requirements for "{component.props.originalType}" are defined */}
         Unsupported content type: {component.props.originalType}
       </div>
     );
   }
 
   const Component = componentRegistry[component.type];
-
-  if (!Component) {
-    return null;
-  }
-
+  if (!Component) return null;
   return <Component {...component.props} />;
 };
 
-// Mirror PDF Letter fallback (612×792 pt, 72 pt margins) at 96 CSS px/in.
-// 1 pt = 96/72 px → page 816×1056 px; content height 648 pt → 864 px.
-const PAGE_WIDTH_PX = 816;
-const PAGE_HEIGHT_PX = 1056;
-const PAGE_MARGIN_PX = 96;
-const PAGE_GUTTER_PX = 24;
-const PAGE_CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_MARGIN_PX * 2;
-const APPROX_CHARS_PER_LINE = 88;
-const APPROX_LINE_HEIGHT_PX = 24;
-const PAGE_LINE_BUDGET = Math.max(
-  10,
-  Math.floor(PAGE_CONTENT_HEIGHT_PX / APPROX_LINE_HEIGHT_PX)
-);
+/**
+ * PDF-like page body height for column switching only (not a forced visual box).
+ * Letter content area ≈ 648pt → ~864 CSS px; use viewport when smaller.
+ */
+const DEFAULT_COLUMN_PAGE_HEIGHT_PX = 864;
+const RESERVED_CHROME_PX = 180;
+const COLUMN_CHARS_PER_LINE = 42;
+const LINE_HEIGHT_PX = 22;
+const IMAGE_BLOCK_HEIGHT_PX = 240; // image + caption
+const HEADING_HEIGHT_PX = 36;
+const BLOCK_GAP_PX = 12;
 
-const isFullWidthComponent = () => false;
-
-const computeLineBudgetFromPageHeight = (contentHeightPx = PAGE_CONTENT_HEIGHT_PX) => {
-  const safeHeight = Number.isFinite(contentHeightPx) ? contentHeightPx : PAGE_CONTENT_HEIGHT_PX;
-  return Math.max(10, Math.floor(safeHeight / APPROX_LINE_HEIGHT_PX));
+const computeColumnPageHeight = (viewportHeight) => {
+  const fromViewport = (Number.isFinite(viewportHeight) ? viewportHeight : 900) - RESERVED_CHROME_PX;
+  return Math.max(480, Math.min(DEFAULT_COLUMN_PAGE_HEIGHT_PX, fromViewport));
 };
 
-const estimateTextLines = (value) => {
+const estimateTextHeight = (value) => {
   const text = String(value ?? '').trim();
   if (!text) return 0;
-  return Math.max(1, Math.ceil(text.length / APPROX_CHARS_PER_LINE));
+  return Math.max(1, Math.ceil(text.length / COLUMN_CHARS_PER_LINE)) * LINE_HEIGHT_PX;
 };
 
-const estimateComponentLines = (component) => {
+const estimateBlockHeight = (component) => {
   if (!component) return 0;
-  if (component.type === 'Paragraph') return estimateTextLines(component.props?.text);
+  if (component.type === 'Paragraph') {
+    return estimateTextHeight(component.props?.text) + BLOCK_GAP_PX;
+  }
   if (component.type === 'LearningObjective') {
-    const intro = estimateTextLines(component.props?.introText);
+    const intro = estimateTextHeight(component.props?.introText);
     const objectives = Array.isArray(component.props?.objectives) ? component.props.objectives : [];
-    const objectiveLines = objectives.reduce((sum, item) => sum + Math.max(1, estimateTextLines(item)), 0);
-    return Math.max(2, intro + objectiveLines + 1);
+    const objectiveHeight = objectives.reduce(
+      (sum, item) => sum + Math.max(LINE_HEIGHT_PX, estimateTextHeight(item)),
+      0
+    );
+    return Math.max(HEADING_HEIGHT_PX, intro + objectiveHeight + HEADING_HEIGHT_PX) + BLOCK_GAP_PX;
   }
-  if (component.type === 'Heading') return 2;
-  return 3;
+  if (component.type === 'Heading') return HEADING_HEIGHT_PX + BLOCK_GAP_PX;
+  if (component.type === 'ImageBlock' || component.type === 'IconLabel') {
+    return IMAGE_BLOCK_HEIGHT_PX + BLOCK_GAP_PX;
+  }
+  return HEADING_HEIGHT_PX + BLOCK_GAP_PX;
 };
 
-const splitTextByLineBudget = (value, leftBudgetLines) => {
-  const text = String(value ?? '').trim();
-  if (!text) return ['', ''];
-  if (leftBudgetLines <= 0) return ['', text];
+/**
+ * Same flow as PDF ensureLayoutSpace:
+ * fill column 1, then column 2, then a new sheet. Whole blocks only.
+ */
+const buildPdfLikeColumnPages = (components = [], pageHeightPx = DEFAULT_COLUMN_PAGE_HEIGHT_PX) => {
+  const sheets = [];
+  let left = [];
+  let right = [];
+  let leftHeight = 0;
+  let rightHeight = 0;
+  let column = 0;
 
-  const totalLines = estimateTextLines(text);
-  if (totalLines <= leftBudgetLines) return [text, ''];
-
-  const sentenceParts = text
-    .split(/(?<=[.!?])\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (sentenceParts.length > 1) {
-    let usedLines = 0;
-    const leftSentences = [];
-    let sentenceIndex = 0;
-    while (sentenceIndex < sentenceParts.length) {
-      const lineCount = estimateTextLines(sentenceParts[sentenceIndex]);
-      if (leftSentences.length > 0 && usedLines + lineCount > leftBudgetLines) break;
-      leftSentences.push(sentenceParts[sentenceIndex]);
-      usedLines += lineCount;
-      sentenceIndex += 1;
-    }
-
-    if (leftSentences.length > 0) {
-      const rightSentences = sentenceParts.slice(leftSentences.length);
-      return [leftSentences.join(' '), rightSentences.join(' ')];
-    }
-  }
-
-  const words = text.split(/\s+/).filter(Boolean);
-  const leftWordCount = Math.max(1, Math.floor((leftBudgetLines / totalLines) * words.length));
-  return [words.slice(0, leftWordCount).join(' '), words.slice(leftWordCount).join(' ')];
-};
-
-const cloneComponentWithText = (component, text) => ({
-  ...component,
-  props: {
-    ...component.props,
-    text,
-  },
-});
-
-const createSpread = () => ({
-  kind: 'spread',
-  left: [],
-  right: [],
-  leftLines: 0,
-  rightLines: 0,
-});
-
-const buildTwoColumnRows = (components = [], lineBudget = PAGE_LINE_BUDGET) => {
-  const rows = [];
-  let currentSpread = createSpread();
-  let activeSide = 'left';
-
-  const finalizeSpreadIfUsed = () => {
-    if (!currentSpread.left.length && !currentSpread.right.length) return;
-    rows.push(currentSpread);
-    currentSpread = createSpread();
-    activeSide = 'left';
+  const flushSheet = () => {
+    if (!left.length && !right.length) return;
+    sheets.push({ left, right });
+    left = [];
+    right = [];
+    leftHeight = 0;
+    rightHeight = 0;
+    column = 0;
   };
 
-  const pushFullWidth = (component, key) => {
-    finalizeSpreadIfUsed();
-    rows.push({ kind: 'full', key, component });
-  };
-
-  const placeIntoSide = (entry, side) => {
-    if (side === 'left') {
-      currentSpread.left.push(entry);
-      currentSpread.leftLines += estimateComponentLines(entry.component);
+  const placeInColumn = (component, key) => {
+    const entry = { key, component };
+    if (column === 0) {
+      left.push(entry);
+      leftHeight += estimateBlockHeight(component);
     } else {
-      currentSpread.right.push(entry);
-      currentSpread.rightLines += estimateComponentLines(entry.component);
+      right.push(entry);
+      rightHeight += estimateBlockHeight(component);
     }
   };
 
-  const ensureCapacity = (neededLines = 1) => {
-    if (activeSide === 'left') {
-      if (currentSpread.leftLines + neededLines <= lineBudget) return;
-      activeSide = 'right';
-    }
+  components.forEach((component, index) => {
+    if (!component) return;
+    const height = estimateBlockHeight(component);
+    const key = component.id || `block-${index}`;
 
-    if (activeSide === 'right') {
-      if (currentSpread.rightLines + neededLines <= lineBudget) return;
-      finalizeSpreadIfUsed();
-    }
-  };
-
-  const placeGeneric = (component, key) => {
-    const lines = estimateComponentLines(component);
-    ensureCapacity(lines);
-    placeIntoSide({ key, component }, activeSide);
-  };
-
-  let index = 0;
-  while (index < components.length) {
-    const component = components[index];
-    if (!component) {
-      index += 1;
-      continue;
-    }
-
-    if (isFullWidthComponent(component)) {
-      pushFullWidth(component, `${component.id || index}-full`);
-      index += 1;
-      continue;
-    }
-
-    if (component.type === 'LearningObjective') {
-      placeGeneric(component, `${component.id || index}-objective`);
-      index += 1;
-      continue;
-    }
-
-    if (component.type === 'Paragraph') {
-      let remainingText = String(component.props?.text || '').trim();
-      if (!remainingText) {
-        index += 1;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const used = column === 0 ? leftHeight : rightHeight;
+      const fits = used + height <= pageHeightPx || used === 0;
+      if (fits) {
+        placeInColumn(component, key);
+        return;
+      }
+      if (column === 0) {
+        column = 1;
         continue;
       }
-
-      while (remainingText) {
-        const usedLines = activeSide === 'left' ? currentSpread.leftLines : currentSpread.rightLines;
-        let remainingBudget = lineBudget - usedLines;
-        if (remainingBudget <= 0) {
-          ensureCapacity(1);
-          remainingBudget = lineBudget - (activeSide === 'left' ? currentSpread.leftLines : currentSpread.rightLines);
-        }
-
-        const [fitText, overflowText] = splitTextByLineBudget(remainingText, Math.max(1, remainingBudget));
-        if (!fitText) {
-          ensureCapacity(1);
-          activeSide = activeSide === 'left' ? 'right' : 'left';
-          continue;
-        }
-
-        placeIntoSide(
-          {
-            key: `${component.id || index}-${activeSide}-${Math.abs(remainingText.length - fitText.length)}`,
-            component: cloneComponentWithText(component, fitText),
-          },
-          activeSide
-        );
-        remainingText = overflowText;
-
-        if (remainingText) {
-          if (activeSide === 'left') {
-            activeSide = 'right';
-          } else {
-            finalizeSpreadIfUsed();
-            activeSide = 'left';
-          }
-        }
-      }
-
-      index += 1;
-      continue;
+      flushSheet();
     }
 
-    placeGeneric(component, `${component.id || index}-generic`);
-    index += 1;
-  }
+    placeInColumn(component, key);
+  });
 
-  finalizeSpreadIfUsed();
-  return rows;
+  flushSheet();
+  return sheets;
 };
 
 const LessonRenderer = ({ page }) => {
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight : 900
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => setViewportHeight(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   if (!page) {
     return null;
   }
@@ -242,6 +142,7 @@ const LessonRenderer = ({ page }) => {
     scopedTypography.sectionTitle?.text?.color ||
     undefined;
   const paragraphColor = scopedTypography.paragraphText?.color;
+  const columnPageHeight = computeColumnPageHeight(viewportHeight);
   const pageStyleVars = {
     ...generateAllCssVariables(scopedTypography),
     ...(sectionColor
@@ -250,43 +151,27 @@ const LessonRenderer = ({ page }) => {
     ...(paragraphColor
       ? { '--paragraph-color': paragraphColor, '--body-color': paragraphColor }
       : {}),
-    '--page-width': `${PAGE_WIDTH_PX}px`,
-    '--page-height': `${PAGE_HEIGHT_PX}px`,
-    '--page-margin': `${PAGE_MARGIN_PX}px`,
-    '--page-gutter': `${PAGE_GUTTER_PX}px`,
-    '--page-content-height': `${PAGE_CONTENT_HEIGHT_PX}px`,
   };
 
-  const twoColumnRows =
-    page.layout === 'two-column'
-      ? buildTwoColumnRows(page.components || [], computeLineBudgetFromPageHeight())
-      : [];
-
   if (page.layout === 'two-column') {
+    const sheets = buildPdfLikeColumnPages(page.components || [], columnPageHeight);
+
     return (
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
-        {twoColumnRows.map((row, rowIndex) => (
-          <div key={`row-${rowIndex}`} className={styles.pageSheet}>
-            {row.kind === 'full' ? (
-              <div className={styles.fullWidthRow}>
-                <DynamicComponent component={row.component} />
+        {sheets.map((sheet, sheetIndex) => (
+          <div key={`sheet-${sheetIndex}`} className={styles.pageSheet}>
+            <div className={styles.columns}>
+              <div className={styles.column}>
+                {sheet.left.map((item) => (
+                  <DynamicComponent key={item.key} component={item.component} />
+                ))}
               </div>
-            ) : (
-              <div className={`${styles.columns} ${row.right.length ? '' : styles.singleColumnSpread}`}>
-                <div className={styles.column}>
-                  {row.left.map((item) => (
-                    <DynamicComponent key={item.key} component={item.component} />
-                  ))}
-                </div>
-                {row.right.length ? (
-                  <div className={styles.column}>
-                    {row.right.map((item) => (
-                      <DynamicComponent key={item.key} component={item.component} />
-                    ))}
-                  </div>
-                ) : null}
+              <div className={styles.column}>
+                {sheet.right.map((item) => (
+                  <DynamicComponent key={item.key} component={item.component} />
+                ))}
               </div>
-            )}
+            </div>
           </div>
         ))}
       </article>

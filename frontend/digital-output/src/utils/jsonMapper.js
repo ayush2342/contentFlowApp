@@ -296,6 +296,8 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   image: 'Image',
   figureimage: 'Image',
   figurecaption: 'FigureCaption',
+  exhibitcaption: 'FigureCaption',
+  imagecaption: 'FigureCaption',
   caption: 'FigureCaption',
   logowithtext: 'LogoWithText',
 };
