@@ -426,7 +426,8 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
       return null;
     }
     const urlPath = normalizePublicAssetPath(block.data.url);
-    const caption = normalizeText(block?.data?.caption);
+    // Match PDF: caption may live on data.caption or data.text
+    const caption = normalizeText(block?.data?.caption || block?.data?.text);
     const mediaId = `tree-media-${ctx.mediaIndex++}`;
     ctx.media[mediaId] = {
       fileName: basenameFromPath(urlPath),
@@ -450,21 +451,28 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     };
   }
 
-  if (type === 'FigureCaption' && text) {
+  if (type === 'FigureCaption') {
+    const captionText = normalizeText(block?.data?.text || block?.data?.caption);
+    if (!captionText) return null;
+
+    // Attach to the pending image even if other blocks were mapped in between.
     if (ctx.pendingImageMediaId && ctx.media[ctx.pendingImageMediaId]) {
-      ctx.media[ctx.pendingImageMediaId].caption = text;
-      const lastComponent = ctx.components[ctx.components.length - 1];
-      if (lastComponent?.type === 'ImageBlock') {
-        lastComponent.props.caption = text;
-        lastComponent.props.alt = text;
+      ctx.media[ctx.pendingImageMediaId].caption = captionText;
+      for (let i = ctx.components.length - 1; i >= 0; i -= 1) {
+        if (ctx.components[i]?.type === 'ImageBlock') {
+          ctx.components[i].props.caption = captionText;
+          ctx.components[i].props.alt = captionText;
+          break;
+        }
       }
+      ctx.pendingImageMediaId = null;
       return null;
     }
 
     return {
       id: `content-${index}`,
       type: 'Paragraph',
-      props: { text },
+      props: { text: captionText },
     };
   }
 
@@ -728,7 +736,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       }
       flushLearningObjectives();
       const mediaId = `tree-media-${mediaIndex++}`;
-      const caption = normalizeText(node?.data?.caption);
+      const caption = normalizeText(node?.data?.caption || node?.data?.text);
       const urlPath = normalizePublicAssetPath(node.data.url);
 
       media[mediaId] = {
@@ -742,12 +750,15 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (type === 'FigureCaption' && dataText) {
+    if (type === 'FigureCaption') {
+      const captionText = normalizeText(node?.data?.text || node?.data?.caption || dataText);
+      if (!captionText) return;
       // Word flow may emit caption as a separate block after Image.
       if (pendingImageMediaId && media[pendingImageMediaId]) {
-        media[pendingImageMediaId].caption = dataText;
+        media[pendingImageMediaId].caption = captionText;
+        pendingImageMediaId = null;
       } else {
-        content.push({ type: 'paragraph', text: dataText });
+        content.push({ type: 'paragraph', text: captionText });
       }
       return;
     }
