@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
 import { generateAllCssVariables, resolveTypographyStyles } from '../../../../shared/typography-styles.js';
@@ -22,17 +21,25 @@ const DynamicComponent = ({ component }) => {
   return <Component {...component.props} />;
 };
 
+// Mirror PDF Letter fallback (612×792 pt, 72 pt margins) at 96 CSS px/in.
+// 1 pt = 96/72 px → page 816×1056 px; content height 648 pt → 864 px.
+const PAGE_WIDTH_PX = 816;
+const PAGE_HEIGHT_PX = 1056;
+const PAGE_MARGIN_PX = 96;
+const PAGE_GUTTER_PX = 24;
+const PAGE_CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - PAGE_MARGIN_PX * 2;
 const APPROX_CHARS_PER_LINE = 88;
-const DEFAULT_VIEWPORT_HEIGHT = 900;
-const RESERVED_VERTICAL_SPACE = 200;
 const APPROX_LINE_HEIGHT_PX = 24;
+const PAGE_LINE_BUDGET = Math.max(
+  10,
+  Math.floor(PAGE_CONTENT_HEIGHT_PX / APPROX_LINE_HEIGHT_PX)
+);
 
 const isFullWidthComponent = () => false;
 
-const computeLineBudgetFromViewport = (viewportHeight) => {
-  const safeHeight = Number.isFinite(viewportHeight) ? viewportHeight : DEFAULT_VIEWPORT_HEIGHT;
-  const usableHeight = Math.max(320, safeHeight - RESERVED_VERTICAL_SPACE);
-  return Math.max(10, Math.floor(usableHeight / APPROX_LINE_HEIGHT_PX));
+const computeLineBudgetFromPageHeight = (contentHeightPx = PAGE_CONTENT_HEIGHT_PX) => {
+  const safeHeight = Number.isFinite(contentHeightPx) ? contentHeightPx : PAGE_CONTENT_HEIGHT_PX;
+  return Math.max(10, Math.floor(safeHeight / APPROX_LINE_HEIGHT_PX));
 };
 
 const estimateTextLines = (value) => {
@@ -106,7 +113,7 @@ const createSpread = () => ({
   rightLines: 0,
 });
 
-const buildTwoColumnRows = (components = [], lineBudget = 26) => {
+const buildTwoColumnRows = (components = [], lineBudget = PAGE_LINE_BUDGET) => {
   const rows = [];
   let currentSpread = createSpread();
   let activeSide = 'left';
@@ -225,17 +232,6 @@ const buildTwoColumnRows = (components = [], lineBudget = 26) => {
 };
 
 const LessonRenderer = ({ page }) => {
-  const [viewportHeight, setViewportHeight] = useState(() =>
-    typeof window !== 'undefined' ? window.innerHeight : DEFAULT_VIEWPORT_HEIGHT
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onResize = () => setViewportHeight(window.innerHeight);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   if (!page) {
     return null;
   }
@@ -254,19 +250,23 @@ const LessonRenderer = ({ page }) => {
     ...(paragraphColor
       ? { '--paragraph-color': paragraphColor, '--body-color': paragraphColor }
       : {}),
+    '--page-width': `${PAGE_WIDTH_PX}px`,
+    '--page-height': `${PAGE_HEIGHT_PX}px`,
+    '--page-margin': `${PAGE_MARGIN_PX}px`,
+    '--page-gutter': `${PAGE_GUTTER_PX}px`,
+    '--page-content-height': `${PAGE_CONTENT_HEIGHT_PX}px`,
   };
 
   const twoColumnRows =
     page.layout === 'two-column'
-      ? buildTwoColumnRows(page.components || [], computeLineBudgetFromViewport(viewportHeight))
+      ? buildTwoColumnRows(page.components || [], computeLineBudgetFromPageHeight())
       : [];
 
   if (page.layout === 'two-column') {
-
     return (
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
         {twoColumnRows.map((row, rowIndex) => (
-          <div key={`row-${rowIndex}`} className={styles.rowBlock}>
+          <div key={`row-${rowIndex}`} className={styles.pageSheet}>
             {row.kind === 'full' ? (
               <div className={styles.fullWidthRow}>
                 <DynamicComponent component={row.component} />
