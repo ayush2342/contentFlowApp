@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
 import { generateAllCssVariables, resolveTypographyStyles, DEFAULT_THEME_ID } from '../../../../shared/typography-styles.js';
@@ -19,120 +19,119 @@ const DynamicComponent = ({ component }) => {
 };
 
 /**
- * PDF-like page body height for column switching only (not a forced visual box).
- * Letter content area ≈ 648pt → ~864 CSS px; use viewport when smaller.
+ * One JSON page = one sheet.
+ * Left fills to this height, then remaining blocks go to right (no extra sheets).
+ * Kept tall so left takes as much of the page content as possible before switching.
  */
-const DEFAULT_COLUMN_PAGE_HEIGHT_PX = 864;
-const RESERVED_CHROME_PX = 180;
-const COLUMN_CHARS_PER_LINE = 42;
-const LINE_HEIGHT_PX = 22;
-const IMAGE_BLOCK_HEIGHT_PX = 240; // image + caption
-const HEADING_HEIGHT_PX = 36;
-const BLOCK_GAP_PX = 12;
-
-const computeColumnPageHeight = (viewportHeight) => {
-  const fromViewport = (Number.isFinite(viewportHeight) ? viewportHeight : 900) - RESERVED_CHROME_PX;
-  return Math.max(480, Math.min(DEFAULT_COLUMN_PAGE_HEIGHT_PX, fromViewport));
-};
-
-const estimateTextHeight = (value) => {
-  const text = String(value ?? '').trim();
-  if (!text) return 0;
-  return Math.max(1, Math.ceil(text.length / COLUMN_CHARS_PER_LINE)) * LINE_HEIGHT_PX;
-};
-
-const estimateBlockHeight = (component) => {
-  if (!component) return 0;
-  if (component.type === 'Paragraph') {
-    return estimateTextHeight(component.props?.text) + BLOCK_GAP_PX;
-  }
-  if (component.type === 'LearningObjective') {
-    const intro = estimateTextHeight(component.props?.introText);
-    const objectives = Array.isArray(component.props?.objectives) ? component.props.objectives : [];
-    const objectiveHeight = objectives.reduce(
-      (sum, item) => sum + Math.max(LINE_HEIGHT_PX, estimateTextHeight(item)),
-      0
-    );
-    return Math.max(HEADING_HEIGHT_PX, intro + objectiveHeight + HEADING_HEIGHT_PX) + BLOCK_GAP_PX;
-  }
-  if (component.type === 'Heading') return HEADING_HEIGHT_PX + BLOCK_GAP_PX;
-  if (component.type === 'ImageBlock' || component.type === 'IconLabel') {
-    return IMAGE_BLOCK_HEIGHT_PX + BLOCK_GAP_PX;
-  }
-  return HEADING_HEIGHT_PX + BLOCK_GAP_PX;
-};
+const PDF_PAGE_CONTENT_HEIGHT_PX = 1240;
 
 /**
- * Same flow as PDF ensureLayoutSpace:
- * fill column 1, then column 2, then a new sheet. Whole blocks only.
+ * Split one JSON page into left/right using measured block heights
+ * (same width as the real column). No guessed text heights.
  */
-const buildPdfLikeColumnPages = (components = [], pageHeightPx = DEFAULT_COLUMN_PAGE_HEIGHT_PX) => {
-  const sheets = [];
-  let left = [];
-  let right = [];
-  let leftHeight = 0;
-  let rightHeight = 0;
-  let column = 0;
+const TwoColumnPageSheet = ({ components = [], pageHeightPx = PDF_PAGE_CONTENT_HEIGHT_PX }) => {
+  const measureRef = useRef(null);
+  const [splitIndex, setSplitIndex] = useState(null);
 
-  const flushSheet = () => {
-    if (!left.length && !right.length) return;
-    sheets.push({ left, right });
-    left = [];
-    right = [];
-    leftHeight = 0;
-    rightHeight = 0;
-    column = 0;
-  };
+  const blocks = useMemo(
+    () =>
+      (components || [])
+        .filter(Boolean)
+        .map((component, index) => ({
+          key: component.id || `block-${index}`,
+          component,
+        })),
+    [components]
+  );
 
-  const placeInColumn = (component, key) => {
-    const entry = { key, component };
-    if (column === 0) {
-      left.push(entry);
-      leftHeight += estimateBlockHeight(component);
-    } else {
-      right.push(entry);
-      rightHeight += estimateBlockHeight(component);
-    }
-  };
+  useLayoutEffect(() => {
+    const root = measureRef.current;
+    if (!root) return undefined;
 
-  components.forEach((component, index) => {
-    if (!component) return;
-    const height = estimateBlockHeight(component);
-    const key = component.id || `block-${index}`;
-
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const used = column === 0 ? leftHeight : rightHeight;
-      const fits = used + height <= pageHeightPx || used === 0;
-      if (fits) {
-        placeInColumn(component, key);
+    const measureSplit = () => {
+      const children = Array.from(root.children);
+      if (!children.length) {
+        setSplitIndex(0);
         return;
       }
-      if (column === 0) {
-        column = 1;
-        continue;
+
+      const gapPx = (() => {
+        const gap = getComputedStyle(root).gap || getComputedStyle(root).rowGap || '0';
+        const parsed = Number.parseFloat(gap);
+        return Number.isFinite(parsed) ? parsed : 0;
+      })();
+
+      let used = 0;
+      let nextSplit = children.length;
+
+      for (let i = 0; i < children.length; i += 1) {
+        const height = children[i].getBoundingClientRect().height;
+        const extraGap = i > 0 ? gapPx : 0;
+        if (used > 0 && used + extraGap + height > pageHeightPx) {
+          nextSplit = i;
+          break;
+        }
+        used += extraGap + height;
       }
-      flushSheet();
-    }
 
-    placeInColumn(component, key);
-  });
+      setSplitIndex(nextSplit);
+    };
 
-  flushSheet();
-  return sheets;
+    measureSplit();
+
+    const images = root.querySelectorAll('img');
+    const onAssetChange = () => measureSplit();
+    images.forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener('load', onAssetChange);
+        img.addEventListener('error', onAssetChange);
+      }
+    });
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureSplit) : null;
+    resizeObserver?.observe(root);
+
+    return () => {
+      images.forEach((img) => {
+        img.removeEventListener('load', onAssetChange);
+        img.removeEventListener('error', onAssetChange);
+      });
+      resizeObserver?.disconnect();
+    };
+  }, [blocks, pageHeightPx]);
+
+  const resolvedSplit = splitIndex == null ? blocks.length : splitIndex;
+  const left = blocks.slice(0, resolvedSplit);
+  const right = blocks.slice(resolvedSplit);
+
+  return (
+    <div className={styles.pageSheet}>
+      <div ref={measureRef} className={styles.measureColumn} aria-hidden="true">
+        {blocks.map((item) => (
+          <div key={`measure-${item.key}`} className={styles.measureBlock}>
+            <DynamicComponent component={item.component} />
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.columns}>
+        <div className={styles.column}>
+          {left.map((item) => (
+            <DynamicComponent key={item.key} component={item.component} />
+          ))}
+        </div>
+        <div className={styles.column}>
+          {right.map((item) => (
+            <DynamicComponent key={item.key} component={item.component} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const LessonRenderer = ({ page }) => {
-  const [viewportHeight, setViewportHeight] = useState(() =>
-    typeof window !== 'undefined' ? window.innerHeight : 900
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onResize = () => setViewportHeight(window.innerHeight);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   if (!page) {
     return null;
   }
@@ -144,7 +143,6 @@ const LessonRenderer = ({ page }) => {
     scopedTypography.sectionTitle?.text?.color ||
     undefined;
   const paragraphColor = scopedTypography.paragraphText?.color;
-  const columnPageHeight = computeColumnPageHeight(viewportHeight);
   const pageStyleVars = {
     ...generateAllCssVariables(scopedTypography),
     ...(sectionColor
@@ -153,29 +151,16 @@ const LessonRenderer = ({ page }) => {
     ...(paragraphColor
       ? { '--paragraph-color': paragraphColor, '--body-color': paragraphColor }
       : {}),
+    '--pdf-page-height': `${PDF_PAGE_CONTENT_HEIGHT_PX}px`,
   };
 
   if (page.layout === 'two-column') {
-    const sheets = buildPdfLikeColumnPages(page.components || [], columnPageHeight);
-
     return (
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
-        {sheets.map((sheet, sheetIndex) => (
-          <div key={`sheet-${sheetIndex}`} className={styles.pageSheet}>
-            <div className={styles.columns}>
-              <div className={styles.column}>
-                {sheet.left.map((item) => (
-                  <DynamicComponent key={item.key} component={item.component} />
-                ))}
-              </div>
-              <div className={styles.column}>
-                {sheet.right.map((item) => (
-                  <DynamicComponent key={item.key} component={item.component} />
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
+        <TwoColumnPageSheet
+          components={page.components || []}
+          pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
+        />
       </article>
     );
   }
