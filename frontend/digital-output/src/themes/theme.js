@@ -1,25 +1,37 @@
-import { typographyStyles, generateAllCssVariables } from '../../../../shared/typography-styles.js';
+import {
+  typographyStyles as defaultTypographyStyles,
+  generateAllCssVariables,
+  resolveTypographyStyles,
+  DEFAULT_THEME_ID,
+} from '../../../../shared/typography-styles.js';
 
-const sectionTitleColor =
-  typographyStyles.sectionTitle?.color ||
-  typographyStyles.sectionTitle?.text?.color ||
+const getSectionTitleColor = (styles) =>
+  styles.sectionTitle?.color ||
+  styles.sectionTitle?.text?.color ||
+  styles.lessonTitle?.color ||
   '#214880';
 
 export const theme = {
-  primaryColor: typographyStyles.chapterTitle?.color === '#000000'
-    ? sectionTitleColor
-    : typographyStyles.chapterTitle?.color || sectionTitleColor,
+  primaryColor: getSectionTitleColor(defaultTypographyStyles),
   secondaryColor: '#EAF3FF',
-  fontFamily: `${typographyStyles.paragraphText?.font || 'Arial'}, sans-serif`,
+  fontFamily: `${defaultTypographyStyles.paragraphText?.font || 'Arial'}, sans-serif`,
 };
 
-export const applyTheme = (root = document.documentElement) => {
-  // Base theme variables
+export const applyTheme = (root = document.documentElement, templateId = DEFAULT_THEME_ID) => {
+  const typographyStyles = resolveTypographyStyles(templateId);
+  const sectionTitleColor = getSectionTitleColor(typographyStyles);
+
   root.style.setProperty('--primary-color', sectionTitleColor);
   root.style.setProperty('--secondary-color', theme.secondaryColor);
-  root.style.setProperty('--font-family', theme.fontFamily);
+  root.style.setProperty(
+    '--font-family',
+    `${typographyStyles.paragraphText?.font || 'Arial'}, sans-serif`
+  );
   root.style.setProperty('--heading-color', sectionTitleColor);
-  root.style.setProperty('--paragraph-color', typographyStyles.paragraphText?.color || '#000000');
+  root.style.setProperty(
+    '--paragraph-color',
+    typographyStyles.paragraphText?.color || '#000000'
+  );
   root.style.setProperty('--border-radius', '8px');
   root.style.setProperty('--surface-color', '#ffffff');
   root.style.setProperty('--on-primary-color', '#ffffff');
@@ -32,16 +44,18 @@ export const applyTheme = (root = document.documentElement) => {
   root.style.setProperty('--activity-bg', '#f9f9f9');
   root.style.setProperty('--table-stripe-bg', '#fafafa');
   root.style.setProperty('--quote-color', '#444444');
-  root.style.setProperty('--body-color', typographyStyles.paragraphText?.color || '#000000');
+  root.style.setProperty(
+    '--body-color',
+    typographyStyles.paragraphText?.color || '#000000'
+  );
   root.style.setProperty('--body-bg', '#ffffff');
   root.style.setProperty('--card-shadow', '0 4px 12px rgba(0, 85, 170, 0.15)');
+  root.dataset.templateId = String(templateId || DEFAULT_THEME_ID);
 
-  // Apply all typography CSS variables
-  const typographyVars = generateAllCssVariables();
+  const typographyVars = generateAllCssVariables(typographyStyles);
   Object.entries(typographyVars).forEach(([varName, value]) => {
     root.style.setProperty(varName, value);
   });
 };
 
-// Export typography styles for direct access if needed
-export { typographyStyles };
+export { defaultTypographyStyles as typographyStyles, DEFAULT_THEME_ID };

@@ -5,7 +5,7 @@ const DEFAULT_CONTEXT = {
   tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID || '',
   documentId: import.meta.env.VITE_DEFAULT_DOCUMENT_ID || '',
   clientName: import.meta.env.VITE_DEFAULT_CLIENT_NAME || '',
-  templateId: import.meta.env.VITE_DEFAULT_TEMPLATE_ID || '',
+  templateId: import.meta.env.VITE_DEFAULT_TEMPLATE_ID || 'theme2',
 };
 
 const getApiBaseUrl = () =>
@@ -94,7 +94,7 @@ const writeStoredContext = (context) => {
   }
 };
 
-const getRouteContext = () => {
+export const getRouteContext = () => {
   const searchParams = new URLSearchParams(window.location.search);
   const outputPathMatch = window.location.pathname.match(/\/output\/([^/?#]+)/);
   const storedContext = readStoredContext();
@@ -111,7 +111,11 @@ const getRouteContext = () => {
       storedContext.documentId ||
       DEFAULT_CONTEXT.documentId,
     clientName: searchParams.get('clientName') || storedContext.clientName || DEFAULT_CONTEXT.clientName,
-    templateId: searchParams.get('templateId') || storedContext.templateId || DEFAULT_CONTEXT.templateId,
+    templateId:
+      searchParams.get('templateId') ||
+      storedContext.templateId ||
+      DEFAULT_CONTEXT.templateId ||
+      'theme2',
   };
 
   if (context.outputId || (context.tenantId && context.documentId)) {
@@ -172,7 +176,7 @@ export const getCourseData = async (inputContext = null) => {
   return {
     ...resilientMapped,
     // TODO(phase-2): use etag/lastModified in client-side cache key if we add local caching.
-    templateId: payload.templateId,
+    templateId: payload.templateId || context.templateId || 'theme2',
     etag: payload.etag,
     lastModified: payload.lastModified,
   };

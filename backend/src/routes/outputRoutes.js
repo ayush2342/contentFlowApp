@@ -3,6 +3,7 @@ import { getDocumentFromS3, getMediaStreamFromS3 } from '../services/s3Service.j
 import { resolveTemplateId } from '../services/templateResolver.js';
 import { generatePdf } from '../services/pdfService.js';
 import { createOutputSession, getOutputSession } from '../services/outputSessionService.js';
+import { resolveStylesheet } from '../services/stylesheetService.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -37,8 +38,8 @@ const buildOutputUrlPayload = async ({
     clientName: clientName?.toString() || null,
   });
 
-  const webUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}`;
-  const pdfUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}/pdf`;
+  const webUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}?templateId=${encodeURIComponent(resolvedTemplate)}`;
+  const pdfUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}/pdf?templateId=${encodeURIComponent(resolvedTemplate)}`;
 
   return {
     outputId: session.outputId,
@@ -193,6 +194,27 @@ router.get('/media', async (req, res, next) => {
 
     res.setHeader('Content-Type', media.contentType);
     media.body.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Resolve stylesheet for a template/theme.
+ * Tries S3 first (STYLESHEET_S3_KEY_TEMPLATE); on failure returns local theme1/theme2.
+ */
+router.get('/stylesheet', async (req, res, next) => {
+  try {
+    const templateId = req.query.templateId?.toString();
+    const stylesheet = await resolveStylesheet({ templateId });
+    return res.json({
+      source: stylesheet.source,
+      templateId: stylesheet.templateId,
+      themeId: stylesheet.themeId,
+      key: stylesheet.key,
+      defaultThemeId: env.defaultThemeId,
+      ...stylesheet.document,
+    });
   } catch (error) {
     next(error);
   }

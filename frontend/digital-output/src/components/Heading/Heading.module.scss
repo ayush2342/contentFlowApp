@@ -119,6 +119,7 @@
   font-size: var(--typography-chapterOverview-size);
   font-weight: var(--typography-chapterOverview-weight);
   color: var(--typography-chapterOverview-color);
+  text-transform: var(--typography-chapterOverview-transform, none);
 }
 
 .compositeNumber,

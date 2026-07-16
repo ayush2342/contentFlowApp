@@ -4,10 +4,10 @@ import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { env } from '../config/env.js';
 import { getMediaStreamFromS3 } from './s3Service.js';
+import { resolveStylesheet, toPdfTypographyConfig } from './stylesheetService.js';
 
 const pdfCache = new Map();
 const defaultPdfSourceDir = path.resolve(process.cwd(), '..', 'frontend', 'pdf-output');
-const sharedSourceDir = path.resolve(process.cwd(), '..', 'shared');
 const runtimeRoot = path.resolve(process.cwd(), 'runtime', 'pdf-jobs');
 
 const getCacheRecord = (cacheKey) => {
@@ -130,7 +130,8 @@ const runInDesignScript = async ({ scriptPath }) =>
  * Phase 1 keeps a short-lived in-memory cache; persistent/shared cache can be added later.
  */
 export const generatePdf = async ({ tenantId, documentId, etag, templateId, data }) => {
-  const cacheKey = `${tenantId}:${documentId}:${etag || 'no-etag'}`;
+  const resolvedTemplateId = templateId || env.defaultThemeId || 'theme2';
+  const cacheKey = `${tenantId}:${documentId}:${etag || 'no-etag'}:${resolvedTemplateId}`;
   const cached = getCacheRecord(cacheKey);
   if (cached) {
     return { ...cached, fromCache: true };
@@ -145,23 +146,27 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   const runtimeTemplatePath = path.join(templatesDir, 'projectX.indd');
   const runtimeJsonPath = path.join(jobDir, 'tree_output.json');
   const runtimePdfPath = path.join(jobDir, 'output.pdf');
-  const sharedTypographyPath = path.join(sharedSourceDir, 'typography-styles.json');
   const runtimeTypographyPath = path.join(jobDir, 'typography-styles.json');
 
   await fs.mkdir(assetsDir, { recursive: true });
   await fs.mkdir(templatesDir, { recursive: true });
   await fs.copyFile(scriptSourcePath, runtimeScriptPath);
   await fs.copyFile(templateSourcePath, runtimeTemplatePath);
-  // Non-fatal: the InDesign script falls back to shared/ paths or built-in
-  // defaults if this copy fails, so it must never abort the whole PDF job
-  // (which would also prevent render.log from being produced).
+
+  // Stylesheet from templateId: S3 first, else local theme1/theme2.
   try {
-    await fs.copyFile(sharedTypographyPath, runtimeTypographyPath);
-  } catch (typographyCopyError) {
+    const stylesheet = await resolveStylesheet({ templateId: resolvedTemplateId });
+    const typographyConfig = toPdfTypographyConfig(stylesheet);
+    await fs.writeFile(runtimeTypographyPath, JSON.stringify(typographyConfig, null, 2), 'utf8');
+    console.info(
+      `[pdf] typography source=${stylesheet.source} templateId=${resolvedTemplateId} theme=${stylesheet.themeId}`
+    );
+  } catch (typographyError) {
     console.warn(
-      `Could not copy typography-styles.json into job folder: ${typographyCopyError.message}`
+      `Could not resolve stylesheet into job folder: ${typographyError.message}`
     );
   }
+
   await fs.writeFile(runtimeJsonPath, JSON.stringify(data ?? [], null, 2), 'utf8');
 
   const imageKeys = collectImageKeys(data);

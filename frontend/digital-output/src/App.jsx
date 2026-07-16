@@ -4,10 +4,12 @@ import { Provider } from 'react-redux';
 import { store } from './app/store';
 import AppRoutes from './routes/AppRoutes';
 import { applyTheme } from './themes/theme';
+import { getRouteContext } from './services/courseService';
 
 const App = () => {
   useEffect(() => {
-    applyTheme();
+    const { templateId } = getRouteContext();
+    applyTheme(document.documentElement, templateId || 'theme2');
   }, []);
 
   return (

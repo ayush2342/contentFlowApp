@@ -1,0 +1,109 @@
+{
+  "themeId": "theme1",
+  "label": "Theme 1",
+  "STYLES": {
+    "chapterNumber": {
+      "font": "Arial",
+      "size": 15,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "chapterHeading": {
+      "font": "Arial",
+      "size": 15,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "chapterTitle": {
+      "font": "Arial",
+      "size": 22,
+      "color": "#000000",
+      "bold": false
+    },
+    "chapterOverview": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#0074BC",
+      "bold": true,
+      "textTransform": "uppercase"
+    },
+    "lessonOverview": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": true
+    },
+    "lessonTitle": {
+      "font": "Arial",
+      "size": 12,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "sectionTitle": {
+      "font": "Arial",
+      "size": 10,
+      "color": "#000000",
+      "bold": false
+    },
+    "subSectionTitle": {
+      "font": "Arial",
+      "size": 11,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "learningObjectives": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#0074BC",
+      "bold": true
+    },
+    "paragraphText": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": false
+    },
+    "bulletList": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": false
+    },
+    "partNumber": {
+      "font": "Arial",
+      "size": 15,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "greenSubSectionTitle": {
+      "font": "Arial",
+      "size": 11,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "subTitle": {
+      "font": "Arial",
+      "size": 11,
+      "color": "#0074BC",
+      "bold": false
+    },
+    "subTitlesList": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": true
+    },
+    "imageFigureNumber": {
+      "font": "Arial",
+      "size": 7.5,
+      "color": "#C31427",
+      "bold": true
+    },
+    "imageFigureText": {
+      "font": "Arial",
+      "size": 7.5,
+      "color": "#000000",
+      "bold": false
+    }
+  }
+}

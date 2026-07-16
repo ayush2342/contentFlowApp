@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
-import { generateAllCssVariables, resolveTypographyStyles } from '../../../../shared/typography-styles.js';
+import { generateAllCssVariables, resolveTypographyStyles, DEFAULT_THEME_ID } from '../../../../shared/typography-styles.js';
+import { getRouteContext } from '../services/courseService';
 
 const DynamicComponent = ({ component }) => {
   if (component.type === '__unsupported__') {
@@ -136,7 +137,8 @@ const LessonRenderer = ({ page }) => {
     return null;
   }
 
-  const scopedTypography = resolveTypographyStyles();
+  const { templateId } = getRouteContext();
+  const scopedTypography = resolveTypographyStyles(templateId || DEFAULT_THEME_ID);
   const sectionColor =
     scopedTypography.sectionTitle?.color ||
     scopedTypography.sectionTitle?.text?.color ||

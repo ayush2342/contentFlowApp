@@ -34,4 +34,16 @@ export const env = {
   inDesignScriptPath: process.env.INDESIGN_SCRIPT_PATH || '',
   inDesignTemplatePath: process.env.INDESIGN_TEMPLATE_PATH || '',
   inDesignTimeoutMs: Number(process.env.INDESIGN_TIMEOUT_MS || 300000),
+  /** Default local theme when S3 stylesheet is missing/fails. */
+  defaultThemeId: (process.env.DEFAULT_THEME_ID || 'theme2').trim(),
+  /**
+   * Optional S3 key template for stylesheets.
+   * Placeholders: {prefix}, {templateId}
+   * Example: {prefix}/stylesheets/{templateId}.json
+   * Leave as placeholder to always use local themes until S3 files exist.
+   */
+  stylesheetS3KeyTemplate: (
+    process.env.STYLESHEET_S3_KEY_TEMPLATE ||
+    '{prefix}/stylesheets/{templateId}.json'
+  ).trim(),
 };

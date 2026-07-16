@@ -1,5 +1,5 @@
 const clientTemplateMap = {
-  default: 'course-v2',
+  default: 'theme2',
 };
 
 export const resolveTemplateId = ({ templateId, clientName }) => {
