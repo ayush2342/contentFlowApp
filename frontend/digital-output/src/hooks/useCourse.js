@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchCourseData } from '../features/course/courseThunks';
+import { applyTheme } from '../themes/theme';
 
 export const useCourse = () => {
   const dispatch = useDispatch();
@@ -13,6 +14,12 @@ export const useCourse = () => {
     // Let service resolve route + session context, so navigation keeps tenant/doc state.
     dispatch(fetchCourseData());
   }, [dispatch, contextKey]);
+
+  useEffect(() => {
+    if (courseData?.templateId) {
+      applyTheme(document.documentElement, courseData.templateId);
+    }
+  }, [courseData?.templateId]);
 
   return { loading, error, courseData, selectedBook, selectedChapter, selectedLesson };
 };

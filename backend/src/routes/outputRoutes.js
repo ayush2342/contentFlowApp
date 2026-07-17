@@ -38,8 +38,9 @@ const buildOutputUrlPayload = async ({
     clientName: clientName?.toString() || null,
   });
 
-  const webUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}?templateId=${encodeURIComponent(resolvedTemplate)}`;
-  const pdfUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}/pdf?templateId=${encodeURIComponent(resolvedTemplate)}`;
+  // Theme comes from the output session (POST body templateId), not the URL.
+  const webUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}`;
+  const pdfUrl = `${env.digitalOutputBaseUrl}/output/${session.outputId}/pdf`;
 
   return {
     outputId: session.outputId,

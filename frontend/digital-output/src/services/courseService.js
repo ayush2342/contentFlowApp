@@ -158,6 +158,7 @@ export const getCourseData = async (inputContext = null) => {
 
   const payload = await response.json();
   const resolvedTenantId = payload.tenantId || context.tenantId;
+  const resolvedTemplateId = payload.templateId || context.templateId || 'theme2';
   const sourceData =
     payload?.data?.data ??
     payload?.data?.document ??
@@ -166,6 +167,14 @@ export const getCourseData = async (inputContext = null) => {
     payload?.document ??
     payload?.output ??
     payload;
+
+  // Persist theme from session/document response so the URL can stay clean.
+  writeStoredContext({
+    ...context,
+    tenantId: resolvedTenantId,
+    documentId: payload.documentId || context.documentId,
+    templateId: resolvedTemplateId,
+  });
 
   const mapped = mapTreeOutputJson(sourceData, {
     mediaBaseUrl: `${getApiBaseUrl()}/media`,
@@ -176,7 +185,7 @@ export const getCourseData = async (inputContext = null) => {
   return {
     ...resilientMapped,
     // TODO(phase-2): use etag/lastModified in client-side cache key if we add local caching.
-    templateId: payload.templateId || context.templateId || 'theme2',
+    templateId: resolvedTemplateId,
     etag: payload.etag,
     lastModified: payload.lastModified,
   };
