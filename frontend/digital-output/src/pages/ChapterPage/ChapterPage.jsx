@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useCourse } from '../../hooks/useCourse';
 import { findChapter } from '../../utils/findInCourse';
@@ -10,14 +10,24 @@ import {
 import LessonRenderer from '../../renderers/LessonRenderer';
 import styles from './ChapterPage.module.scss';
 
+const getFirstChapter = (courseData) => {
+  for (const book of courseData?.books ?? []) {
+    const chapter = book?.chapters?.[0];
+    if (chapter) return { book, chapter };
+  }
+  return null;
+};
+
 const ChapterPage = () => {
   const { chapterId } = useParams();
-  const location = useLocation();
-  const search = location.search || '';
   const dispatch = useDispatch();
   const { loading, error, courseData } = useCourse();
 
-  const result = findChapter(courseData, chapterId);
+  const result = useMemo(() => {
+    if (chapterId) return findChapter(courseData, chapterId);
+    return getFirstChapter(courseData);
+  }, [courseData, chapterId]);
+
   const chapter = result?.chapter;
 
   useEffect(() => {
@@ -33,12 +43,6 @@ const ChapterPage = () => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.backRow}>
-        <Link to={{ pathname: '/', search }} className={styles.back}>
-          &larr; Back to Chapter Library
-        </Link>
-      </div>
-
       <div className={styles.chapter}>
         {chapter.lessons?.length ? (
           <div className={styles.contentStack}>
