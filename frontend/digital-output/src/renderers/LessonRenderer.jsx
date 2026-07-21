@@ -1,7 +1,16 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
-import { generateAllCssVariables, resolveTypographyStyles, DEFAULT_THEME_ID } from '../../../../shared/typography-styles.js';
+import {
+  generateAllCssVariables,
+  resolveTypographyStyles,
+  DEFAULT_THEME_ID,
+} from '../../../../shared/typography-styles.js';
+import {
+  getComponentColumns,
+  getLocalFormatDocument,
+  getPageColumns,
+} from '../../../../shared/layout-formats.js';
 import { getRouteContext } from '../services/courseService';
 
 const DynamicComponent = ({ component }) => {
@@ -21,13 +30,11 @@ const DynamicComponent = ({ component }) => {
 /**
  * One JSON page = one sheet.
  * Left fills to this height, then remaining blocks go to right (no extra sheets).
- * Kept tall so left takes as much of the page content as possible before switching.
  */
 const PDF_PAGE_CONTENT_HEIGHT_PX = 1240;
 
 /**
- * Split one JSON page into left/right using measured block heights
- * (same width as the real column). No guessed text heights.
+ * Split blocks into left/right using measured heights (same width as real column).
  */
 const TwoColumnPageSheet = ({ components = [], pageHeightPx = PDF_PAGE_CONTENT_HEIGHT_PX }) => {
   const measureRef = useRef(null);
@@ -131,12 +138,53 @@ const TwoColumnPageSheet = ({ components = [], pageHeightPx = PDF_PAGE_CONTENT_H
   );
 };
 
-const LessonRenderer = ({ page }) => {
+/**
+ * On a 1-column page, consecutive blocks with component columns=2 are packed
+ * into a 2-column region (e.g. opener.LessonOverview.columns = 2).
+ */
+const buildLayoutSegments = (components, formatDoc, pageType) => {
+  const list = (components || []).filter(Boolean);
+  const segments = [];
+  let index = 0;
+
+  while (index < list.length) {
+    const columns = getComponentColumns(formatDoc, pageType, list[index].contentType);
+    if (columns === 2) {
+      const group = [];
+      while (index < list.length) {
+        const nextColumns = getComponentColumns(formatDoc, pageType, list[index].contentType);
+        if (nextColumns !== 2) break;
+        group.push(list[index]);
+        index += 1;
+      }
+      segments.push({ columns: 2, components: group });
+    } else {
+      const group = [];
+      while (index < list.length) {
+        const nextColumns = getComponentColumns(formatDoc, pageType, list[index].contentType);
+        if (nextColumns === 2) break;
+        group.push(list[index]);
+        index += 1;
+      }
+      segments.push({ columns: 1, components: group });
+    }
+  }
+
+  return segments;
+};
+
+const LessonRenderer = ({ page, layout: layoutOverride }) => {
   if (!page) {
     return null;
   }
 
   const { templateId } = getRouteContext();
+  const formatDoc =
+    layoutOverride || getLocalFormatDocument(templateId || DEFAULT_THEME_ID);
+  const pageType = page.pageType || 'opener';
+  const pageColumns =
+    page.pageColumns || getPageColumns(formatDoc, pageType);
+
   const scopedTypography = resolveTypographyStyles(templateId || DEFAULT_THEME_ID);
   const sectionColor =
     scopedTypography.sectionTitle?.color ||
@@ -154,7 +202,8 @@ const LessonRenderer = ({ page }) => {
     '--pdf-page-height': `${PDF_PAGE_CONTENT_HEIGHT_PX}px`,
   };
 
-  if (page.layout === 'two-column') {
+  // Page-level 2 columns (e.g. format2 non-opener): fill left then right.
+  if (pageColumns === 2 || page.layout === 'two-column') {
     return (
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
         <TwoColumnPageSheet
@@ -165,11 +214,31 @@ const LessonRenderer = ({ page }) => {
     );
   }
 
+  // Page-level 1 column: full width, with optional 2-col component runs.
+  const segments = buildLayoutSegments(page.components || [], formatDoc, pageType);
+
   return (
     <article className={styles.lesson} style={pageStyleVars}>
-      {page.components?.map((component, index) => (
-        <DynamicComponent key={component.id || index} component={component} />
-      ))}
+      {segments.map((segment, segmentIndex) => {
+        if (segment.columns === 2) {
+          return (
+            <div key={`segment-${segmentIndex}`} className={styles.twoColumnLesson}>
+              <TwoColumnPageSheet
+                components={segment.components}
+                pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
+              />
+            </div>
+          );
+        }
+
+        return (
+          <div key={`segment-${segmentIndex}`} className={styles.singleColumnSegment}>
+            {segment.components.map((component, index) => (
+              <DynamicComponent key={component.id || index} component={component} />
+            ))}
+          </div>
+        );
+      })}
     </article>
   );
 };

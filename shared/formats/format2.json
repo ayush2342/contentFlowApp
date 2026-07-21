@@ -1,0 +1,30 @@
+{
+  "formatId": "format2",
+  "label": "Format 2",
+  "opener": {
+    "columns": 1,
+    "ChapterNumber": { "columns": 1 },
+    "ChapterTitle": { "columns": 1 },
+    "ChapterOverview": { "columns": 1 },
+    "LessonOverview": { "columns": 2 },
+    "LessonTitle": { "columns": 1 },
+    "SectionTitle": { "columns": 1 },
+    "SubSectionTitle": { "columns": 1 },
+    "ParagraphText": { "columns": 1 },
+    "PartNumber": { "columns": 1 },
+    "Figure": { "columns": 1 }
+  },
+  "non-opener": {
+    "columns": 2,
+    "ChapterNumber": { "columns": 1 },
+    "ChapterTitle": { "columns": 1 },
+    "ChapterOverview": { "columns": 1 },
+    "LessonOverview": { "columns": 1 },
+    "LessonTitle": { "columns": 1 },
+    "SectionTitle": { "columns": 1 },
+    "SubSectionTitle": { "columns": 1 },
+    "ParagraphText": { "columns": 1 },
+    "PartNumber": { "columns": 1 },
+    "Figure": { "columns": 1 }
+  }
+}

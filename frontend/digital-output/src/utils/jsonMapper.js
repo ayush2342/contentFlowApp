@@ -1,3 +1,5 @@
+import { getPageColumns } from '../../../../shared/layout-formats.js';
+
 const COMPONENT_TYPE_MAP = {
   heading: 'Heading',
   paragraph: 'Paragraph',
@@ -5,6 +7,7 @@ const COMPONENT_TYPE_MAP = {
   learningObjective: 'LearningObjective',
   iconLabel: 'IconLabel',
 };
+
 
 const slugify = (value) =>
   String(value)
@@ -380,6 +383,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'Heading',
+      contentType: type,
       props: { text, level: 2, variant: headingVariant },
     };
   }
@@ -388,6 +392,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'Paragraph',
+      contentType: type === 'Text' ? 'ParagraphText' : type,
       props: { text },
     };
   }
@@ -396,6 +401,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'LearningObjective',
+      contentType: type,
       props: {
         title: text,
         introText: '',
@@ -419,6 +425,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'Paragraph',
+      contentType: 'ParagraphText',
       props: { text: items.join(' ') },
     };
   }
@@ -440,6 +447,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'ImageBlock',
+      contentType: 'Figure',
       props: {
         src: resolveMediaSrc(
           ctx.media[mediaId].fileName,
@@ -474,6 +482,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'Paragraph',
+      contentType: 'Figure',
       props: { text: captionText },
     };
   }
@@ -502,6 +511,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'IconLabel',
+      contentType: 'Figure',
       props: { text: logoText, src },
     };
   }
@@ -509,6 +519,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
   return {
     id: `content-${index}`,
     type: '__unsupported__',
+    contentType: type || block?.type,
     props: { originalType: block?.type, payload: block },
   };
 };
@@ -540,8 +551,9 @@ const mapPagedTemplateJson = (pages, options = {}) => {
 
     mediaIndex = ctx.mediaIndex;
     const pageNo = page?.page_no ?? index + 1;
-    const pageType = normalizeText(page?.page_type).toLowerCase();
-    const layout = pageType === 'non-opener' ? 'two-column' : 'single-column';
+    const pageType = normalizeText(page?.page_type).toLowerCase() || 'opener';
+    const pageColumns = getPageColumns(options.layout, pageType);
+    const layout = pageColumns === 2 ? 'two-column' : 'single-column';
     const lessonKey = `page-${pageNo}`;
 
     return {
@@ -555,7 +567,8 @@ const mapPagedTemplateJson = (pages, options = {}) => {
           id: `page-${slugify(lessonKey) || index + 1}`,
           title: `Page ${pageNo}`,
           sectionNumber: String(pageNo),
-          pageType: pageType || 'opener',
+          pageType,
+          pageColumns,
           layout,
           components,
         },

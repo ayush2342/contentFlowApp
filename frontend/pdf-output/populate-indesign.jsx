@@ -32,6 +32,7 @@ var POPULATE_SCRIPT_VERSION = "dynamic-v23";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
+var LAYOUT_FORMAT = null; // from layout-format.json (format2 default locally)
 
 // -----------------------------------------------------------------------------
 // Run headless (no popups/dialogs on server)
@@ -565,6 +566,62 @@ function loadTypographyConfig(scriptFolderPath) {
     } catch (parseError) {
         return null;
     }
+}
+
+function loadLayoutFormat(scriptFolderPath) {
+    var configPaths = [
+        scriptFolderPath + "/layout-format.json",
+        scriptFolderPath + "/../../shared/formats/format2.json",
+        scriptFolderPath + "/../../../shared/formats/format2.json"
+    ];
+    var configFile;
+    var i;
+    var rawJson;
+    var config;
+
+    for (i = 0; i < configPaths.length; i++) {
+        configFile = File(configPaths[i]);
+        if (configFile.exists) {
+            break;
+        }
+        configFile = null;
+    }
+
+    if (!configFile || !configFile.exists || !configFile.open("r")) {
+        return null;
+    }
+
+    rawJson = configFile.read();
+    configFile.close();
+
+    try {
+        config = parseJSON(rawJson);
+        // Job file shape: { formatId, layout: { opener, non-opener } }
+        if (config && config.layout) {
+            return config.layout;
+        }
+        return config;
+    } catch (parseError) {
+        return null;
+    }
+}
+
+/** Page column count from format sheet (default: opener=1, non-opener=2). */
+function resolvePageColumnCount(pageType, layoutFormat) {
+    var key = String(pageType || "opener").toLowerCase();
+    var section;
+
+    if (key === "non_opener" || key === "non-opener" || key === "nonopener") {
+        key = "non-opener";
+    } else {
+        key = "opener";
+    }
+
+    if (layoutFormat && layoutFormat[key] && layoutFormat[key].columns != null) {
+        return Number(layoutFormat[key].columns) === 2 ? 2 : 1;
+    }
+
+    return key === "non-opener" ? 2 : 1;
 }
 
 function buildFrameStylesFromConfig(typographyConfig) {
@@ -3500,6 +3557,19 @@ function exportActiveDocumentToPdf(document, scriptFolderPath) {
 function initializeStylesFromConfig(scriptFolderPath) {
     var typographyConfig = loadTypographyConfig(scriptFolderPath);
     var configStyles;
+    var layoutFormat;
+
+    layoutFormat = loadLayoutFormat(scriptFolderPath);
+    if (layoutFormat) {
+        LAYOUT_FORMAT = layoutFormat;
+        appendRenderLog(
+            "Layout format loaded (opener.columns=" +
+            ((LAYOUT_FORMAT.opener && LAYOUT_FORMAT.opener.columns) || "?") +
+            ", non-opener.columns=" +
+            ((LAYOUT_FORMAT["non-opener"] && LAYOUT_FORMAT["non-opener"].columns) || "?") +
+            ")"
+        );
+    }
     
     if (typographyConfig) {
         configStyles = buildFrameStylesFromConfig(typographyConfig);
@@ -3702,10 +3772,10 @@ function main() {
 
             rebuildBlockRegistry();
 
-            layoutState.columnCount =
-                layoutState.pageType === "opener"
-                    ? 1
-                    : 2;
+            layoutState.columnCount = resolvePageColumnCount(
+                layoutState.pageType,
+                LAYOUT_FORMAT
+            );
 
             layoutState.currentColumn = 0;
 

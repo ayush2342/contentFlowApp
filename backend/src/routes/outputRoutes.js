@@ -155,12 +155,15 @@ router.get('/output/:outputId/document', async (req, res, next) => {
     }
 
     const document = await getDocumentFromS3(session.tenantId, session.documentId);
+    const stylesheet = await resolveStylesheet({ templateId: session.templateId });
 
     res.json({
       outputId,
       tenantId: session.tenantId,
       documentId: session.documentId,
       templateId: session.templateId,
+      formatId: stylesheet.formatId,
+      layout: stylesheet.layout,
       etag: document.etag,
       lastModified: document.lastModified,
       data: document.data,
@@ -210,11 +213,14 @@ router.get('/stylesheet', async (req, res, next) => {
     const stylesheet = await resolveStylesheet({ templateId });
     return res.json({
       source: stylesheet.source,
-      templateId: stylesheet.templateId,
-      themeId: stylesheet.themeId,
       key: stylesheet.key,
       defaultThemeId: env.defaultThemeId,
       ...stylesheet.document,
+      templateId: stylesheet.templateId,
+      themeId: stylesheet.themeId,
+      formatId: stylesheet.formatId,
+      layoutSource: stylesheet.layoutSource,
+      layout: stylesheet.layout,
     });
   } catch (error) {
     next(error);

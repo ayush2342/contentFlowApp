@@ -153,13 +153,26 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   await fs.copyFile(scriptSourcePath, runtimeScriptPath);
   await fs.copyFile(templateSourcePath, runtimeTemplatePath);
 
-  // Stylesheet from templateId: S3 first, else local theme1/theme2.
+  // Stylesheet + layout from templateId: S3 first, else local theme/format.
   try {
     const stylesheet = await resolveStylesheet({ templateId: resolvedTemplateId });
     const typographyConfig = toPdfTypographyConfig(stylesheet);
     await fs.writeFile(runtimeTypographyPath, JSON.stringify(typographyConfig, null, 2), 'utf8');
+    const runtimeLayoutPath = path.join(jobDir, 'layout-format.json');
+    await fs.writeFile(
+      runtimeLayoutPath,
+      JSON.stringify(
+        {
+          formatId: stylesheet.formatId,
+          layout: stylesheet.layout,
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
     console.info(
-      `[pdf] typography source=${stylesheet.source} templateId=${resolvedTemplateId} theme=${stylesheet.themeId}`
+      `[pdf] typography source=${stylesheet.source} templateId=${resolvedTemplateId} theme=${stylesheet.themeId} format=${stylesheet.formatId} layoutSource=${stylesheet.layoutSource}`
     );
   } catch (typographyError) {
     console.warn(

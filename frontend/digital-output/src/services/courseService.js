@@ -1,4 +1,5 @@
 import { mapTreeOutputJson } from '../utils/jsonMapper';
+import { getLocalFormatDocument } from '../../../../shared/layout-formats.js';
 
 const DEFAULT_CONTEXT = {
   outputId: import.meta.env.VITE_DEFAULT_OUTPUT_ID || '',
@@ -176,9 +177,14 @@ export const getCourseData = async (inputContext = null) => {
     templateId: resolvedTemplateId,
   });
 
+  const layout =
+    payload.layout ||
+    getLocalFormatDocument(resolvedTemplateId);
+
   const mapped = mapTreeOutputJson(sourceData, {
     mediaBaseUrl: `${getApiBaseUrl()}/media`,
     tenantId: resolvedTenantId,
+    layout,
   });
   const resilientMapped = ensureChapterFallback(mapped, sourceData, context);
 
@@ -186,6 +192,8 @@ export const getCourseData = async (inputContext = null) => {
     ...resilientMapped,
     // TODO(phase-2): use etag/lastModified in client-side cache key if we add local caching.
     templateId: resolvedTemplateId,
+    formatId: payload.formatId || layout?.formatId || null,
+    layout,
     etag: payload.etag,
     lastModified: payload.lastModified,
   };

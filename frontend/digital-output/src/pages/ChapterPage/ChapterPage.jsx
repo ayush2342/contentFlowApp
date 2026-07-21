@@ -48,7 +48,10 @@ const ChapterPage = () => {
           <div className={styles.contentStack}>
             {chapter.lessons.map((lesson) => (
               <section key={lesson.id} className={styles.lessonSection}>
-                <LessonRenderer page={lesson.pages?.[0]} />
+                <LessonRenderer
+                  page={lesson.pages?.[0]}
+                  layout={courseData?.layout}
+                />
               </section>
             ))}
           </div>
