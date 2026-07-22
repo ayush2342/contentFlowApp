@@ -93,6 +93,10 @@ const CONTENT_TYPE_TO_FORMAT_KEY = {
   Image: 'Figure',
   FigureCaption: 'Figure',
   LearningObjectives: 'LessonOverview',
+  Quotation: 'Quotation',
+  Quote: 'Quotation',
+  Table: 'Table',
+  Footer: 'Footer',
 };
 
 export const toFormatContentKey = (contentType) => {

@@ -12,7 +12,10 @@
     "SubSectionTitle": { "columns": 1 },
     "ParagraphText": { "columns": 1 },
     "PartNumber": { "columns": 1 },
-    "Figure": { "columns": 1 }
+    "Figure": { "columns": 1 },
+    "Quotation": { "columns": 1 },
+    "Table": { "columns": 1 },
+    "Footer": { "columns": 1 }
   },
   "non-opener": {
     "columns": 2,
@@ -25,6 +28,9 @@
     "SubSectionTitle": { "columns": 1 },
     "ParagraphText": { "columns": 1 },
     "PartNumber": { "columns": 1 },
-    "Figure": { "columns": 1 }
+    "Figure": { "columns": 1 },
+    "Quotation": { "columns": 1 },
+    "Table": { "columns": 1 },
+    "Footer": { "columns": 1 }
   }
 }

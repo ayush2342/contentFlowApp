@@ -34,16 +34,26 @@ export const env = {
   inDesignScriptPath: process.env.INDESIGN_SCRIPT_PATH || '',
   inDesignTemplatePath: process.env.INDESIGN_TEMPLATE_PATH || '',
   inDesignTimeoutMs: Number(process.env.INDESIGN_TIMEOUT_MS || 300000),
-  /** Default local theme when S3 stylesheet is missing/fails. */
+  /** Default local theme when S3 theme is missing/fails. */
   defaultThemeId: (process.env.DEFAULT_THEME_ID || 'theme2').trim(),
+  /** Default local format when S3 format is missing/fails. */
+  defaultFormatId: (process.env.DEFAULT_FORMAT_ID || 'format2').trim(),
   /**
-   * Optional S3 key template for stylesheets.
-   * Placeholders: {prefix}, {templateId}
-   * Example: {prefix}/stylesheets/{templateId}.json
-   * Leave as placeholder to always use local themes until S3 files exist.
+   * S3 key pattern for theme JSON.
+   * Placeholders: {env} / {prefix}, {id} / {themeId} / {templateId}
+   * Example: {env}/appearance/theme/{id}.json → dev/appearance/theme/theme2.json
    */
-  stylesheetS3KeyTemplate: (
-    process.env.STYLESHEET_S3_KEY_TEMPLATE ||
-    '{prefix}/stylesheets/{templateId}.json'
+  themeS3KeyTemplate: (
+    process.env.THEME_S3_KEY_TEMPLATE ||
+    '{env}/appearance/theme/{id}.json'
+  ).trim(),
+  /**
+   * S3 key pattern for format/layout JSON.
+   * Placeholders: {env} / {prefix}, {id} / {formatId}
+   * Example: {env}/appearance/format/{id}.json → dev/appearance/format/format2.json
+   */
+  formatS3KeyTemplate: (
+    process.env.FORMAT_S3_KEY_TEMPLATE ||
+    '{env}/appearance/format/{id}.json'
   ).trim(),
 };

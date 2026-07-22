@@ -1,18 +1,26 @@
 .quote {
-  border-left: 4px solid var(--primary-color);
-  margin: 1.5rem 0;
-  padding: 0.5rem 0 0.5rem 1.25rem;
-  font-style: italic;
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  background: var(--typography-quotation-bg, #c1d4c3);
+  border-radius: 2px;
 }
 
 .text {
-  margin: 0 0 0.5rem;
-  line-height: 1.6;
-  color: var(--quote-color);
+  margin: 0;
+  font-family: var(--typography-quotationText-font, Arial, sans-serif);
+  font-size: var(--typography-quotationText-size, 13pt);
+  font-weight: var(--typography-quotationText-weight, 400);
+  color: var(--typography-quotationText-color, #000000);
+  line-height: 1.45;
+  font-style: normal;
 }
 
 .author {
+  display: block;
+  margin-top: 0.75rem;
+  font-family: var(--typography-quotationAuthor-font, Arial, sans-serif);
+  font-size: var(--typography-quotationAuthor-size, 10pt);
+  font-weight: var(--typography-quotationAuthor-weight, 400);
+  color: var(--typography-quotationAuthor-color, #000000);
   font-style: normal;
-  font-size: 0.875rem;
-  color: var(--text-muted);
 }

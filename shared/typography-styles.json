@@ -1,6 +1,6 @@
 {
   "themeId": "theme2",
-  "label": "Theme 2 (default)",
+  "label": "Theme 2",
   "STYLES": {
     "chapterNumber": {
       "font": "Arial",
@@ -86,7 +86,7 @@
       "bold": false
     },
     "paragraphText": {
-      "font": "Arial",
+      "font": "Neue Kabel",
       "size": 10,
       "color": "#000000",
       "bold": false
@@ -120,6 +120,51 @@
     "imageFigureText": {
       "font": "Arial",
       "size": 7.5,
+      "color": "#000000",
+      "bold": false
+    },
+    "quotation": {
+      "text": {
+        "font": "Arial",
+        "size": 13,
+        "color": "#000000",
+        "bold": false
+      },
+      "author": {
+        "font": "Arial",
+        "size": 10,
+        "color": "#000000",
+        "bold": false
+      },
+      "backgroundColor": "#C1D4C3"
+    },
+    "table": {
+      "headingText": {
+        "font": "Arial",
+        "size": 13,
+        "color": "#FFFFFF",
+        "bold": true,
+        "backgroundColor": "#CA5027"
+      },
+      "subHeadingText": {
+        "font": "Arial",
+        "size": 11,
+        "color": "#000000",
+        "bold": false,
+        "backgroundColor": "#E7B193"
+      },
+      "rowsText": {
+        "font": "Arial",
+        "size": 9,
+        "color": "#000000",
+        "bold": false,
+        "backgroundColor": "#FFFFFF",
+        "altBackgroundColor": "#F9E5D9"
+      }
+    },
+    "footer": {
+      "font": "Arial",
+      "size": 9,
       "color": "#000000",
       "bold": false
     }

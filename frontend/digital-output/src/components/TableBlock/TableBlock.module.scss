@@ -1,9 +1,9 @@
 .tableBlock {
-  margin: 1.5rem 0;
+  margin: 1rem 0;
 }
 
 .title {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   color: var(--heading-color);
   font-weight: 600;
 }
@@ -15,24 +15,46 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--font-family);
-  font-size: 0.9375rem;
+  font-family: var(--typography-tableRows-font, Arial, sans-serif);
+  font-size: var(--typography-tableRows-size, 9pt);
+  color: var(--typography-tableRows-color, #000000);
 
   th,
   td {
-    border: 1px solid var(--border-color);
-    padding: 0.625rem 0.875rem;
+    border: 1px solid #e0e0e0;
+    padding: 0.45rem 0.65rem;
     text-align: left;
-    color: var(--paragraph-color);
+    vertical-align: top;
   }
 
   th {
-    background: var(--secondary-color);
-    color: var(--heading-color);
-    font-weight: 600;
+    font-family: var(--typography-tableHeading-font, Arial, sans-serif);
+    font-size: var(--typography-tableHeading-size, 13pt);
+    font-weight: var(--typography-tableHeading-weight, 700);
+    color: var(--typography-tableHeading-color, #ffffff);
+    background: var(--typography-tableHeading-bg, #ca5027);
   }
 
-  tr:nth-child(even) {
-    background: var(--table-stripe-bg);
+  th.subHeading,
+  .subHeading {
+    font-family: var(--typography-tableSubHeading-font, Arial, sans-serif);
+    font-size: var(--typography-tableSubHeading-size, 11pt);
+    font-weight: var(--typography-tableSubHeading-weight, 400);
+    color: var(--typography-tableSubHeading-color, #000000);
+    background: var(--typography-tableSubHeading-bg, #e7b193);
+  }
+
+  td {
+    background: var(--typography-tableRows-bg, #ffffff);
+    font-weight: var(--typography-tableRows-weight, 400);
+  }
+
+  tbody tr:nth-child(even) td {
+    background: var(--typography-tableRows-alt-bg, #f9e5d9);
+  }
+
+  .indexCell {
+    font-weight: 600;
+    background: var(--typography-tableSubHeading-bg, #e7b193);
   }
 }

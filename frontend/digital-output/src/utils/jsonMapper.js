@@ -303,6 +303,10 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   imagecaption: 'FigureCaption',
   caption: 'FigureCaption',
   logowithtext: 'LogoWithText',
+  quotation: 'Quotation',
+  quote: 'Quotation',
+  table: 'Table',
+  footer: 'Footer',
 };
 
 const normalizeClassTemplateRawType = (rawType) => {
@@ -513,6 +517,69 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
       type: 'IconLabel',
       contentType: 'Figure',
       props: { text: logoText, src },
+    };
+  }
+
+  if (type === 'Quotation') {
+    const quoteText = normalizeText(
+      block?.data?.text || block?.data?.quote || block?.data?.quotation
+    );
+    const author = normalizeText(
+      block?.data?.author || block?.data?.attribution || block?.data?.source
+    );
+    if (!quoteText && !author) return null;
+    return {
+      id: `content-${index}`,
+      type: 'Quote',
+      contentType: 'Quotation',
+      props: { text: quoteText, author },
+    };
+  }
+
+  if (type === 'Table') {
+    const tablePayload =
+      block?.data?.table && typeof block.data.table === 'object'
+        ? block.data.table
+        : block?.data && typeof block.data === 'object'
+          ? block.data
+          : null;
+    if (!tablePayload) return null;
+    const cols = Array.isArray(tablePayload.cols) ? tablePayload.cols : [];
+    const rows = Array.isArray(tablePayload.rows) ? tablePayload.rows : [];
+    if (!cols.length && !rows.length) return null;
+    return {
+      id: `content-${index}`,
+      type: 'TableBlock',
+      contentType: 'Table',
+      props: {
+        title: normalizeText(block?.data?.title || tablePayload.title),
+        table: {
+          cols,
+          index: tablePayload.index,
+          rows,
+        },
+      },
+    };
+  }
+
+  if (type === 'Footer') {
+    const footerText = normalizeText(
+      block?.data?.text || block?.data?.left || block?.data?.center
+    );
+    const left = normalizeText(block?.data?.left);
+    const right = normalizeText(block?.data?.right);
+    const center = normalizeText(block?.data?.center);
+    if (!footerText && !left && !right && !center) return null;
+    return {
+      id: `content-${index}`,
+      type: 'Footer',
+      contentType: 'Footer',
+      props: {
+        text: footerText,
+        left: left || undefined,
+        right: right || undefined,
+        center: center || undefined,
+      },
     };
   }
 

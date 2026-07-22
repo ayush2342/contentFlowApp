@@ -27,16 +27,32 @@ const DynamicComponent = ({ component }) => {
   return <Component {...component.props} />;
 };
 
-/**
- * One JSON page = one sheet.
- * Left fills to this height, then remaining blocks go to right (no extra sheets).
- */
+/** One JSON page = one sheet. Left fills to this height, then right. */
 const PDF_PAGE_CONTENT_HEIGHT_PX = 1240;
+
+const splitBodyAndFooters = (components = []) => {
+  const body = [];
+  const footers = [];
+  (components || []).forEach((component) => {
+    if (!component) return;
+    if (component.type === 'Footer' || component.contentType === 'Footer') {
+      footers.push(component);
+    } else {
+      body.push(component);
+    }
+  });
+  return { body, footers };
+};
 
 /**
  * Split blocks into left/right using measured heights (same width as real column).
+ * Footers are excluded from column flow and rendered fixed at the bottom.
  */
-const TwoColumnPageSheet = ({ components = [], pageHeightPx = PDF_PAGE_CONTENT_HEIGHT_PX }) => {
+const TwoColumnPageSheet = ({
+  components = [],
+  footers = [],
+  pageHeightPx = PDF_PAGE_CONTENT_HEIGHT_PX,
+}) => {
   const measureRef = useRef(null);
   const [splitIndex, setSplitIndex] = useState(null);
 
@@ -134,6 +150,14 @@ const TwoColumnPageSheet = ({ components = [], pageHeightPx = PDF_PAGE_CONTENT_H
           ))}
         </div>
       </div>
+
+      {footers.length ? (
+        <div className={styles.pageFooter}>
+          {footers.map((component, index) => (
+            <DynamicComponent key={component.id || `footer-${index}`} component={component} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -182,8 +206,8 @@ const LessonRenderer = ({ page, layout: layoutOverride }) => {
   const formatDoc =
     layoutOverride || getLocalFormatDocument(templateId || DEFAULT_THEME_ID);
   const pageType = page.pageType || 'opener';
-  const pageColumns =
-    page.pageColumns || getPageColumns(formatDoc, pageType);
+  const pageColumns = page.pageColumns || getPageColumns(formatDoc, pageType);
+  const { body, footers } = splitBodyAndFooters(page.components || []);
 
   const scopedTypography = resolveTypographyStyles(templateId || DEFAULT_THEME_ID);
   const sectionColor =
@@ -207,7 +231,8 @@ const LessonRenderer = ({ page, layout: layoutOverride }) => {
     return (
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
         <TwoColumnPageSheet
-          components={page.components || []}
+          components={body}
+          footers={footers}
           pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
         />
       </article>
@@ -215,30 +240,40 @@ const LessonRenderer = ({ page, layout: layoutOverride }) => {
   }
 
   // Page-level 1 column: full width, with optional 2-col component runs.
-  const segments = buildLayoutSegments(page.components || [], formatDoc, pageType);
+  const segments = buildLayoutSegments(body, formatDoc, pageType);
 
   return (
-    <article className={styles.lesson} style={pageStyleVars}>
-      {segments.map((segment, segmentIndex) => {
-        if (segment.columns === 2) {
+    <article className={`${styles.lesson} ${styles.pageSheet}`} style={pageStyleVars}>
+      <div className={styles.pageBody}>
+        {segments.map((segment, segmentIndex) => {
+          if (segment.columns === 2) {
+            return (
+              <div key={`segment-${segmentIndex}`} className={styles.twoColumnLesson}>
+                <TwoColumnPageSheet
+                  components={segment.components}
+                  pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
+                />
+              </div>
+            );
+          }
+
           return (
-            <div key={`segment-${segmentIndex}`} className={styles.twoColumnLesson}>
-              <TwoColumnPageSheet
-                components={segment.components}
-                pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
-              />
+            <div key={`segment-${segmentIndex}`} className={styles.singleColumnSegment}>
+              {segment.components.map((component, index) => (
+                <DynamicComponent key={component.id || index} component={component} />
+              ))}
             </div>
           );
-        }
+        })}
+      </div>
 
-        return (
-          <div key={`segment-${segmentIndex}`} className={styles.singleColumnSegment}>
-            {segment.components.map((component, index) => (
-              <DynamicComponent key={component.id || index} component={component} />
-            ))}
-          </div>
-        );
-      })}
+      {footers.length ? (
+        <div className={styles.pageFooter}>
+          {footers.map((component, index) => (
+            <DynamicComponent key={component.id || `footer-${index}`} component={component} />
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 };

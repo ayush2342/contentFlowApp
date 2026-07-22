@@ -10,7 +10,10 @@
     "LessonTitle": { "columns": 1 },
     "SubSectionTitle": { "columns": 1 },
     "ParagraphText": { "columns": 1 },
-    "Figure": { "columns": 1 }
+    "Figure": { "columns": 1 },
+    "Quotation": { "columns": 1 },
+    "Table": { "columns": 1 },
+    "Footer": { "columns": 1 }
   },
   "non-opener": {
     "columns": 1,
@@ -21,6 +24,9 @@
     "LessonTitle": { "columns": 1 },
     "SubSectionTitle": { "columns": 1 },
     "ParagraphText": { "columns": 1 },
-    "Figure": { "columns": 1 }
+    "Figure": { "columns": 1 },
+    "Quotation": { "columns": 1 },
+    "Table": { "columns": 1 },
+    "Footer": { "columns": 1 }
   }
 }

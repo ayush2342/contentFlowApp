@@ -1,0 +1,366 @@
+﻿[
+    {
+        "page_type":  "non-opener",
+        "page_no":  1,
+        "content":  [
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "dev/tenants/4379b1c922fe47a3bb96e7786b412bb4/documents/9ed65792-6e7b-4d28-991b-7d49444ca60c/assets/69aeb0c75aa640a6a1bbcb3f84feda86.jpg",
+                                         "caption":  ""
+                                     }
+                        },
+                        {
+                            "type":  "ChapterOverview",
+                            "data":  {
+                                         "text":  "Part 1"
+                                     }
+                        },
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "",
+                                         "caption":  "[Image]"
+                                     }
+                        },
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "",
+                                         "caption":  "[Image]"
+                                     }
+                        },
+                        {
+                            "type":  "ChapterNumber",
+                            "data":  {
+                                         "text":  "Chapter 1"
+                                     }
+                        },
+                        {
+                            "type":  "ChapterTitle",
+                            "data":  {
+                                         "text":  "An Overview of   Marketing"
+                                     }
+                        },
+                        {
+                            "type":  "LearningObjectives",
+                            "data":  {
+                                         "text":  "Learning Outcomes"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "After studying this chapter, you will be able to . . ."
+                                     }
+                        },
+                        {
+                            "type":  "BulletList",
+                            "data":  {
+                                         "items":  [
+                                                       "1-1 Define the term marketing"
+                                                   ]
+                                     }
+                        },
+                        {
+                            "type":  "BulletList",
+                            "data":  {
+                                         "items":  [
+                                                       "1-2 Describe four marketing management  philosophies"
+                                                   ]
+                                     }
+                        },
+                        {
+                            "type":  "BulletList",
+                            "data":  {
+                                         "items":  [
+                                                       "1-3 Discuss the differences between sales and market  orientations"
+                                                   ]
+                                     }
+                        },
+                        {
+                            "type":  "BulletList",
+                            "data":  {
+                                         "items":  [
+                                                       "1-4 Describe several reasons for studying marketing"
+                                                   ]
+                                     }
+                        },
+                        {
+                            "type":  "ChapterNumber",
+                            "data":  {
+                                         "text":  "1"
+                                     }
+                        }
+                    ]
+    },
+    {
+        "page_type":  "non-opener",
+        "page_no":  2,
+        "content":  [
+                        {
+                            "type":  "SectionTitle",
+                            "data":  {
+                                         "text":  "1-1 What Is Marketing?"
+                                     }
+                        },
+                        {
+                            "type":  "SubSectionTitle",
+                            "data":  {
+                                         "text":  "1-1 Define the term marketing"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "What does the term marketing mean to you? Many people  think marketing means personal selling. Others think it  means advertising. Still others believe that marketing con- cerns making products available in stores, arranging displays,  and maintaining inventories of products for future sales.  Marketing includes all these activities and more."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Marketing has two facets. First, it is a philosophy,  an attitude, a perspective, or a management orientation  that stresses customer satisfaction. Second, marketing is  an organizational function and a set of processes used to  implement this philosophy."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "The American Marketing Association’s (AMA) defini- tion of marketing focuses on the second facet. According  to the AMA, marketing is the activity, set of institutions,  and processes for creating, communicating, delivering, and  exchanging offerings that have value for customers, clients,  partners, and society at large.1"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Marketing involves more than just activities a group of  people performs in a defined area or department. In the often- quoted words of David Packard, co-founder of Hewlett- Packard (HP), “Marketing is too important to be left only  to the marketing department.” Marketing entails processes  that focus on delivering value and benefits to customers, not  just selling goods, services, and/or ideas. It uses communica- tion, distribution, and pricing strategies to provide customers  and other stakeholders with the goods, services, ideas, values,  and benefits they want when and where they want them. It  involves building long term, mutually rewarding relation- ships when these benefit all parties concerned. Marketing  also entails an understanding that organizations have many  connected stakeholder “partners,” including employees, sup- pliers, stockholders, distributors, and others."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Research showed that an investment portfolio of compa- nies that promote a culture of health, safety and well-being  outperformed the stock market 2 percent per year over a  10-year period.2 In 2022, Cisco, Hilton, and Wegman’s  Food Markets secured the top three positions on Fortune’s  “100 Best Companies to Work For” list. These organiza- tions prioritized diversity, equity, inclusion, and belonging  programs, which encouraged employees to express their  authentic selves without any fear of rejection. Compared"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "marketing the activity, set of institutions, and processes  for creating, communicating, delivering, and exchanging  offerings that have value for customers, clients, partners,  and society at large"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "exchange people giving up something to receive some- thing else they would rather have"
+                                     }
+                        },
+                        {
+                            "type":  "ChapterNumber",
+                            "data":  {
+                                         "text":  "2"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Part One: The World of Marketing"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "to the average workplace, approximately 90 percent of  employees felt comfortable being themselves. Additionally,  these companies expanded their resources for mental health  assistance, support services for older adults, child care, and  well-being. They also provided financial and professional  assistance to their employees during layoffs and furloughs,  and offered COVID-19 care during the pandemic.3"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "“Marketing is too important to be left only  to the marketing department.”"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "David Packard, co-founder of Hewlett-Packard"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "One desired outcome of marketing is an exchange— people giving up something to receive something else they  would rather have. Normally, we think of money as the  medium of exchange. We “give up” money to “get” the  goods and services we want. Exchange does not require  money, however. Two (or more) people may barter or trade  such items as baseball cards or oil paintings."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "An exchange can take place only if the following five  conditions exist:"
+                                     }
+                        },
+                        {
+                            "type":  "BulletList",
+                            "data":  {
+                                         "items":  [
+                                                       "1. There must be at least two parties. 2. Each party has something that might be of value to the  other party. 3. Each party is capable of communication and delivery. 4. Each party is free to accept or reject the exchange offer. 5. Each party believes it is appropriate or desirable to deal  with the other party.4"
+                                                   ]
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Exchange will not necessarily take place even if all these  conditions exist, but they must exist for exchange to be  possible. For example, suppose you place an advertisement"
+                                     }
+                        },
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "",
+                                         "caption":  "[Image]"
+                                     }
+                        },
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "dev/tenants/4379b1c922fe47a3bb96e7786b412bb4/documents/9ed65792-6e7b-4d28-991b-7d49444ca60c/assets/8555c21d788a4c50bd93caaa87b38e53.jpg",
+                                         "caption":  ""
+                                     }
+                        },
+                        {
+                            "type":  "Image",
+                            "data":  {
+                                         "url":  "",
+                                         "caption":  "[Image]"
+                                     }
+                        }
+                    ]
+    },
+    {
+        "page_type":  "non-opener",
+        "page_no":  3,
+        "content":  [
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "on Craigslist or Facebook Marketplace stating that your  used automobile is for sale at a certain price. Several people  may contact you to ask about the car, some may test-drive  it, and one or more may even make an offer. All five con- ditions necessary for an exchange to occur exist in this  scenario. But unless you reach an agreement with a buyer  and sell the car, an exchange will not take place."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Notice that marketing can occur even if an exchange  does not occur. In the example just discussed, you would  have engaged in marketing by advertising the car, even if  no one bought it."
+                                     }
+                        },
+                        {
+                            "type":  "SectionTitle",
+                            "data":  {
+                                         "text":  "1-2 The Four Marketing  Management Philosophies"
+                                     }
+                        },
+                        {
+                            "type":  "SubSectionTitle",
+                            "data":  {
+                                         "text":  "1-2 Describe four marketing management philosophies"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Four competing philosophies strongly influence an orga- nization’s marketing processes. These philosophies are  commonly called production, sales, market, and societal  marketing orientations."
+                                     }
+                        },
+                        {
+                            "type":  "GreenSubSectionTitle",
+                            "data":  {
+                                         "text":  "1-2a Production Orientation"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "A production orientation is a philosophy that focuses on  the firm’s internal capabilities rather than on the desires and  needs of the marketplace. A production orientation means  that management assesses its resources and asks these ques- tions: “What can we do best?” “What can our engineers  design?” “What is easy to produce, given our equipment?”  In the case of a service organization, managers ask, “What  services are most convenient for the firm to offer?” and  “Where do our talents lie?” The furniture industry is infa- mous for its disregard of customers and for its slow cycle  times. For example, most traditional furniture stores (think  Ashley or Haverty’s) carry the same styles and varieties of  furniture they have carried for many years. They always pro- duce and stock sofas, coffee tables, chairs, and end tables for  the living room. Bedroom suites always include at least a  queen- or king-sized bed, two dressers, and two nightstands."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Regardless of what customers may be looking for, this  selection is what they will find at these stores—and they  have been so long-lived because what they produce has  matched customer expectations. This industry has always  been production oriented."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "There is nothing wrong with assessing a firm’s capabilities;  in fact, such assessments are major considerations in strategic  marketing planning (refer back to Chapter 2). A production  orientation can fall short if it does not consider whether the  goods and services that the firm produces most efficiently  also meet the needs of the marketplace. On the other hand,  sometimes what a firm can best produce is exactly what the"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "market wants. Apple has a history of production orientation,  creating computers, operating systems, and other gadgetry  because it can and hopes to sell the result. Some items have  found a waiting market (early computers, iPod, iPhone).  Other products, like the Newton, one of the first versions of  a personal digital assistant (PDA), were simply flops."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "In some situations, as when competition is weak or  demand exceeds supply, a production-oriented firm can  survive and even prosper. More often, however, firms that  succeed in competitive markets have a clear understand- ing that they must first determine what customers want  and then produce it, rather than focus on what company  management thinks should be produced and hope that the  product is something customers want."
+                                     }
+                        },
+                        {
+                            "type":  "GreenSubSectionTitle",
+                            "data":  {
+                                         "text":  "1-2b Sales Orientation"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "A sales orientation is based on the belief that people  will buy more goods and services if aggressive sales  techniques are used and that high sales result in high  profits. Not only does this approach emphasize sales to  the final buyer, but intermediaries are also encouraged  to push manufacturers’ products more aggressively. To  sales-oriented firms, marketing means selling things and  collecting money."
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "The fundamental problem with a sales orientation, as  with a production orientation, is a lack of understanding  of the needs and wants of the marketplace. Sales-oriented  companies often find that, despite the quality of their sales  force, they cannot convince people to buy goods or ser- vices that are neither wanted nor needed."
+                                     }
+                        },
+                        {
+                            "type":  "GreenSubSectionTitle",
+                            "data":  {
+                                         "text":  "1-2c Market Orientation"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "The marketing concept is a simple and intuitively appeal- ing philosophy that focuses on a market orientation. It  states that the social and economic justification for an  organization’s existence is the satisfaction of customer  wants and needs while meeting organizational objec- tives. What a business thinks it produces is not of primary  importance to its success. Instead, what customers think"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "production orientation a philosophy that focuses on the  firm’s internal capabilities rather than on the desires and  needs of the marketplace"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "sales orientation the belief that people will buy more  goods and services if aggressive sales techniques are used  and that high sales result in high profits"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "marketing concept the idea that the social and economic  justification for an organization’s existence is the satisfac- tion of customer wants and needs while meeting organiza- tional objectives"
+                                     }
+                        },
+                        {
+                            "type":  "ParagraphText",
+                            "data":  {
+                                         "text":  "Chapter 1: An Overview of Marketing"
+                                     }
+                        },
+                        {
+                            "type":  "ChapterNumber",
+                            "data":  {
+                                         "text":  "3"
+                                     }
+                        }
+                    ]
+    }
+]

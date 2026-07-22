@@ -21,6 +21,19 @@ const s3Client = new S3Client({
   },
 });
 
+const applyKeyTemplate = (template, { envName, id }) => {
+  if (!template) return null;
+  const safeEnv = String(envName || 'dev');
+  const safeId = String(id || '');
+  return template
+    .replaceAll('{env}', safeEnv)
+    .replaceAll('{prefix}', safeEnv)
+    .replaceAll('{id}', safeId)
+    .replaceAll('{themeId}', safeId)
+    .replaceAll('{formatId}', safeId)
+    .replaceAll('{templateId}', safeId);
+};
+
 /** Safe theme file id: theme1, theme2, theme3, … (no path traversal). */
 export const sanitizeThemeId = (templateId) => {
   const raw = String(templateId || '')
@@ -35,19 +48,28 @@ export const resolveLocalThemeId = (templateId) =>
   sanitizeThemeId(templateId) || env.defaultThemeId || 'theme2';
 
 /**
- * S3 key for stylesheet. Uses templateId from the plugin request.
- * STYLESHEET_S3_KEY_TEMPLATE placeholders: {prefix}, {templateId}
+ * Theme S3 key: {env}/appearance/theme/{id}.json
  */
-export const buildStylesheetS3Key = ({ templateId } = {}) => {
-  const template = env.stylesheetS3KeyTemplate;
-  if (!template) return null;
+export const buildThemeS3Key = ({ templateId } = {}) =>
+  applyKeyTemplate(env.themeS3KeyTemplate, {
+    envName: env.requestPrefix || 'dev',
+    id: resolveLocalThemeId(templateId),
+  });
 
-  const id = resolveLocalThemeId(templateId);
-  return template
-    .replaceAll('{prefix}', env.requestPrefix || 'dev')
-    .replaceAll('{templateId}', id)
-    .replaceAll('{themeId}', id);
+/**
+ * Format S3 key: {env}/appearance/format/{id}.json
+ * theme2 → format2 by convention.
+ */
+export const buildFormatS3Key = ({ templateId, formatId } = {}) => {
+  const id = formatId || templateIdToFormatId(templateId);
+  return applyKeyTemplate(env.formatS3KeyTemplate, {
+    envName: env.requestPrefix || 'dev',
+    id,
+  });
 };
+
+/** @deprecated Use buildThemeS3Key */
+export const buildStylesheetS3Key = buildThemeS3Key;
 
 const extractEmbeddedLayout = (document) => {
   if (!document || typeof document !== 'object') return null;
@@ -58,6 +80,20 @@ const extractEmbeddedLayout = (document) => {
   return null;
 };
 
+const loadJsonFromS3 = async (key) => {
+  const result = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: env.s3Bucket,
+      Key: key,
+    })
+  );
+  const chunks = [];
+  for await (const chunk of result.Body) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+};
+
 const loadLocalFormatDocument = async (templateId) => {
   const formatId = templateIdToFormatId(templateId);
   const filePath = path.join(formatsDir, `${formatId}.json`);
@@ -65,15 +101,41 @@ const loadLocalFormatDocument = async (templateId) => {
     const raw = await fs.readFile(filePath, 'utf8');
     return { formatId, source: 'local', layout: JSON.parse(raw), key: filePath };
   } catch {
-    const fallbackPath = path.join(formatsDir, `${DEFAULT_FORMAT_ID}.json`);
+    const fallbackId = env.defaultFormatId || DEFAULT_FORMAT_ID;
+    const fallbackPath = path.join(formatsDir, `${fallbackId}.json`);
     const raw = await fs.readFile(fallbackPath, 'utf8');
     return {
-      formatId: DEFAULT_FORMAT_ID,
+      formatId: fallbackId,
       source: 'local',
       layout: JSON.parse(raw),
       key: fallbackPath,
     };
   }
+};
+
+const loadFormatFromS3OrLocal = async (templateId) => {
+  const formatId = templateIdToFormatId(templateId);
+  const s3Key = buildFormatS3Key({ formatId });
+
+  if (s3Key) {
+    try {
+      const document = await loadJsonFromS3(s3Key);
+      const layout = extractEmbeddedLayout(document) || document;
+      console.info(`[format] loaded from S3: ${s3Key}`);
+      return {
+        formatId: document.formatId || formatId,
+        source: 's3',
+        layout,
+        key: s3Key,
+      };
+    } catch (error) {
+      console.warn(
+        `[format] S3 fetch failed for "${s3Key}" (${error.message}); falling back to local format`
+      );
+    }
+  }
+
+  return loadLocalFormatDocument(templateId);
 };
 
 const attachLayout = async (stylesheetResult) => {
@@ -88,12 +150,12 @@ const attachLayout = async (stylesheetResult) => {
     };
   }
 
-  const localFormat = await loadLocalFormatDocument(stylesheetResult.templateId);
+  const formatResult = await loadFormatFromS3OrLocal(stylesheetResult.templateId);
   return {
     ...stylesheetResult,
-    formatId: localFormat.formatId,
-    layoutSource: localFormat.source,
-    layout: localFormat.layout,
+    formatId: formatResult.formatId,
+    layoutSource: formatResult.source,
+    layout: formatResult.layout,
   };
 };
 
@@ -110,18 +172,8 @@ const loadLocalThemeDocument = async (templateId) => {
   };
 };
 
-const loadStylesheetFromS3 = async (key, templateId) => {
-  const result = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: env.s3Bucket,
-      Key: key,
-    })
-  );
-  const chunks = [];
-  for await (const chunk of result.Body) {
-    chunks.push(Buffer.from(chunk));
-  }
-  const document = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+const loadThemeFromS3 = async (key, templateId) => {
+  const document = await loadJsonFromS3(key);
   const themeId = document.themeId || resolveLocalThemeId(templateId);
   return {
     source: 's3',
@@ -133,22 +185,22 @@ const loadStylesheetFromS3 = async (key, templateId) => {
 };
 
 /**
- * Resolve stylesheet + layout using templateId:
- * 1) Try S3 stylesheet (may embed layout)
- * 2) Fall back to local theme + local format (themeN → formatN, default format2)
+ * Resolve theme + format using templateId:
+ * 1) Theme from S3 {env}/appearance/theme/{id}.json, else local themes/
+ * 2) Format from S3 {env}/appearance/format/{id}.json (or embedded in theme), else local formats/
  */
 export const resolveStylesheet = async ({ templateId } = {}) => {
   const requestedTemplateId = resolveLocalThemeId(templateId);
-  const s3Key = buildStylesheetS3Key({ templateId: requestedTemplateId });
+  const themeKey = buildThemeS3Key({ templateId: requestedTemplateId });
 
-  if (s3Key) {
+  if (themeKey) {
     try {
-      const fromS3 = await loadStylesheetFromS3(s3Key, requestedTemplateId);
-      console.info(`[stylesheet] loaded from S3: ${s3Key}`);
+      const fromS3 = await loadThemeFromS3(themeKey, requestedTemplateId);
+      console.info(`[theme] loaded from S3: ${themeKey}`);
       return attachLayout(fromS3);
     } catch (error) {
       console.warn(
-        `[stylesheet] S3 fetch failed for "${s3Key}" (${error.message}); falling back to local theme for templateId=${requestedTemplateId}`
+        `[theme] S3 fetch failed for "${themeKey}" (${error.message}); falling back to local theme for templateId=${requestedTemplateId}`
       );
     }
   }
@@ -159,7 +211,7 @@ export const resolveStylesheet = async ({ templateId } = {}) => {
   } catch (localError) {
     const fallback = env.defaultThemeId || 'theme2';
     console.warn(
-      `[stylesheet] local theme for "${requestedTemplateId}" missing (${localError.message}); using ${fallback}`
+      `[theme] local theme for "${requestedTemplateId}" missing (${localError.message}); using ${fallback}`
     );
     return attachLayout(await loadLocalThemeDocument(fallback));
   }
