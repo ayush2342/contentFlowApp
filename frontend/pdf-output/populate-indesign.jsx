@@ -28,7 +28,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v23";
+var POPULATE_SCRIPT_VERSION = "dynamic-v24";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
@@ -362,15 +362,50 @@ function hexToRgb(hex) {
 }
 
 function convertTypographyStyle(style) {
+    var colorValue;
+
+    if (!style || typeof style !== "object") {
+        return {
+            fontFamily: "",
+            pointSize: 12,
+            bold: false,
+            italic: false,
+            leftIndent: 0,
+            color: [0, 0, 0],
+            backgroundColor: null,
+            altBackgroundColor: null
+        };
+    }
+
+    if (style.color && typeof style.color !== "string" && style.color.length !== undefined) {
+        colorValue = style.color;
+    } else {
+        colorValue = hexToRgb(style.color);
+    }
+
     return {
-        fontFamily: style.font || "",
-        pointSize: style.size || 12,
+        fontFamily: style.font || style.fontFamily || "",
+        pointSize: style.size || style.pointSize || 12,
         bold: style.bold === true,
         italic: style.italic === true,
         leftIndent: style.leftIndent || 0,
-        color: hexToRgb(style.color),
-        backgroundColor: style.backgroundColor || null
+        color: colorValue,
+        backgroundColor: style.backgroundColor || null,
+        altBackgroundColor: style.altBackgroundColor || style.altbackgroundColor || null
     };
+}
+
+function isQuotationStyle(value) {
+    return value &&
+        typeof value === "object" &&
+        value.text && typeof value.text === "object" &&
+        value.author && typeof value.author === "object";
+}
+
+function isTableStyle(value) {
+    return value &&
+        typeof value === "object" &&
+        (value.headingText || value.rowsText);
 }
 
 function isRawCompositeStyle(value) {
@@ -462,6 +497,20 @@ function resolveConfigStyle(rawEntry) {
             number: convertTypographyStyle(rawEntry.number)
         };
     }
+    if (isQuotationStyle(rawEntry)) {
+        return {
+            text: convertTypographyStyle(rawEntry.text),
+            author: convertTypographyStyle(rawEntry.author),
+            backgroundColor: rawEntry.backgroundColor || null
+        };
+    }
+    if (isTableStyle(rawEntry)) {
+        return {
+            headingText: convertTypographyStyle(rawEntry.headingText || {}),
+            subHeadingText: convertTypographyStyle(rawEntry.subHeadingText || {}),
+            rowsText: convertTypographyStyle(rawEntry.rowsText || {})
+        };
+    }
     return convertTypographyStyle(rawEntry);
 }
 
@@ -475,6 +524,20 @@ function cloneFallbackStyle(key) {
         return {
             text: convertTypographyStyle(fallback.text),
             number: convertTypographyStyle(fallback.number)
+        };
+    }
+    if (isQuotationStyle(fallback)) {
+        return {
+            text: convertTypographyStyle(fallback.text),
+            author: convertTypographyStyle(fallback.author),
+            backgroundColor: fallback.backgroundColor || null
+        };
+    }
+    if (isTableStyle(fallback)) {
+        return {
+            headingText: convertTypographyStyle(fallback.headingText || {}),
+            subHeadingText: convertTypographyStyle(fallback.subHeadingText || {}),
+            rowsText: convertTypographyStyle(fallback.rowsText || {})
         };
     }
     return fallback;
@@ -498,6 +561,9 @@ function buildCanonicalStyleMap(styleSet) {
     var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList", "paragraphText"]);
     var imageFigureNumber = pickTypographyEntry(styleSet, ["imageFigureNumber"]);
     var imageFigureText = pickTypographyEntry(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
+    var quotation = pickRawTypographyEntry(styleSet, ["quotation", "quote"]);
+    var table = pickRawTypographyEntry(styleSet, ["table"]);
+    var footer = pickTypographyEntry(styleSet, ["footer"]);
 
     return {
         chapterHeading: chapterHeading,
@@ -522,7 +588,10 @@ function buildCanonicalStyleMap(styleSet) {
         text: paragraphText,
         imageCaption: imageFigureText,
         figureCaption: imageFigureText,
-        logoText: subSectionTitle || greenSubSectionTitle
+        logoText: subSectionTitle || greenSubSectionTitle,
+        quotation: quotation,
+        table: table,
+        footer: footer
     };
 }
 
@@ -704,7 +773,37 @@ var FRAME_STYLES_DEFAULTS = {
         number: { font: "Arial", size: 11, color: "#CA5027", bold: true }
     },
     greenSubSectionTitle: { font: "Arial", pointSize: 15, bold: true, italic: false, leftIndent: 0, color: [0, 133, 74] },
-    subTitle: { font: "Arial", pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [202, 80, 39] }
+    subTitle: { font: "Arial", pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [202, 80, 39] },
+    quotation: {
+        text: { font: "Arial", size: 13, color: "#000000", bold: false },
+        author: { font: "Arial", size: 10, color: "#000000", bold: false },
+        backgroundColor: "#C1D4C3"
+    },
+    table: {
+        headingText: {
+            font: "Arial",
+            size: 13,
+            color: "#FFFFFF",
+            bold: true,
+            backgroundColor: "#CA5027"
+        },
+        subHeadingText: {
+            font: "Arial",
+            size: 11,
+            color: "#000000",
+            bold: false,
+            backgroundColor: "#E7B193"
+        },
+        rowsText: {
+            font: "Arial",
+            size: 9,
+            color: "#000000",
+            bold: false,
+            backgroundColor: "#FFFFFF",
+            altBackgroundColor: "#F9E5D9"
+        }
+    },
+    footer: { fontFamily: "Arial", pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] }
 };
 
 var FRAME_STYLES = FRAME_STYLES_DEFAULTS;
@@ -853,6 +952,24 @@ var BLOCK_REGISTRY = {
         kind: "text",
         prototype: "proto:subTitle",
         spacingAfter: 8
+    },
+    Quotation: {
+        label: "quotation",
+        style: FRAME_STYLES.quotation,
+        kind: "quotation",
+        spacingAfter: 14
+    },
+    Table: {
+        label: "table",
+        style: FRAME_STYLES.table,
+        kind: "table",
+        spacingAfter: 14
+    },
+    Footer: {
+        label: "footer",
+        style: FRAME_STYLES.footer,
+        kind: "footer",
+        spacingAfter: 0
     }
 };
 
@@ -1970,7 +2087,12 @@ function normalizeBlockType(itemType) {
         subtitle: "SubTitle",
         subsectiontitle: "SubSectionTitle",
         caption: "FigureCaption",
-        figurecaption: "FigureCaption"
+        figurecaption: "FigureCaption",
+        quotation: "Quotation",
+        quote: "Quotation",
+        table: "Table",
+        tableblock: "Table",
+        footer: "Footer"
     };
 
     if (aliases[compact]) {
@@ -2608,6 +2730,13 @@ function getPageLayoutBounds(page) {
     var usableLeft = bounds[1] + leftMargin;
     var usableRight = bounds[3] - rightMargin;
     var usableWidth = usableRight - usableLeft;
+    var usableBottom = bounds[2] - bottomMargin;
+    var footerReserve = 0;
+
+    if (layoutState && layoutState.footerReserve) {
+        footerReserve = layoutState.footerReserve;
+        usableBottom -= footerReserve;
+    }
 
     var columnWidth =
         (usableWidth - ((columnCount - 1) * gutter)) /
@@ -2624,14 +2753,50 @@ function getPageLayoutBounds(page) {
         "Layout Bounds => columns=" + columnCount +
         ", currentColumn=" + currentColumn +
         ", left=" + left +
-        ", right=" + right
+        ", right=" + right +
+        (footerReserve ? (", footerReserve=" + footerReserve) : "")
     );
 
     return {
         top: bounds[0] + topMargin,
         left: left,
-        bottom: bounds[2] - bottomMargin,
+        bottom: usableBottom,
         right: right
+    };
+}
+
+function getFullPageMarginBounds(page) {
+    var bounds;
+    var margins;
+    var topMargin;
+    var leftMargin;
+    var bottomMargin;
+    var rightMargin;
+
+    try {
+        bounds = page.bounds;
+    } catch (boundsError) {
+        bounds = [0, 0, 792, 612];
+    }
+
+    try {
+        margins = page.marginPreferences;
+        topMargin = margins.top;
+        leftMargin = margins.left;
+        bottomMargin = margins.bottom;
+        rightMargin = margins.right;
+    } catch (marginError) {
+        topMargin = 72;
+        leftMargin = 72;
+        bottomMargin = 72;
+        rightMargin = 72;
+    }
+
+    return {
+        top: bounds[0] + topMargin,
+        left: bounds[1] + leftMargin,
+        bottom: bounds[2] - bottomMargin,
+        right: bounds[3] - rightMargin
     };
 }
 
@@ -2740,10 +2905,11 @@ function createLayoutState(document, page) {
         page: page,
         cursorY: bounds.top,
         blockGap: DYNAMIC_LAYOUT.blockGap,
-        columnCount:1,
-        currentColumn:0,
-        gutter:18,
-        pageType: "opener"
+        columnCount: 1,
+        currentColumn: 0,
+        gutter: 18,
+        pageType: "opener",
+        footerReserve: 0
     };
 }
 
@@ -3404,6 +3570,492 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
     appendRenderLog("LogoWithText cursorY: " + layoutState.cursorY);
 }
 
+function splitBodyAndFooters(contentItems) {
+    var body = [];
+    var footers = [];
+    var i;
+    var item;
+    var itemType;
+
+    for (i = 0; i < contentItems.length; i++) {
+        item = contentItems[i];
+        itemType = normalizeBlockType(item.type);
+        if (itemType === "Footer") {
+            footers.push(item);
+        } else {
+            body.push(item);
+        }
+    }
+
+    return { body: body, footers: footers };
+}
+
+function getFooterDisplayText(data) {
+    var left;
+    var right;
+    var main;
+    var parts;
+
+    if (!data) {
+        return "";
+    }
+
+    left = trimString(data.left || "");
+    right = trimString(data.right || "");
+    main = trimString(data.text || data.center || "");
+
+    if (left || right) {
+        parts = [];
+        if (left) {
+            parts.push(left);
+        }
+        if (main) {
+            parts.push(main);
+        }
+        if (right) {
+            parts.push(right);
+        }
+        return parts.join("   ");
+    }
+
+    return main;
+}
+
+function getPageDocumentOffset(page) {
+    try {
+        return page.documentOffset;
+    } catch (offsetError) {
+        return 0;
+    }
+}
+
+function collectTextFramesInChain(frame) {
+    var current = frame;
+    var frames = [];
+
+    if (!frame) {
+        return frames;
+    }
+
+    try {
+        while (current.previousTextFrame) {
+            current = current.previousTextFrame;
+        }
+    } catch (walkBackError) {}
+
+    while (current) {
+        frames.push(current);
+        try {
+            current = current.nextTextFrame;
+            if (!current) {
+                break;
+            }
+        } catch (walkForwardError) {
+            break;
+        }
+    }
+
+    return frames;
+}
+
+function applyQuotationPresentation(frame, quotationStyle, hasAuthor) {
+    var frames;
+    var i;
+    var fillStyle;
+    var story;
+    var paragraphs;
+
+    if (!frame || !quotationStyle) {
+        return;
+    }
+
+    frames = collectTextFramesInChain(frame);
+    fillStyle = { backgroundColor: quotationStyle.backgroundColor || null };
+
+    for (i = 0; i < frames.length; i++) {
+        applyFrameFillColor(frames[i], fillStyle);
+        try {
+            frames[i].textFramePreferences.insetSpacing = [10, 12, 10, 12];
+        } catch (insetError) {}
+    }
+
+    if (!hasAuthor || !quotationStyle.author) {
+        return;
+    }
+
+    try {
+        story = frames[0].parentStory;
+        paragraphs = story.paragraphs;
+        if (paragraphs.length > 1) {
+            applyTextRangeStyle(paragraphs[paragraphs.length - 1].texts[0], quotationStyle.author);
+        }
+    } catch (authorStyleError) {}
+}
+
+function populateDynamicQuotationBlock(layoutState, document, registryEntry, data, blockIndex) {
+    var quoteText = trimString(
+        (data && (data.text || data.quote || data.quotation)) || ""
+    );
+    var author = trimString(
+        (data && (data.author || data.attribution || data.source)) || ""
+    );
+    var cleanText = quoteText;
+    var style = registryEntry.style || FRAME_STYLES.quotation || FRAME_STYLES_DEFAULTS.quotation;
+    var textStyle;
+    var frame;
+
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: Quotation");
+    appendRenderLog("Occurrence: " + blockIndex);
+
+    if (author) {
+        cleanText = quoteText ? (quoteText + "\r" + author) : author;
+    }
+
+    if (!cleanText || isPlaceholderText(cleanText)) {
+        appendRenderLog("Status: not populated - empty quotation");
+        return;
+    }
+
+    textStyle = (style && style.text) ? style.text : style;
+
+    try {
+        frame = flowDynamicText(
+            layoutState,
+            cleanText,
+            textStyle,
+            DYNAMIC_LAYOUT.minTextFrameHeight,
+            72
+        );
+        applyQuotationPresentation(frame, style, !!author);
+        advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
+        populatedCount += 1;
+        appendRenderLog("Status: populated (quotation)");
+    } catch (quoteError) {
+        appendRenderLog("Status: not populated - " + quoteError.message);
+        warnings.push('Could not create quotation #' + blockIndex + ": " + quoteError.message);
+    }
+}
+
+function normalizeTableIndexes(index) {
+    var out = [];
+    var i;
+
+    if (!index) {
+        return out;
+    }
+
+    if (index.length !== undefined) {
+        for (i = 0; i < index.length; i++) {
+            if (index[i] && index[i].values && index[i].values.length !== undefined) {
+                out.push(index[i]);
+            }
+        }
+        return out;
+    }
+
+    if (typeof index === "object" && index.values && index.values.length !== undefined) {
+        out.push(index);
+    }
+
+    return out;
+}
+
+function buildTableMatrix(data) {
+    var tableData;
+    var cols;
+    var rows;
+    var indexes;
+    var validIndexes;
+    var headers = [];
+    var bodyRows = [];
+    var i;
+    var j;
+    var row;
+    var cells;
+    var outRow;
+
+    tableData = (data && data.table && typeof data.table === "object") ? data.table : (data || {});
+    cols = tableData.cols || data.headers || [];
+    if (!cols || cols.length === undefined) {
+        cols = [];
+    }
+    rows = tableData.rows || [];
+    if (!rows || rows.length === undefined) {
+        rows = [];
+    }
+
+    indexes = normalizeTableIndexes(tableData.index);
+    validIndexes = [];
+    for (i = 0; i < indexes.length; i++) {
+        if (!rows.length || indexes[i].values.length === rows.length) {
+            validIndexes.push(indexes[i]);
+        }
+    }
+
+    for (i = 0; i < validIndexes.length; i++) {
+        headers.push(trimString(validIndexes[i].name || ""));
+    }
+    for (i = 0; i < cols.length; i++) {
+        headers.push(trimString(cols[i] != null ? String(cols[i]) : ""));
+    }
+
+    for (i = 0; i < rows.length; i++) {
+        row = rows[i];
+        cells = (row && row.length !== undefined) ? row : [row];
+        outRow = [];
+        for (j = 0; j < validIndexes.length; j++) {
+            outRow.push(
+                validIndexes[j].values[i] != null
+                    ? String(validIndexes[j].values[i])
+                    : ""
+            );
+        }
+        for (j = 0; j < cols.length; j++) {
+            outRow.push(cells[j] != null ? String(cells[j]) : "");
+        }
+        bodyRows.push(outRow);
+    }
+
+    return {
+        title: trimString((data && data.title) || tableData.title || ""),
+        headers: headers,
+        rows: bodyRows,
+        indexCount: validIndexes.length
+    };
+}
+
+function applyCellFillFromHex(cell, hex) {
+    var doc;
+    var rgb;
+    var colorName;
+    var color;
+
+    if (!cell || !hex) {
+        return;
+    }
+
+    rgb = hexToRgb(hex);
+    try {
+        doc = app.activeDocument;
+        colorName = "JSON_CELL_" + rgb.join("_");
+        color = ensureDocumentColor(doc, colorName, rgb);
+        if (color !== null) {
+            cell.fillColor = color;
+        }
+    } catch (cellFillError) {}
+}
+
+function styleTableCellText(cell, style) {
+    var texts;
+
+    if (!cell || !style) {
+        return;
+    }
+
+    try {
+        texts = cell.texts[0];
+        applyTextRangeStyle(texts, style);
+    } catch (cellTextError) {}
+}
+
+function populateDynamicTableBlock(layoutState, document, registryEntry, data, blockIndex) {
+    var matrix = buildTableMatrix(data || {});
+    var style = registryEntry.style || FRAME_STYLES.table || FRAME_STYLES_DEFAULTS.table;
+    var headingStyle;
+    var subHeadingStyle;
+    var rowsStyle;
+    var colCount;
+    var rowCount;
+    var estimatedHeight;
+    var layoutBounds;
+    var frame;
+    var table;
+    var r;
+    var c;
+    var cell;
+    var cellStyle;
+    var fillHex;
+    var titleFrame;
+
+    appendRenderLog("---");
+    appendRenderLog("JSON block type: Table");
+    appendRenderLog("Occurrence: " + blockIndex);
+
+    if (!matrix.headers.length && !matrix.rows.length) {
+        appendRenderLog("Status: not populated - empty table");
+        return;
+    }
+
+    headingStyle = (style && style.headingText) ? style.headingText : null;
+    subHeadingStyle = (style && style.subHeadingText) ? style.subHeadingText : null;
+    rowsStyle = (style && style.rowsText) ? style.rowsText : null;
+
+    colCount = matrix.headers.length || 1;
+    rowCount = matrix.rows.length + (matrix.headers.length ? 1 : 0);
+    estimatedHeight = Math.max(48, rowCount * 18 + 24);
+
+    if (matrix.title) {
+        try {
+            titleFrame = flowDynamicText(
+                layoutState,
+                matrix.title,
+                FRAME_STYLES.subSectionTitle || FRAME_STYLES_DEFAULTS.subSectionTitle,
+                DYNAMIC_LAYOUT.minTextFrameHeight,
+                28
+            );
+            advanceLayoutCursor(layoutState, titleFrame, 6);
+        } catch (titleError) {
+            warnings.push("Could not place table title #" + blockIndex + ": " + titleError.message);
+        }
+    }
+
+    layoutBounds = ensureLayoutSpace(layoutState, Math.min(estimatedHeight, 120));
+    try {
+        frame = createTextFrameOnPage(
+            layoutState.page,
+            layoutBounds,
+            layoutState.cursorY,
+            Math.min(estimatedHeight, getAvailableColumnHeight(layoutState))
+        );
+        frame.contents = "";
+
+        table = frame.insertionPoints.item(-1).tables.add();
+        table.columnCount = colCount;
+        if (matrix.headers.length) {
+            table.headerRowCount = 1;
+            table.bodyRowCount = matrix.rows.length > 0 ? matrix.rows.length : 1;
+        } else {
+            table.headerRowCount = 0;
+            table.bodyRowCount = matrix.rows.length > 0 ? matrix.rows.length : 1;
+        }
+
+        if (matrix.headers.length) {
+            for (c = 0; c < colCount; c++) {
+                cell = table.rows[0].cells[c];
+                cell.contents = matrix.headers[c] || "";
+                if (c < matrix.indexCount) {
+                    styleTableCellText(cell, subHeadingStyle || headingStyle);
+                    applyCellFillFromHex(
+                        cell,
+                        (subHeadingStyle && subHeadingStyle.backgroundColor) ||
+                            (headingStyle && headingStyle.backgroundColor)
+                    );
+                } else {
+                    styleTableCellText(cell, headingStyle);
+                    applyCellFillFromHex(
+                        cell,
+                        headingStyle && headingStyle.backgroundColor
+                    );
+                }
+            }
+        }
+
+        for (r = 0; r < matrix.rows.length; r++) {
+            for (c = 0; c < colCount; c++) {
+                cell = table.rows[r + (matrix.headers.length ? 1 : 0)].cells[c];
+                cell.contents = matrix.rows[r][c] != null ? String(matrix.rows[r][c]) : "";
+
+                if (c < matrix.indexCount) {
+                    cellStyle = subHeadingStyle || rowsStyle;
+                    fillHex = (subHeadingStyle && subHeadingStyle.backgroundColor) ||
+                        (rowsStyle && rowsStyle.backgroundColor);
+                } else {
+                    cellStyle = rowsStyle;
+                    fillHex = rowsStyle && rowsStyle.backgroundColor;
+                    if (r % 2 === 1 && rowsStyle && rowsStyle.altBackgroundColor) {
+                        fillHex = rowsStyle.altBackgroundColor;
+                    }
+                }
+
+                styleTableCellText(cell, cellStyle);
+                applyCellFillFromHex(cell, fillHex);
+            }
+        }
+
+        try {
+            frame.parentStory.recompose();
+            document.recompose();
+        } catch (recomposeTableError) {}
+
+        tightenTextFrameToRenderedContent(frame);
+        advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
+        populatedCount += 1;
+        appendRenderLog("Status: populated (table " + colCount + "x" + rowCount + ")");
+    } catch (tableError) {
+        appendRenderLog("Status: not populated - " + tableError.message);
+        warnings.push('Could not create table #' + blockIndex + ": " + tableError.message);
+        try {
+            if (frame) {
+                frame.remove();
+            }
+        } catch (removeFrameError) {}
+    }
+}
+
+function placeFootersOnRenderedPages(layoutState, document, footerItems, startPageIndex) {
+    var combined = [];
+    var i;
+    var data;
+    var text;
+    var footerText;
+    var style;
+    var endPageIndex;
+    var pageIndex;
+    var page;
+    var fullBounds;
+    var footerHeight = 28;
+    var frame;
+
+    for (i = 0; i < footerItems.length; i++) {
+        data = footerItems[i].data || {};
+        text = getFooterDisplayText(data);
+        if (text) {
+            combined.push(text);
+        }
+    }
+
+    if (!combined.length) {
+        appendRenderLog("Footer: no text to place");
+        return;
+    }
+
+    footerText = combined.join("  |  ");
+    style = FRAME_STYLES.footer || FRAME_STYLES_DEFAULTS.footer;
+    endPageIndex = getPageDocumentOffset(layoutState.page);
+
+    for (pageIndex = startPageIndex; pageIndex <= endPageIndex; pageIndex++) {
+        try {
+            page = document.pages[pageIndex];
+        } catch (pageError) {
+            continue;
+        }
+
+        fullBounds = getFullPageMarginBounds(page);
+        try {
+            frame = page.textFrames.add({
+                geometricBounds: [
+                    fullBounds.bottom - footerHeight,
+                    fullBounds.left,
+                    fullBounds.bottom,
+                    fullBounds.right
+                ]
+            });
+            assignFrameToContentLayer(frame);
+            clearRuntimeLabel(frame);
+            frame.contents = footerText;
+            applyFrameStyle(frame, style);
+            populatedCount += 1;
+        } catch (footerError) {
+            warnings.push("Could not place footer on page index " + pageIndex + ": " + footerError.message);
+        }
+    }
+
+    appendRenderLog(
+        "Footer placed on pages " + startPageIndex + "-" + endPageIndex
+    );
+}
+
 function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
     var i;
     var item;
@@ -3412,15 +4064,19 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
     var registryEntry;
     var typeCounts = {};
     var blockIndex;
-    var p;
-    var jsonPage;
+    var split;
+    var startPageIndex;
 
     if (!layoutState) {
         layoutState = createLayoutState(document, document.pages[0]);
     }
 
-    for (i = 0; i < contentItems.length; i++) {
-        item = contentItems[i];
+    split = splitBodyAndFooters(contentItems || []);
+    startPageIndex = getPageDocumentOffset(layoutState.page);
+    layoutState.footerReserve = split.footers.length ? 36 : 0;
+
+    for (i = 0; i < split.body.length; i++) {
+        item = split.body[i];
         itemType = normalizeBlockType(item.type);
         data = item.data || {};
         registryEntry = resolveRegistryEntry(itemType);
@@ -3442,6 +4098,16 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
             continue;
         }
 
+        if (registryEntry.kind === "quotation") {
+            populateDynamicQuotationBlock(layoutState, document, registryEntry, data, blockIndex);
+            continue;
+        }
+
+        if (registryEntry.kind === "table") {
+            populateDynamicTableBlock(layoutState, document, registryEntry, data, blockIndex);
+            continue;
+        }
+
         if (registryEntry.kind === "text") {
             populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex);
             continue;
@@ -3449,6 +4115,12 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
 
         logUnsupportedBlockType(itemType);
     }
+
+    if (split.footers.length) {
+        placeFootersOnRenderedPages(layoutState, document, split.footers, startPageIndex);
+    }
+
+    layoutState.footerReserve = 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -3592,7 +4264,8 @@ function logResolvedTypographySample() {
     var keys = [
         "chapterTitle", "sectionTitle", "paragraphText", "topic",
         "imageCaption", "imageFigureNumber", "figureCaption", "logoText",
-        "partNumber", "subTitlesList", "greenSubSectionTitle", "subTitle"
+        "partNumber", "subTitlesList", "greenSubSectionTitle", "subTitle",
+        "quotation", "table", "footer"
     ];
     var i;
     var key;
@@ -3607,6 +4280,17 @@ function logResolvedTypographySample() {
         }
         if (isCompositeStyle(style)) {
             appendRenderLog("  style " + key + ": composite text/number");
+            continue;
+        }
+        if (isQuotationStyle(style)) {
+            appendRenderLog(
+                "  style " + key + ": quotation text/author bg=" +
+                (style.backgroundColor || "(none)")
+            );
+            continue;
+        }
+        if (isTableStyle(style)) {
+            appendRenderLog("  style " + key + ": table heading/subHeading/rows");
             continue;
         }
         color = style.color ? ("[" + style.color.join(",") + "]") : "(none)";
@@ -3641,6 +4325,9 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.SubTitlesList.style = FRAME_STYLES.subTitlesList || FRAME_STYLES_DEFAULTS.subTitlesList;
     BLOCK_REGISTRY.GreenSubSectionTitle.style = FRAME_STYLES.greenSubSectionTitle || FRAME_STYLES_DEFAULTS.greenSubSectionTitle;
     BLOCK_REGISTRY.SubTitle.style = FRAME_STYLES.subTitle || FRAME_STYLES_DEFAULTS.subTitle;
+    BLOCK_REGISTRY.Quotation.style = FRAME_STYLES.quotation || FRAME_STYLES_DEFAULTS.quotation;
+    BLOCK_REGISTRY.Table.style = FRAME_STYLES.table || FRAME_STYLES_DEFAULTS.table;
+    BLOCK_REGISTRY.Footer.style = FRAME_STYLES.footer || FRAME_STYLES_DEFAULTS.footer;
 }
 
 // -----------------------------------------------------------------------------
