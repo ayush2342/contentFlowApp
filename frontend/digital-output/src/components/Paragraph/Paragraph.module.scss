@@ -19,8 +19,17 @@
 }
 
 .bulletList {
+  margin: 0 0 0.85rem;
+  padding-left: 1.25rem;
+  line-height: 1.6;
+  list-style: disc;
   font-family: var(--typography-bulletList-font, var(--font-family));
   font-size: var(--typography-bulletList-size, 9pt);
   color: var(--typography-bulletList-color, var(--paragraph-color));
   font-weight: var(--typography-bulletList-weight, 400);
+
+  li {
+    margin: 0 0 0.35rem;
+    padding-left: 0.15rem;
+  }
 }

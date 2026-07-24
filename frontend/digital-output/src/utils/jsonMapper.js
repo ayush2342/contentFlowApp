@@ -283,6 +283,7 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   lessonnumber: 'LessonNumber',
   lessontitle: 'LessonTitle',
   lessonoverview: 'LessonOverview',
+  topic: 'Topic',
   learningobjectives: 'LearningObjectives',
   sectiontitle: 'SectionTitle',
   subsectiontitle: 'SubSectionTitle',
@@ -340,6 +341,9 @@ const extractLearningObjectives = (text) => {
   return objectives;
 };
 
+const normalizeBulletItem = (value) =>
+  normalizeText(value).replace(/^[\u2022•\-\*]\s*/, '');
+
 const parseSectionHeading = (text) => {
   const normalized = normalizeText(text);
   const match = normalized.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);
@@ -369,12 +373,14 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
 
   const headingVariantMap = {
     ChapterNumber: 'chapterNumber',
+    LessonNumber: 'chapterNumber',
     PartNumber: 'partNumber',
     ChapterHeading: 'chapterHeading',
     ChapterTitle: 'chapterTitle',
     ChapterOverview: 'chapterOverview',
     LessonTitle: 'lessonTitle',
     LessonOverview: 'lessonOverview',
+    Topic: 'lessonOverview',
     SectionTitle: 'sectionTitle',
     SubSectionTitle: 'subSectionTitle',
     GreenSubSectionTitle: 'greenSubSectionTitle',
@@ -382,17 +388,66 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     SubTitlesList: 'subTitlesList',
   };
 
+  const isLearningObjectivesHeading =
+    (type === 'LearningObjectives' || type === 'ChapterOverview') &&
+    text &&
+    /learning\s*objectives?/i.test(text);
+
+  if (isLearningObjectivesHeading) {
+    const component = {
+      id: `content-${index}`,
+      type: 'LearningObjective',
+      contentType: 'LearningObjectives',
+      props: {
+        title: text,
+        introText: '',
+        objectives: [],
+      },
+    };
+    ctx.pendingLearningObjective = component;
+    return component;
+  }
+
   const headingVariant = headingVariantMap[type];
   if (headingVariant && text) {
+    ctx.pendingLearningObjective = null;
     return {
       id: `content-${index}`,
       type: 'Heading',
-      contentType: type,
+      contentType:
+        type === 'Topic' || type === 'LessonOverview'
+          ? 'LessonOverview'
+          : type === 'LessonNumber'
+            ? 'ChapterNumber'
+            : type,
       props: { text, level: 2, variant: headingVariant },
     };
   }
 
   if ((type === 'ParagraphText' || type === 'Text') && text) {
+    if (ctx.pendingLearningObjective) {
+      const introMatch = text.match(
+        /^(By the end of this section,?\s*you will be able to:?)\s*/i
+      );
+      if (introMatch) {
+        ctx.pendingLearningObjective.props.introText = introMatch[1].replace(/:?\s*$/, ':');
+        const rest = text.slice(introMatch[0].length).trim();
+        const objectives = extractLearningObjectives(rest || text);
+        if (objectives.length) {
+          ctx.pendingLearningObjective.props.objectives.push(...objectives);
+        }
+        return null;
+      }
+
+      const objectives = extractLearningObjectives(text);
+      if (objectives.length > 1 || (objectives.length === 1 && objectives[0] !== text)) {
+        ctx.pendingLearningObjective.props.objectives.push(...objectives);
+        return null;
+      }
+
+      ctx.pendingLearningObjective = null;
+    }
+
     return {
       id: `content-${index}`,
       type: 'Paragraph',
@@ -402,7 +457,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
   }
 
   if (type === 'LearningObjectives' && text) {
-    return {
+    const component = {
       id: `content-${index}`,
       type: 'LearningObjective',
       contentType: type,
@@ -412,25 +467,29 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
         objectives: [],
       },
     };
+    ctx.pendingLearningObjective = component;
+    return component;
   }
 
   if (type === 'BulletList') {
     const items = Array.isArray(block?.data?.items)
-      ? block.data.items.map((item) => normalizeText(item)).filter(Boolean)
+      ? block.data.items.map((item) => normalizeBulletItem(item)).filter(Boolean)
       : [];
     if (!items.length) return null;
 
-    const lastComponent = ctx.components[ctx.components.length - 1];
-    if (lastComponent?.type === 'LearningObjective') {
-      lastComponent.props.objectives = [...(lastComponent.props.objectives || []), ...items];
+    if (ctx.pendingLearningObjective) {
+      ctx.pendingLearningObjective.props.objectives = [
+        ...(ctx.pendingLearningObjective.props.objectives || []),
+        ...items,
+      ];
       return null;
     }
 
     return {
       id: `content-${index}`,
       type: 'Paragraph',
-      contentType: 'ParagraphText',
-      props: { text: items.join(' ') },
+      contentType: 'BulletList',
+      props: { items },
     };
   }
 
@@ -594,7 +653,9 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
 const mapPagedTemplateJson = (pages, options = {}) => {
   const normalizedPages = Array.isArray(pages) ? pages : [];
   const chapterTitle = findFirstTypeText(normalizedPages, 'ChapterTitle');
-  const chapterNumberText = findFirstTypeText(normalizedPages, 'ChapterNumber');
+  const chapterNumberText =
+    findFirstTypeText(normalizedPages, 'ChapterNumber') ||
+    findFirstTypeText(normalizedPages, 'LessonNumber');
   const chapterNumberMatch = chapterNumberText.match(/(\d+)/);
   const chapterNumber = chapterNumberMatch ? Number(chapterNumberMatch[1]) : null;
   const media = {};
@@ -608,6 +669,7 @@ const mapPagedTemplateJson = (pages, options = {}) => {
       options,
       mediaIndex,
       pendingImageMediaId: null,
+      pendingLearningObjective: null,
       components,
     };
 

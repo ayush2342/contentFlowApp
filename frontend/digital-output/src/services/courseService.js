@@ -194,6 +194,7 @@ export const getCourseData = async (inputContext = null) => {
     templateId: resolvedTemplateId,
     formatId: payload.formatId || layout?.formatId || null,
     layout,
+    typography: payload.typography || null,
     etag: payload.etag,
     lastModified: payload.lastModified,
   };

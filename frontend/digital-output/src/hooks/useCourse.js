@@ -17,9 +17,9 @@ export const useCourse = () => {
 
   useEffect(() => {
     if (courseData?.templateId) {
-      applyTheme(document.documentElement, courseData.templateId);
+      applyTheme(document.documentElement, courseData.templateId, courseData.typography);
     }
-  }, [courseData?.templateId]);
+  }, [courseData?.templateId, courseData?.typography]);
 
   return { loading, error, courseData, selectedBook, selectedChapter, selectedLesson };
 };

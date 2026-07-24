@@ -50,9 +50,9 @@
     },
     "sectionTitle": {
       "font": "Arial",
-      "size": 18,
-      "color": "#214880",
-      "bold": true
+      "size": 10,
+      "color": "#000000",
+      "bold": false
     },
     "subSectionTitle": {
       "font": "Arial",
@@ -79,24 +79,6 @@
       "bold": false,
       "backgroundColor": "#CA5027"
     },
-    "subTitle": {
-      "font": "Arial",
-      "size": 12,
-      "color": "#CA5027",
-      "bold": false
-    },
-    "paragraphText": {
-      "font": "Neue Kabel",
-      "size": 10,
-      "color": "#000000",
-      "bold": false
-    },
-    "bulletList": {
-      "font": "Arial",
-      "size": 10,
-      "color": "#000000",
-      "bold": false
-    },
     "subTitlesList": {
       "text": {
         "font": "Arial",
@@ -110,6 +92,18 @@
         "color": "#CA5027",
         "bold": true
       }
+    },
+    "paragraphText": {
+      "font": "Neue Kabel",
+      "size": 10,
+      "color": "#000000",
+      "bold": false
+    },
+    "bulletList": {
+      "font": "Arial",
+      "size": 9,
+      "color": "#000000",
+      "bold": false
     },
     "imageFigureNumber": {
       "font": "Arial",

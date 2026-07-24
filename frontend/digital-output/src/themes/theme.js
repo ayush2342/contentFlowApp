@@ -1,7 +1,7 @@
 import {
   typographyStyles as defaultTypographyStyles,
   generateAllCssVariables,
-  resolveTypographyStyles,
+  resolveTypographyStylesFromPayload,
   DEFAULT_THEME_ID,
 } from '../../../../shared/typography-styles.js';
 
@@ -17,8 +17,12 @@ export const theme = {
   fontFamily: `${defaultTypographyStyles.paragraphText?.font || 'Arial'}, sans-serif`,
 };
 
-export const applyTheme = (root = document.documentElement, templateId = DEFAULT_THEME_ID) => {
-  const typographyStyles = resolveTypographyStyles(templateId);
+export const applyTheme = (
+  root = document.documentElement,
+  templateId = DEFAULT_THEME_ID,
+  typographyPayload = null
+) => {
+  const typographyStyles = resolveTypographyStylesFromPayload(typographyPayload, templateId);
   const sectionTitleColor = getSectionTitleColor(typographyStyles);
 
   root.style.setProperty('--primary-color', sectionTitleColor);

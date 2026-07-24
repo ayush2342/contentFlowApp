@@ -65,7 +65,12 @@ const BookPage = () => {
                   <div className={styles.lessonStack}>
                     {chapter.lessons.map((lesson) => (
                       <section key={lesson.id} className={styles.lessonSection}>
-                        <LessonRenderer page={lesson.pages?.[0]} />
+                        <LessonRenderer
+                          page={lesson.pages?.[0]}
+                          layout={courseData?.layout}
+                          templateId={courseData?.templateId}
+                          typography={courseData?.typography}
+                        />
                       </section>
                     ))}
                   </div>

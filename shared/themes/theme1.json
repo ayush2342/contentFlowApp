@@ -39,12 +39,6 @@
       "color": "#0074BC",
       "bold": false
     },
-    "sectionTitle": {
-      "font": "Arial",
-      "size": 10,
-      "color": "#000000",
-      "bold": false
-    },
     "subSectionTitle": {
       "font": "Arial",
       "size": 11,
@@ -64,18 +58,6 @@
       "bold": true,
       "textTransform": "uppercase"
     },
-    "subTitle": {
-      "font": "Arial",
-      "size": 11,
-      "color": "#0074BC",
-      "bold": false
-    },
-    "subTitlesList": {
-      "font": "Arial",
-      "size": 9,
-      "color": "#000000",
-      "bold": true
-    },
     "paragraphText": {
       "font": "IBM Plex Sans",
       "size": 9,
@@ -86,12 +68,6 @@
       "font": "Arial",
       "size": 9,
       "color": "#000000",
-      "bold": false
-    },
-    "partNumber": {
-      "font": "Arial",
-      "size": 15,
-      "color": "#0074BC",
       "bold": false
     },
     "imageFigureNumber": {
@@ -105,45 +81,6 @@
       "size": 7.5,
       "color": "#000000",
       "bold": false
-    },
-    "quotation": {
-      "text": {
-        "font": "Arial",
-        "size": 13,
-        "color": "#000000",
-        "bold": false
-      },
-      "author": {
-        "font": "Arial",
-        "size": 10,
-        "color": "#000000",
-        "bold": false
-      },
-      "backgroundColor": "#D6E6F5"
-    },
-    "table": {
-      "headingText": {
-        "font": "Arial",
-        "size": 13,
-        "color": "#FFFFFF",
-        "bold": true,
-        "backgroundColor": "#0074BC"
-      },
-      "subHeadingText": {
-        "font": "Arial",
-        "size": 11,
-        "color": "#000000",
-        "bold": false,
-        "backgroundColor": "#B3D4F0"
-      },
-      "rowsText": {
-        "font": "Arial",
-        "size": 9,
-        "color": "#000000",
-        "bold": false,
-        "backgroundColor": "#FFFFFF",
-        "altBackgroundColor": "#E8F3FC"
-      }
     },
     "footer": {
       "font": "Arial",

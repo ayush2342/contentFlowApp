@@ -35,7 +35,17 @@ const splitIntroductionPrefix = (text) => {
   };
 };
 
-const Paragraph = ({ text }) => {
+const Paragraph = ({ text, items }) => {
+  if (Array.isArray(items) && items.length) {
+    return (
+      <ul className={styles.bulletList}>
+        {items.map((item, index) => (
+          <li key={`bullet-${index}`}>{renderWithLinks(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+
   const intro = splitIntroductionPrefix(text);
 
   if (intro) {

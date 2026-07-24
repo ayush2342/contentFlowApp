@@ -3,7 +3,7 @@ import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
 import {
   generateAllCssVariables,
-  resolveTypographyStyles,
+  resolveTypographyStylesFromPayload,
   DEFAULT_THEME_ID,
 } from '../../../../shared/typography-styles.js';
 import {
@@ -197,19 +197,25 @@ const buildLayoutSegments = (components, formatDoc, pageType) => {
   return segments;
 };
 
-const LessonRenderer = ({ page, layout: layoutOverride }) => {
+const LessonRenderer = ({
+  page,
+  layout: layoutOverride,
+  templateId: templateIdProp,
+  typography: typographyProp,
+}) => {
   if (!page) {
     return null;
   }
 
-  const { templateId } = getRouteContext();
+  const { templateId: routeTemplateId } = getRouteContext();
+  const templateId = templateIdProp || routeTemplateId || DEFAULT_THEME_ID;
   const formatDoc =
-    layoutOverride || getLocalFormatDocument(templateId || DEFAULT_THEME_ID);
+    layoutOverride || getLocalFormatDocument(templateId);
   const pageType = page.pageType || 'opener';
   const pageColumns = page.pageColumns || getPageColumns(formatDoc, pageType);
   const { body, footers } = splitBodyAndFooters(page.components || []);
 
-  const scopedTypography = resolveTypographyStyles(templateId || DEFAULT_THEME_ID);
+  const scopedTypography = resolveTypographyStylesFromPayload(typographyProp, templateId);
   const sectionColor =
     scopedTypography.sectionTitle?.color ||
     scopedTypography.sectionTitle?.text?.color ||

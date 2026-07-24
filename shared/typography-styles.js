@@ -162,6 +162,18 @@ export const resolveTypographyStyles = (templateIdOrMode = DEFAULT_THEME_ID) => 
   return normalizeStylePreset(getLocalThemeStyles(raw));
 };
 
+/** Prefer API/S3 theme document STYLES when present; otherwise local theme files. */
+export const resolveTypographyStylesFromPayload = (
+  typographyPayload,
+  templateId = DEFAULT_THEME_ID
+) => {
+  const fromPayload = extractStyles(typographyPayload);
+  if (fromPayload && typeof fromPayload === 'object' && Object.keys(fromPayload).length) {
+    return normalizeStylePreset(fromPayload);
+  }
+  return resolveTypographyStyles(templateId);
+};
+
 export const typographyStyles = resolveTypographyStyles(DEFAULT_THEME_ID);
 
 export const hexToRgb = (hex) => {
@@ -194,9 +206,7 @@ export const toCssVariables = (key, style) => {
     return {
       ...toCssVariables(`${key}Text`, style.text),
       ...toCssVariables(`${key}Author`, style.author),
-      ...(style.backgroundColor
-        ? { [`--typography-${key}-bg`]: style.backgroundColor }
-        : {}),
+      [`--typography-${key}-bg`]: style.backgroundColor || 'transparent',
     };
   }
 
@@ -225,13 +235,14 @@ export const toCssVariables = (key, style) => {
     [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,
     [`${prefix}-color`]: style.color,
-    ...(style.backgroundColor ? { [`${prefix}-bg`]: style.backgroundColor } : {}),
+    // Always set bg so a previous theme's badge color cannot stick (e.g. theme2 → theme1).
+    [`${prefix}-bg`]: style.backgroundColor || 'transparent',
     ...(style.altBackgroundColor || style.altbackgroundColor
       ? {
           [`${prefix}-alt-bg`]:
             style.altBackgroundColor || style.altbackgroundColor,
         }
-      : {}),
+      : { [`${prefix}-alt-bg`]: 'transparent' }),
     [`${prefix}-weight`]: style.bold ? '700' : '400',
     [`${prefix}-style`]: style.italic ? 'italic' : 'normal',
     ...(style.textTransform

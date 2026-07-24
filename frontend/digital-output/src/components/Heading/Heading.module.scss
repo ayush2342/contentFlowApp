@@ -122,6 +122,27 @@
   text-transform: var(--typography-chapterOverview-transform, none);
 }
 
+.lessonOverview {
+  font-family: var(--typography-lessonOverview-font);
+  font-size: var(--typography-lessonOverview-size);
+  font-weight: var(--typography-lessonOverview-weight);
+  color: var(--typography-lessonOverview-color);
+
+  .compositeNumber {
+    font-family: var(--typography-lessonOverviewNumber-font, var(--typography-lessonOverview-font));
+    font-size: var(--typography-lessonOverviewNumber-size, var(--typography-lessonOverview-size));
+    font-weight: var(--typography-lessonOverviewNumber-weight, var(--typography-lessonOverview-weight));
+    color: var(--typography-lessonOverviewNumber-color, var(--typography-lessonOverview-color));
+  }
+
+  .compositeText {
+    font-family: var(--typography-lessonOverview-font);
+    font-size: var(--typography-lessonOverview-size);
+    font-weight: var(--typography-lessonOverview-weight);
+    color: var(--typography-lessonOverview-color);
+  }
+}
+
 .compositeNumber,
 .compositeText {
   display: inline;

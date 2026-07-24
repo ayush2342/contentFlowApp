@@ -41,7 +41,12 @@ const LessonPage = () => {
       <Link to={{ pathname: `/chapter/${chapter.id}`, search }} className={styles.back}>
         &larr; Back to {chapter.title}
       </Link>
-      <LessonRenderer page={page} />
+      <LessonRenderer
+        page={page}
+        layout={courseData?.layout}
+        templateId={courseData?.templateId}
+        typography={courseData?.typography}
+      />
     </div>
   );
 };

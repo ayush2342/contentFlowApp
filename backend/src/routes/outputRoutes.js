@@ -3,7 +3,7 @@ import { getDocumentFromS3, getMediaStreamFromS3 } from '../services/s3Service.j
 import { resolveTemplateId } from '../services/templateResolver.js';
 import { generatePdf } from '../services/pdfService.js';
 import { createOutputSession, getOutputSession } from '../services/outputSessionService.js';
-import { resolveStylesheet } from '../services/stylesheetService.js';
+import { resolveStylesheet, toPdfTypographyConfig } from '../services/stylesheetService.js';
 import { env } from '../config/env.js';
 
 const router = Router();
@@ -156,6 +156,7 @@ router.get('/output/:outputId/document', async (req, res, next) => {
 
     const document = await getDocumentFromS3(session.tenantId, session.documentId);
     const stylesheet = await resolveStylesheet({ templateId: session.templateId });
+    const typography = toPdfTypographyConfig(stylesheet);
 
     res.json({
       outputId,
@@ -164,6 +165,11 @@ router.get('/output/:outputId/document', async (req, res, next) => {
       templateId: session.templateId,
       formatId: stylesheet.formatId,
       layout: stylesheet.layout,
+      typography: {
+        themeId: typography.themeId,
+        templateId: typography.templateId,
+        STYLES: typography.STYLES,
+      },
       etag: document.etag,
       lastModified: document.lastModified,
       data: document.data,

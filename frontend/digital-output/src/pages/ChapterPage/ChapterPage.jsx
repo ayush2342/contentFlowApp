@@ -51,6 +51,8 @@ const ChapterPage = () => {
                 <LessonRenderer
                   page={lesson.pages?.[0]}
                   layout={courseData?.layout}
+                  templateId={courseData?.templateId}
+                  typography={courseData?.typography}
                 />
               </section>
             ))}
