@@ -220,43 +220,57 @@ export const toCssVariables = (key, style) => {
     const altBg =
       style.rowsText?.altBackgroundColor ||
       style.rowsText?.altbackgroundColor ||
-      style.rowsText?.BackgroundColor;
-    if (style.rowsText?.backgroundColor) {
-      vars[`--typography-${key}Rows-bg`] = style.rowsText.backgroundColor;
-    }
-    if (altBg) {
-      vars[`--typography-${key}Rows-alt-bg`] = altBg;
-    }
+      null;
+    // Always set so a previous theme's table colors cannot stick.
+    vars[`--typography-${key}Rows-bg`] =
+      style.rowsText?.backgroundColor || 'transparent';
+    vars[`--typography-${key}Rows-alt-bg`] = altBg || 'transparent';
     return vars;
   }
 
   const prefix = `--typography-${key}`;
+  const hasBadgeBackground = Boolean(style.backgroundColor);
   return {
     [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,
     [`${prefix}-color`]: style.color,
     // Always set bg so a previous theme's badge color cannot stick (e.g. theme2 → theme1).
     [`${prefix}-bg`]: style.backgroundColor || 'transparent',
-    ...(style.altBackgroundColor || style.altbackgroundColor
-      ? {
-          [`${prefix}-alt-bg`]:
-            style.altBackgroundColor || style.altbackgroundColor,
-        }
-      : { [`${prefix}-alt-bg`]: 'transparent' }),
+    [`${prefix}-alt-bg`]:
+      style.altBackgroundColor || style.altbackgroundColor || 'transparent',
+    // Badge padding only when the theme supplies a background (theme2 chapter/part number).
+    [`${prefix}-pad`]: hasBadgeBackground ? '0.2rem 0.6rem' : '0',
     [`${prefix}-weight`]: style.bold ? '700' : '400',
     [`${prefix}-style`]: style.italic ? 'italic' : 'normal',
-    ...(style.textTransform
-      ? { [`${prefix}-transform`]: style.textTransform }
-      : {}),
+    // Always reset transform so theme1 uppercase cannot stick on theme2.
+    [`${prefix}-transform`]: style.textTransform || 'none',
   };
 };
 
 export const generateAllCssVariables = (styles = typographyStyles) => {
   const variables = {};
   Object.entries(styles).forEach(([key, style]) => {
+    if (!style) return;
     Object.assign(variables, toCssVariables(key, style));
   });
   return variables;
+};
+
+/**
+ * Remove previously applied --typography-* inline vars from a root element.
+ * Needed when switching themes: keys present only in the previous theme
+ * (e.g. quotation/table/partNumber on theme2) would otherwise linger.
+ */
+export const clearTypographyCssVariables = (root) => {
+  if (!root?.style) return;
+  const toRemove = [];
+  for (let i = 0; i < root.style.length; i += 1) {
+    const name = root.style.item(i);
+    if (name && name.startsWith('--typography-')) {
+      toRemove.push(name);
+    }
+  }
+  toRemove.forEach((name) => root.style.removeProperty(name));
 };
 
 export const blockTypeToStyleKey = {

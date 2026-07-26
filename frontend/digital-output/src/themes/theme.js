@@ -1,6 +1,7 @@
 import {
   typographyStyles as defaultTypographyStyles,
   generateAllCssVariables,
+  clearTypographyCssVariables,
   resolveTypographyStylesFromPayload,
   DEFAULT_THEME_ID,
 } from '../../../../shared/typography-styles.js';
@@ -9,7 +10,8 @@ const getSectionTitleColor = (styles) =>
   styles.sectionTitle?.color ||
   styles.sectionTitle?.text?.color ||
   styles.lessonTitle?.color ||
-  '#214880';
+  styles.chapterTitle?.color ||
+  '#000000';
 
 export const theme = {
   primaryColor: getSectionTitleColor(defaultTypographyStyles),
@@ -24,6 +26,9 @@ export const applyTheme = (
 ) => {
   const typographyStyles = resolveTypographyStylesFromPayload(typographyPayload, templateId);
   const sectionTitleColor = getSectionTitleColor(typographyStyles);
+
+  // Drop previous theme's typography vars before applying the new set.
+  clearTypographyCssVariables(root);
 
   root.style.setProperty('--primary-color', sectionTitleColor);
   root.style.setProperty('--secondary-color', theme.secondaryColor);

@@ -6,7 +6,8 @@
 
 .partNumber {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
+  /* Pad only when theme sets a background (via --typography-partNumber-pad) */
+  padding: var(--typography-partNumber-pad, 0);
   border-radius: 0.2rem;
   font-family: var(--typography-partNumber-font);
   font-size: var(--typography-partNumber-size);
@@ -17,7 +18,11 @@
 
 .chapterNumber {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
+  /* theme1 (no bg) → pad 0; theme2 (badge bg) → 0.2rem 0.6rem */
+  padding: var(
+    --typography-chapterNumber-pad,
+    var(--typography-chapterHeading-pad, 0)
+  );
   border-radius: 0.2rem;
   font-family: var(--typography-chapterNumber-font, var(--typography-chapterHeading-font));
   font-size: var(--typography-chapterNumber-size, var(--typography-chapterHeading-size));
@@ -35,7 +40,7 @@
 
 .chapterHeading {
   display: inline-block;
-  padding: 0.2rem 0.6rem;
+  padding: var(--typography-chapterHeading-pad, 0);
   border-radius: 0.2rem;
   font-family: var(--typography-chapterHeading-font);
   font-size: var(--typography-chapterHeading-size);

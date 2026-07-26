@@ -47,4 +47,4 @@ const Heading = ({ text, level = 1, variant }) => {
 };
 
 export default Heading;
-
+

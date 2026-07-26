@@ -1,7 +1,8 @@
 .quote {
   margin: 1rem 0;
   padding: 1rem 1.25rem;
-  background: var(--typography-quotation-bg, #c1d4c3);
+  /* Neutral fallback — theme2 green must not appear when theme has no quotation bg */
+  background: var(--typography-quotation-bg, transparent);
   border-radius: 2px;
 }
 

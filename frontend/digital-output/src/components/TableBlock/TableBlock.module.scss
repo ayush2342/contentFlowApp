@@ -31,8 +31,9 @@
     font-family: var(--typography-tableHeading-font, Arial, sans-serif);
     font-size: var(--typography-tableHeading-size, 13pt);
     font-weight: var(--typography-tableHeading-weight, 700);
-    color: var(--typography-tableHeading-color, #ffffff);
-    background: var(--typography-tableHeading-bg, #ca5027);
+    color: var(--typography-tableHeading-color, #000000);
+    /* Neutral fallback — never hardcode another theme's orange palette */
+    background: var(--typography-tableHeading-bg, #e8e8e8);
   }
 
   th.subHeading,
@@ -41,7 +42,7 @@
     font-size: var(--typography-tableSubHeading-size, 11pt);
     font-weight: var(--typography-tableSubHeading-weight, 400);
     color: var(--typography-tableSubHeading-color, #000000);
-    background: var(--typography-tableSubHeading-bg, #e7b193);
+    background: var(--typography-tableSubHeading-bg, #f3f3f3);
   }
 
   td {
@@ -50,11 +51,11 @@
   }
 
   tbody tr:nth-child(even) td {
-    background: var(--typography-tableRows-alt-bg, #f9e5d9);
+    background: var(--typography-tableRows-alt-bg, #fafafa);
   }
 
   .indexCell {
     font-weight: 600;
-    background: var(--typography-tableSubHeading-bg, #e7b193);
+    background: var(--typography-tableSubHeading-bg, #f3f3f3);
   }
 }
