@@ -39,6 +39,12 @@
       "color": "#0074BC",
       "bold": false
     },
+    "sectionTitle": {
+      "font": "Arial",
+      "size": 11,
+      "color": "#0074BC",
+      "bold": false
+    },
     "subSectionTitle": {
       "font": "Arial",
       "size": 11,
