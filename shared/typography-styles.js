@@ -243,13 +243,13 @@ export const toCssVariables = (key, style) => {
 
   const prefix = `--typography-${key}`;
   const hasBadgeBackground = Boolean(style.backgroundColor);
-  // Chapter number/heading: full-width bar → vertical pad only.
+  // Chapter number/heading: full-width bar → vertical + slight horizontal pad (left text).
   // Part number and other badges keep compact horizontal pad.
   const isFullWidthBar = key === 'chapterNumber' || key === 'chapterHeading';
   const padValue = !hasBadgeBackground
     ? '0'
     : isFullWidthBar
-      ? '0.45rem 0'
+      ? '0.45rem 0.85rem'
       : '0.2rem 0.6rem';
   return {
     [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,

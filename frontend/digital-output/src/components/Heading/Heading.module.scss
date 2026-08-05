@@ -20,7 +20,7 @@
   display: block;
   width: 100%;
   box-sizing: border-box;
-  text-align: center;
+  text-align: left;
   /* theme1 (no bg) → pad 0; theme2 (full-width bar) → vertical pad via CSS var */
   padding: var(
     --typography-chapterNumber-pad,

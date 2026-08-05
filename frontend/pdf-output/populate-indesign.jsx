@@ -693,6 +693,120 @@ function resolvePageColumnCount(pageType, layoutFormat) {
     return key === "non-opener" ? 2 : 1;
 }
 
+/** Per-block columns from format sheet (e.g. opener.LessonOverview.columns = 2). */
+function resolveComponentColumnCount(itemType, pageType, layoutFormat) {
+    var key = String(pageType || "opener").toLowerCase();
+    var section;
+    var entry;
+    var columns;
+
+    if (key === "non_opener" || key === "non-opener" || key === "nonopener") {
+        key = "non-opener";
+    } else {
+        key = "opener";
+    }
+
+    section = layoutFormat && layoutFormat[key];
+    entry = section && section[itemType];
+    columns = entry && entry.columns != null ? Number(entry.columns) : NaN;
+    if (columns === 2) return 2;
+    if (columns === 1) return 1;
+    return resolvePageColumnCount(pageType, layoutFormat);
+}
+
+/**
+ * Place consecutive LessonOverview (etc.) items in a 2-col grid on opener pages.
+ * Splits half/half left|right — same intent as web componentTwoColumn.
+ */
+function placeTwoColumnTextGroup(layoutState, document, items, registryEntry) {
+    var mid;
+    var startY;
+    var leftBottom;
+    var rightBottom;
+    var savedColumnCount;
+    var savedColumn;
+    var i;
+    var cleanText;
+    var frame;
+    var protoHeight;
+    var protoResult;
+    var spacing;
+
+    if (!items || !items.length || !registryEntry) {
+        return;
+    }
+
+    mid = Math.ceil(items.length / 2);
+    startY = layoutState.cursorY;
+    savedColumnCount = layoutState.columnCount;
+    savedColumn = layoutState.currentColumn;
+    spacing = resolveBlockSpacing(registryEntry);
+
+    protoResult = resolveTextPrototype(document, registryEntry.prototype);
+    protoHeight = protoResult
+        ? getDynamicTextSeedHeight(
+            protoResult.usedFallback ? protoResult.label : registryEntry.prototype,
+            protoResult.usedFallback ? registryEntry.prototype : null
+          )
+        : DYNAMIC_LAYOUT.minTextFrameHeight;
+
+    layoutState.columnCount = 2;
+    layoutState.currentColumn = 0;
+    layoutState.cursorY = startY;
+
+    for (i = 0; i < mid; i++) {
+        cleanText = getBlockText(items[i].data || {});
+        if (!cleanText || isPlaceholderText(cleanText)) {
+            continue;
+        }
+        try {
+            frame = flowDynamicText(
+                layoutState,
+                cleanText,
+                registryEntry.style,
+                DYNAMIC_LAYOUT.minTextFrameHeight,
+                protoHeight
+            );
+            advanceLayoutCursor(layoutState, frame, spacing);
+            populatedCount += 1;
+        } catch (leftError) {
+            warnings.push("Two-column group left item failed: " + leftError.message);
+        }
+    }
+    leftBottom = layoutState.cursorY;
+
+    layoutState.currentColumn = 1;
+    layoutState.cursorY = startY;
+
+    for (i = mid; i < items.length; i++) {
+        cleanText = getBlockText(items[i].data || {});
+        if (!cleanText || isPlaceholderText(cleanText)) {
+            continue;
+        }
+        try {
+            frame = flowDynamicText(
+                layoutState,
+                cleanText,
+                registryEntry.style,
+                DYNAMIC_LAYOUT.minTextFrameHeight,
+                protoHeight
+            );
+            advanceLayoutCursor(layoutState, frame, spacing);
+            populatedCount += 1;
+        } catch (rightError) {
+            warnings.push("Two-column group right item failed: " + rightError.message);
+        }
+    }
+    rightBottom = layoutState.cursorY;
+
+    layoutState.columnCount = savedColumnCount || 1;
+    layoutState.currentColumn = savedColumn || 0;
+    layoutState.cursorY = Math.max(leftBottom, rightBottom);
+    appendRenderLog(
+        "Two-column text group placed (" + items.length + " items, mid=" + mid + ")"
+    );
+}
+
 function buildFrameStylesFromConfig(typographyConfig) {
     var styles = {};
     var mode = getTypographyMode(typographyConfig);
@@ -1890,11 +2004,16 @@ function applyFrameStyle(textFrame, style) {
         }
     }
 
-    // Chapter number bar: center text to match opener reference layout.
+    // Chapter number bar: full-width fill, text on the left (match web).
     if (style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading) {
         try {
-            story.paragraphs[0].justification = Justification.CENTER_ALIGN;
+            story.paragraphs[0].justification = Justification.LEFT_ALIGN;
         } catch (justifyError) {}
+        try {
+            textFrame.textFramePreferences.verticalJustification =
+                VerticalJustification.CENTER_ALIGN;
+            textFrame.textFramePreferences.insetSpacing = [8, 12, 8, 12];
+        } catch (vJustifyError) {}
     }
 
     applyFrameFillColor(textFrame, style);
@@ -2296,7 +2415,7 @@ function isOpenerLayoutPage(layoutState) {
     return !(raw === "non_opener" || raw === "non-opener" || raw === "nonopener");
 }
 
-/** Opener only: PartNumber badge overlaid on top-left of the last hero image. */
+/** Opener only: PartNumber badge overlaid on top-left of the last hero image (match web). */
 function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
     var imageBounds;
     var page;
@@ -2309,6 +2428,7 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
     var left;
     var frame;
     var story;
+    var appliedStyle;
 
     if (!imageFrame || !text) {
         return;
@@ -2326,20 +2446,21 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
         return;
     }
 
-    pointSize = (style && style.pointSize) || 24;
-    padX = 14;
-    padY = 8;
-    width = Math.max(72, text.length * pointSize * 0.58 + padX * 2);
-    height = pointSize + padY * 2;
-    top = imageBounds[0] + 12;
+    appliedStyle = style || FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber;
+    pointSize = (appliedStyle && appliedStyle.pointSize) || 24;
+    padX = 16;
+    padY = 10;
+    // Approximate web badge: padding + text width (Arial ~0.55em average).
+    width = Math.max(90, text.length * pointSize * 0.55 + padX * 2);
+    height = Math.max(pointSize + padY * 2, 36);
+    top = imageBounds[0] + 14;
     left = imageBounds[1];
 
-    // Keep overlay inside the image.
     if (left + width > imageBounds[3]) {
-        width = Math.max(48, imageBounds[3] - left);
+        width = Math.max(64, imageBounds[3] - left);
     }
     if (top + height > imageBounds[2]) {
-        height = Math.max(pointSize, imageBounds[2] - top);
+        height = Math.max(pointSize + 8, imageBounds[2] - top);
     }
 
     try {
@@ -2348,16 +2469,26 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
         });
         assignFrameToContentLayer(frame);
         clearRuntimeLabel(frame);
+        try {
+            frame.textFramePreferences.insetSpacing = [padY, padX, padY, padX];
+            frame.textFramePreferences.verticalJustification =
+                VerticalJustification.CENTER_ALIGN;
+        } catch (insetError) {}
         frame.contents = text;
-        applyFrameStyle(frame, style || FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber);
+        applyFrameStyle(frame, appliedStyle);
         try {
             story = frame.parentStory;
             if (story && story.paragraphs.length) {
                 story.paragraphs[0].justification = Justification.LEFT_ALIGN;
                 story.paragraphs[0].spaceBefore = 0;
                 story.paragraphs[0].spaceAfter = 0;
+                story.paragraphs[0].leftIndent = 0;
+                story.paragraphs[0].firstLineIndent = 0;
             }
         } catch (paraError) {}
+        try {
+            frame.bringToFront();
+        } catch (zError) {}
         populatedCount += 1;
         appendRenderLog("PartNumber overlay placed on opener image (top-left)");
     } catch (overlayError) {
@@ -2531,9 +2662,22 @@ function shrinkTextFrameToContentBottom(textFrame) {
     } catch (shrinkError) {}
 }
 
-function tightenTextFrameToRenderedContent(textFrame) {
+function tightenTextFrameToRenderedContent(textFrame, options) {
     var story;
     var fitPass;
+    var bounds;
+    var savedLeft;
+    var savedRight;
+    var preserveFullWidth = options && options.preserveFullWidth;
+
+    try {
+        bounds = textFrame.geometricBounds;
+        savedLeft = bounds[1];
+        savedRight = bounds[3];
+    } catch (boundsError) {
+        savedLeft = null;
+        savedRight = null;
+    }
 
     for (fitPass = 0; fitPass < 2; fitPass++) {
         try {
@@ -2548,6 +2692,14 @@ function tightenTextFrameToRenderedContent(textFrame) {
     }
 
     shrinkTextFrameToContentBottom(textFrame);
+
+    // ChapterNumber bar: keep full column width after FRAME_TO_CONTENT shrink.
+    if (preserveFullWidth && savedLeft !== null && savedRight !== null) {
+        try {
+            bounds = textFrame.geometricBounds;
+            textFrame.geometricBounds = [bounds[0], savedLeft, bounds[2], savedRight];
+        } catch (restoreWidthError) {}
+    }
 }
 
 function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
@@ -2567,6 +2719,8 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     var fitPass;
     var contentBottom;
     var tailPadding = 1;
+    var preserveFullWidth =
+        style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading;
 
     layoutBounds = ensureLayoutSpace(layoutState, minHeight);
     available = getAvailableColumnHeight(layoutState);
@@ -2732,7 +2886,9 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
 
     // Shrink the tail frame to the rendered text bottom before cursor placement.
     if (!textFrameOverflows(chainEnd) && !chainEnd.nextTextFrame) {
-        tightenTextFrameToRenderedContent(chainEnd);
+        tightenTextFrameToRenderedContent(chainEnd, {
+            preserveFullWidth: preserveFullWidth
+        });
         try {
             story = chainEnd.parentStory;
             if (story) {
@@ -4207,6 +4363,35 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
         }
 
         if (registryEntry.kind === "text") {
+            // Opener LessonOverview (format2): pack consecutive items into 2 columns.
+            if (
+                itemType === "LessonOverview" &&
+                resolveComponentColumnCount(
+                    itemType,
+                    layoutState.pageType,
+                    LAYOUT_FORMAT
+                ) === 2
+            ) {
+                var overviewGroup = [item];
+                var j = i + 1;
+                while (j < split.body.length) {
+                    if (normalizeBlockType(split.body[j].type) !== "LessonOverview") {
+                        break;
+                    }
+                    overviewGroup.push(split.body[j]);
+                    getBlockTypeCount(typeCounts, "LessonOverview");
+                    j += 1;
+                }
+                i = j - 1;
+                placeTwoColumnTextGroup(
+                    layoutState,
+                    document,
+                    overviewGroup,
+                    registryEntry
+                );
+                continue;
+            }
+
             populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex);
             continue;
         }
