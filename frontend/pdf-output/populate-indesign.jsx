@@ -2005,14 +2005,18 @@ function applyFrameStyle(textFrame, style) {
     }
 
     // Chapter number bar: full-width fill, text on the left (match web).
+    // Avoid large insets here — FRAME_TO_CONTENT + insets was clipping the text.
     if (style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading) {
         try {
             story.paragraphs[0].justification = Justification.LEFT_ALIGN;
+            story.paragraphs[0].spaceBefore = 0;
+            story.paragraphs[0].spaceAfter = 0;
+            story.paragraphs[0].leftIndent = 10;
         } catch (justifyError) {}
         try {
             textFrame.textFramePreferences.verticalJustification =
                 VerticalJustification.CENTER_ALIGN;
-            textFrame.textFramePreferences.insetSpacing = [8, 12, 8, 12];
+            textFrame.textFramePreferences.insetSpacing = [6, 0, 6, 0];
         } catch (vJustifyError) {}
     }
 
@@ -2448,12 +2452,13 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
 
     appliedStyle = style || FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 24;
-    padX = 16;
-    padY = 10;
+    padX = 14;
+    padY = 8;
     // Approximate web badge: padding + text width (Arial ~0.55em average).
     width = Math.max(90, text.length * pointSize * 0.55 + padX * 2);
-    height = Math.max(pointSize + padY * 2, 36);
-    top = imageBounds[0] + 14;
+    height = Math.max(pointSize + padY * 2, 34);
+    // Flush to the image's top-left edge (no gap inside the photo).
+    top = imageBounds[0];
     left = imageBounds[1];
 
     if (left + width > imageBounds[3]) {
@@ -2668,15 +2673,56 @@ function tightenTextFrameToRenderedContent(textFrame, options) {
     var bounds;
     var savedLeft;
     var savedRight;
+    var savedTop;
     var preserveFullWidth = options && options.preserveFullWidth;
+    var minBarHeight = options && options.minBarHeight ? Number(options.minBarHeight) : 0;
 
     try {
         bounds = textFrame.geometricBounds;
+        savedTop = bounds[0];
         savedLeft = bounds[1];
         savedRight = bounds[3];
     } catch (boundsError) {
+        savedTop = null;
         savedLeft = null;
         savedRight = null;
+    }
+
+    // ChapterNumber bar: never use FRAME_TO_CONTENT — it collapses height and
+    // clips white 36pt text, leaving an empty orange strip.
+    if (preserveFullWidth && savedLeft !== null && savedRight !== null) {
+        try {
+            story = textFrame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeBarError) {}
+
+        try {
+            bounds = textFrame.geometricBounds;
+            if (!minBarHeight || minBarHeight < 24) {
+                minBarHeight = 48;
+            }
+            textFrame.geometricBounds = [
+                savedTop !== null ? savedTop : bounds[0],
+                savedLeft,
+                (savedTop !== null ? savedTop : bounds[0]) + minBarHeight,
+                savedRight
+            ];
+        } catch (barSizeError) {}
+
+        try {
+            if (textFrame.overflows === true) {
+                bounds = textFrame.geometricBounds;
+                textFrame.geometricBounds = [
+                    bounds[0],
+                    bounds[1],
+                    bounds[0] + Math.max(minBarHeight, 64),
+                    bounds[3]
+                ];
+            }
+        } catch (growBarError) {}
+        return;
     }
 
     for (fitPass = 0; fitPass < 2; fitPass++) {
@@ -2692,14 +2738,6 @@ function tightenTextFrameToRenderedContent(textFrame, options) {
     }
 
     shrinkTextFrameToContentBottom(textFrame);
-
-    // ChapterNumber bar: keep full column width after FRAME_TO_CONTENT shrink.
-    if (preserveFullWidth && savedLeft !== null && savedRight !== null) {
-        try {
-            bounds = textFrame.geometricBounds;
-            textFrame.geometricBounds = [bounds[0], savedLeft, bounds[2], savedRight];
-        } catch (restoreWidthError) {}
-    }
 }
 
 function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
@@ -2721,6 +2759,9 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     var tailPadding = 1;
     var preserveFullWidth =
         style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading;
+    var chapterBarHeight = preserveFullWidth
+        ? Math.max(((style && style.pointSize) || 36) + 20, 52)
+        : 0;
 
     layoutBounds = ensureLayoutSpace(layoutState, minHeight);
     available = getAvailableColumnHeight(layoutState);
@@ -2732,6 +2773,9 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     }
 
     frameHeight = Math.min(available, Math.max(initialHeight, minHeight));
+    if (preserveFullWidth) {
+        frameHeight = Math.min(available, Math.max(chapterBarHeight, 52));
+    }
     if (frameHeight < DYNAMIC_LAYOUT.minTextFrameHeight) {
         frameHeight = Math.min(available, DYNAMIC_LAYOUT.minTextFrameHeight);
     }
@@ -2887,7 +2931,8 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     // Shrink the tail frame to the rendered text bottom before cursor placement.
     if (!textFrameOverflows(chainEnd) && !chainEnd.nextTextFrame) {
         tightenTextFrameToRenderedContent(chainEnd, {
-            preserveFullWidth: preserveFullWidth
+            preserveFullWidth: preserveFullWidth,
+            minBarHeight: chapterBarHeight
         });
         try {
             story = chainEnd.parentStory;
