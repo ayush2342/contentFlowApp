@@ -3435,6 +3435,94 @@ function prepareTemplateForDynamicLayout(document) {
     appendRenderLog("Content layer: " + contentLayer.name);
 }
 
+/** Full-width ChapterNumber bar with visible left-aligned text (no FRAME_TO_CONTENT). */
+function placeChapterNumberBar(layoutState, text, style) {
+    var layoutBounds;
+    var pointSize;
+    var barHeight;
+    var padY;
+    var padX;
+    var frameTop;
+    var frame;
+    var story;
+    var textRange;
+    var appliedStyle;
+    var gapAfter;
+
+    appliedStyle = style || FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
+    pointSize = (appliedStyle && appliedStyle.pointSize) || 36;
+    padY = 8;
+    padX = 12;
+    barHeight = pointSize + padY * 2;
+    gapAfter = 8;
+
+    layoutBounds = ensureLayoutSpace(layoutState, barHeight);
+    frameTop = layoutState.cursorY;
+
+    frame = createTextFrameOnPage(
+        layoutState.page,
+        layoutBounds,
+        frameTop,
+        barHeight
+    );
+    frame.contents = String(text || "");
+
+    try {
+        frame.textFramePreferences.verticalJustification =
+            VerticalJustification.CENTER_ALIGN;
+        frame.textFramePreferences.insetSpacing = [padY, padX, padY, padX];
+    } catch (prefError) {}
+
+    // Apply typography directly — do not call flow/tighten paths.
+    try {
+        story = frame.parentStory;
+        textRange = story && story.texts.length ? story.texts[0] : null;
+        if (textRange) {
+            if (appliedStyle.pointSize) {
+                textRange.pointSize = appliedStyle.pointSize;
+            }
+            applyConfiguredFontFamily(textRange, appliedStyle);
+            applyFontStyleSafe(textRange, appliedStyle.bold, appliedStyle.italic);
+            applyTextColor(textRange, appliedStyle);
+            if (story.paragraphs.length) {
+                story.paragraphs[0].justification = Justification.LEFT_ALIGN;
+                story.paragraphs[0].spaceBefore = 0;
+                story.paragraphs[0].spaceAfter = 0;
+                story.paragraphs[0].leftIndent = 0;
+                story.paragraphs[0].firstLineIndent = 0;
+            }
+        }
+    } catch (styleError) {
+        warnings.push("ChapterNumber text style failed: " + styleError.message);
+    }
+
+    applyFrameFillColor(frame, appliedStyle);
+
+    try {
+        if (frame.overflows === true) {
+            frame.geometricBounds = [
+                frameTop,
+                layoutBounds.left,
+                frameTop + barHeight + 12,
+                layoutBounds.right
+            ];
+        }
+    } catch (growError) {}
+
+    // Advance cursor without tightenTextFrameToRenderedContent.
+    syncLayoutPageFromFrame(layoutState, frame);
+    try {
+        layoutState.cursorY = frame.geometricBounds[2] + gapAfter;
+    } catch (cursorError) {
+        layoutState.cursorY = frameTop + barHeight + gapAfter;
+    }
+
+    appendRenderLog(
+        "ChapterNumber bar placed full-width left-aligned: \"" + text + "\""
+    );
+    return frame;
+}
+
 function populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex) {
     var protoLabel = registryEntry.prototype;
     var protoResult;
@@ -3466,6 +3554,28 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
             cleanText,
             registryEntry.style
         );
+        return;
+    }
+
+    // ChapterNumber: dedicated full-width bar — never go through flowDynamicText /
+    // advanceLayoutCursor tighten (FRAME_TO_CONTENT was wiping the text).
+    if (itemType === "ChapterNumber" || itemType === "ChapterHeading") {
+        try {
+            frame = placeChapterNumberBar(
+                layoutState,
+                cleanText,
+                registryEntry.style || FRAME_STYLES.chapterNumber
+            );
+            populatedCount += 1;
+            appendRenderLog(
+                "Status: populated chapter bar (text=\"" + cleanText + "\")"
+            );
+        } catch (chapterBarError) {
+            appendRenderLog("Status: not populated - " + chapterBarError.message);
+            warnings.push(
+                'Could not place ChapterNumber bar #' + blockIndex + ": " + chapterBarError.message
+            );
+        }
         return;
     }
 
