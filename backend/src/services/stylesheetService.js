@@ -5,6 +5,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../config/env.js';
 import {
   DEFAULT_FORMAT_ID,
+  normalizeAppearanceId,
   resolveLayoutFormat,
   templateIdToFormatId,
 } from '../../../shared/layout-formats.js';
@@ -34,21 +35,20 @@ const applyKeyTemplate = (template, { envName, id }) => {
     .replaceAll('{templateId}', safeId);
 };
 
-/** Safe theme file id: theme1, theme2, theme3, … (no path traversal). */
+/** Safe numeric theme id: theme1|1 → "1" (no path traversal). */
 export const sanitizeThemeId = (templateId) => {
-  const raw = String(templateId || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_]+/g, '');
-  if (!raw || !/^[a-z0-9-]+$/.test(raw)) return null;
-  return raw;
+  const id = normalizeAppearanceId(templateId, null);
+  if (!id || !/^\d+$/.test(id)) return null;
+  return id;
 };
 
 export const resolveLocalThemeId = (templateId) =>
-  sanitizeThemeId(templateId) || env.defaultThemeId || 'theme2';
+  sanitizeThemeId(templateId) ||
+  normalizeAppearanceId(env.defaultThemeId, '2') ||
+  '2';
 
 /**
- * Theme S3 key: {env}/appearance/theme/{id}.json
+ * Theme S3 key: {env}/appearance/theme/{id}.json → …/theme/2.json
  */
 export const buildThemeS3Key = ({ templateId } = {}) =>
   applyKeyTemplate(env.themeS3KeyTemplate, {
@@ -57,11 +57,13 @@ export const buildThemeS3Key = ({ templateId } = {}) =>
   });
 
 /**
- * Format S3 key: {env}/appearance/format/{id}.json
- * theme2 → format2 by convention.
+ * Format S3 key: {env}/appearance/format/{id}.json → …/format/2.json
+ * theme2|2 → format id 2 by convention.
  */
 export const buildFormatS3Key = ({ templateId, formatId } = {}) => {
-  const id = formatId || templateIdToFormatId(templateId);
+  const id = formatId
+    ? normalizeAppearanceId(formatId, '2')
+    : templateIdToFormatId(templateId);
   return applyKeyTemplate(env.formatS3KeyTemplate, {
     envName: env.requestPrefix || 'dev',
     id,
@@ -71,13 +73,92 @@ export const buildFormatS3Key = ({ templateId, formatId } = {}) => {
 /** @deprecated Use buildThemeS3Key */
 export const buildStylesheetS3Key = buildThemeS3Key;
 
+/**
+ * Format sheets have page-level `columns` under opener/non-opener.
+ * Theme sheets (legacy) also use opener/non-opener but hold typography (font/size/color) — not layout.
+ */
+const isFormatLayoutDocument = (document) => {
+  if (!document || typeof document !== 'object') return false;
+  const opener = document.opener;
+  return Boolean(opener && typeof opener === 'object' && opener.columns != null);
+};
+
 const extractEmbeddedLayout = (document) => {
   if (!document || typeof document !== 'object') return null;
   if (document.layout || document.FORMAT || document.format) {
     return document.layout || document.FORMAT || document.format;
   }
-  if (document.opener || document['non-opener']) return document;
+  if (isFormatLayoutDocument(document)) return document;
   return null;
+};
+
+/** PascalCase / plugin keys → camelCase STYLES keys used by web + PDF. */
+const LEGACY_THEME_KEY_MAP = {
+  ChapterNumber: 'chapterNumber',
+  ChapterHeading: 'chapterHeading',
+  ChapterTitle: 'chapterTitle',
+  ChapterOverview: 'chapterOverview',
+  LessonOverview: 'lessonOverview',
+  LessonTitle: 'lessonTitle',
+  LessonNumber: 'lessonNumber',
+  SectionTitle: 'sectionTitle',
+  SubSectionTitle: 'subSectionTitle',
+  GreenSubSectionTitle: 'greenSubSectionTitle',
+  LearningObjectives: 'learningObjectives',
+  PartNumber: 'partNumber',
+  SubTitlesList: 'subTitlesList',
+  SubTitle: 'subTitle',
+  ParagraphText: 'paragraphText',
+  BulletList: 'bulletList',
+  Quotation: 'quotation',
+  Table: 'table',
+  Footer: 'footer',
+};
+
+/**
+ * Normalize theme JSON into a flat STYLES map.
+ * Supports:
+ * - local/new: { themeId, STYLES: { chapterNumber: … } }
+ * - S3/legacy: { opener: { ChapterNumber: … }, "non-opener": { … } }
+ */
+export const extractThemeStylesMap = (document) => {
+  if (!document || typeof document !== 'object') return null;
+
+  if (document.STYLES && typeof document.STYLES === 'object') {
+    return document.STYLES;
+  }
+
+  // Legacy dual-mode theme: prefer opener styles as the shared map.
+  const legacySource =
+    document.opener && typeof document.opener === 'object' && document.opener.columns == null
+      ? document.opener
+      : document['non-opener'] &&
+          typeof document['non-opener'] === 'object' &&
+          document['non-opener'].columns == null
+        ? document['non-opener']
+        : null;
+
+  if (!legacySource) return null;
+
+  const styles = {};
+  for (const [rawKey, value] of Object.entries(legacySource)) {
+    if (!value || typeof value !== 'object') continue;
+    if (rawKey === 'columns') continue;
+
+    if (rawKey === 'Image' || rawKey === 'image') {
+      const caption = value.Caption || value.caption || value;
+      if (caption?.figureNumber) styles.imageFigureNumber = caption.figureNumber;
+      if (caption?.figureText) styles.imageFigureText = caption.figureText;
+      continue;
+    }
+
+    const mapped =
+      LEGACY_THEME_KEY_MAP[rawKey] ||
+      (rawKey.charAt(0).toLowerCase() + rawKey.slice(1));
+    styles[mapped] = value;
+  }
+
+  return Object.keys(styles).length ? styles : null;
 };
 
 const loadJsonFromS3 = async (key) => {
@@ -123,7 +204,7 @@ const loadFormatFromS3OrLocal = async (templateId) => {
       const layout = extractEmbeddedLayout(document) || document;
       console.info(`[format] loaded from S3: ${s3Key}`);
       return {
-        formatId: document.formatId || formatId,
+        formatId: normalizeAppearanceId(document.formatId || formatId, formatId),
         source: 's3',
         layout,
         key: s3Key,
@@ -174,7 +255,7 @@ const loadLocalThemeDocument = async (templateId) => {
 
 const loadThemeFromS3 = async (key, templateId) => {
   const document = await loadJsonFromS3(key);
-  const themeId = document.themeId || resolveLocalThemeId(templateId);
+  const themeId = resolveLocalThemeId(document.themeId || templateId);
   return {
     source: 's3',
     templateId: resolveLocalThemeId(templateId),
@@ -209,7 +290,7 @@ export const resolveStylesheet = async ({ templateId } = {}) => {
     const localTheme = await loadLocalThemeDocument(requestedTemplateId);
     return attachLayout(localTheme);
   } catch (localError) {
-    const fallback = env.defaultThemeId || 'theme2';
+    const fallback = normalizeAppearanceId(env.defaultThemeId, '2');
     console.warn(
       `[theme] local theme for "${requestedTemplateId}" missing (${localError.message}); using ${fallback}`
     );
@@ -219,22 +300,16 @@ export const resolveStylesheet = async ({ templateId } = {}) => {
 
 export const toPdfTypographyConfig = (stylesheetResult) => {
   const doc = stylesheetResult?.document || {};
-  const themeId =
-    doc.themeId || stylesheetResult?.themeId || env.defaultThemeId || 'theme2';
-  const base = doc.STYLES
-    ? {
-        templateId: stylesheetResult.templateId,
-        themeId,
-        STYLES: doc.STYLES,
-      }
-    : {
-        templateId: stylesheetResult?.templateId,
-        themeId,
-        STYLES: doc,
-      };
+  const themeId = normalizeAppearanceId(
+    doc.themeId || stylesheetResult?.themeId || env.defaultThemeId,
+    '2'
+  );
+  const styles = extractThemeStylesMap(doc) || (doc.STYLES ? doc.STYLES : null) || {};
 
   return {
-    ...base,
+    templateId: stylesheetResult?.templateId,
+    themeId,
+    STYLES: styles,
     formatId: stylesheetResult?.formatId || templateIdToFormatId(stylesheetResult?.templateId),
     layout: stylesheetResult?.layout || null,
   };

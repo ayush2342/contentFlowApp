@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { normalizeAppearanceId } from '../../../shared/layout-formats.js';
 
 dotenv.config();
 
@@ -34,14 +35,14 @@ export const env = {
   inDesignScriptPath: process.env.INDESIGN_SCRIPT_PATH || '',
   inDesignTemplatePath: process.env.INDESIGN_TEMPLATE_PATH || '',
   inDesignTimeoutMs: Number(process.env.INDESIGN_TIMEOUT_MS || 300000),
-  /** Default local theme when S3 theme is missing/fails. */
-  defaultThemeId: (process.env.DEFAULT_THEME_ID || 'theme2').trim(),
-  /** Default local format when S3 format is missing/fails. */
-  defaultFormatId: (process.env.DEFAULT_FORMAT_ID || 'format2').trim(),
+  /** Default local theme when S3 theme is missing/fails (numeric: 1, 2, …). */
+  defaultThemeId: normalizeAppearanceId(process.env.DEFAULT_THEME_ID || '2', '2'),
+  /** Default local format when S3 format is missing/fails (numeric: 1, 2, …). */
+  defaultFormatId: normalizeAppearanceId(process.env.DEFAULT_FORMAT_ID || '2', '2'),
   /**
    * S3 key pattern for theme JSON.
    * Placeholders: {env} / {prefix}, {id} / {themeId} / {templateId}
-   * Example: {env}/appearance/theme/{id}.json → dev/appearance/theme/theme2.json
+   * Example: {env}/appearance/theme/{id}.json → dev/appearance/theme/2.json
    */
   themeS3KeyTemplate: (
     process.env.THEME_S3_KEY_TEMPLATE ||
@@ -50,7 +51,7 @@ export const env = {
   /**
    * S3 key pattern for format/layout JSON.
    * Placeholders: {env} / {prefix}, {id} / {formatId}
-   * Example: {env}/appearance/format/{id}.json → dev/appearance/format/format2.json
+   * Example: {env}/appearance/format/{id}.json → dev/appearance/format/2.json
    */
   formatS3KeyTemplate: (
     process.env.FORMAT_S3_KEY_TEMPLATE ||

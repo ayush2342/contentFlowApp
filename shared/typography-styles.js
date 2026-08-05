@@ -1,7 +1,8 @@
 /**
  * Theme-aware typography for web + PDF.
- * Local themes: any shared/themes/{templateId}.json (theme1, theme2, theme3, …).
- * Runtime may override via S3 (backend stylesheetService); default theme is theme2.
+ * Local themes: any shared/themes/{n}.json (1, 2, 3, …).
+ * Runtime may override via S3 (backend stylesheetService); default theme is 2.
+ * Incoming templateId may be theme2, 2, etc. — normalized to numeric id.
  */
 
 const themeModules = import.meta.glob('./themes/*.json', {
@@ -26,15 +27,27 @@ const buildLocalThemes = () => {
 export const LOCAL_THEMES = buildLocalThemes();
 
 export const DEFAULT_THEME_ID =
-  LOCAL_THEMES.theme2 ? 'theme2' : Object.keys(LOCAL_THEMES)[0] || 'theme2';
+  LOCAL_THEMES['2'] ? '2' : Object.keys(LOCAL_THEMES)[0] || '2';
 
-const sanitizeThemeId = (templateId) => {
+/**
+ * Normalize appearance ids: theme1 / "theme 1" / 1 → "1"; theme2 / 2 → "2".
+ * Strips theme/format prefix so S3/local always use {n}.json.
+ */
+export const normalizeThemeId = (templateId, fallback = DEFAULT_THEME_ID) => {
   const raw = String(templateId || '')
     .trim()
     .toLowerCase()
     .replace(/[\s_]+/g, '');
-  if (!raw || !/^[a-z0-9-]+$/.test(raw)) return null;
-  return raw;
+  if (!raw) return fallback;
+  const prefixed = raw.match(/^(?:theme|format)[-]?(\d+)$/);
+  if (prefixed) return prefixed[1];
+  if (/^\d+$/.test(raw)) return raw;
+  return fallback;
+};
+
+const sanitizeThemeId = (templateId) => {
+  const id = normalizeThemeId(templateId, null);
+  return id;
 };
 
 const extractStyles = (themeDoc) => {
@@ -159,7 +172,7 @@ export const resolveTypographyStyles = (templateIdOrMode = DEFAULT_THEME_ID) => 
   if (raw === 'opener' || raw === 'non-opener' || raw === 'nonopener') {
     return normalizeStylePreset(getLocalThemeStyles(DEFAULT_THEME_ID));
   }
-  return normalizeStylePreset(getLocalThemeStyles(raw));
+  return normalizeStylePreset(getLocalThemeStyles(normalizeThemeId(templateIdOrMode)));
 };
 
 /** Prefer API/S3 theme document STYLES when present; otherwise local theme files. */
@@ -230,6 +243,14 @@ export const toCssVariables = (key, style) => {
 
   const prefix = `--typography-${key}`;
   const hasBadgeBackground = Boolean(style.backgroundColor);
+  // Chapter number/heading: full-width bar → vertical pad only.
+  // Part number and other badges keep compact horizontal pad.
+  const isFullWidthBar = key === 'chapterNumber' || key === 'chapterHeading';
+  const padValue = !hasBadgeBackground
+    ? '0'
+    : isFullWidthBar
+      ? '0.45rem 0'
+      : '0.2rem 0.6rem';
   return {
     [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,
@@ -238,8 +259,7 @@ export const toCssVariables = (key, style) => {
     [`${prefix}-bg`]: style.backgroundColor || 'transparent',
     [`${prefix}-alt-bg`]:
       style.altBackgroundColor || style.altbackgroundColor || 'transparent',
-    // Badge padding only when the theme supplies a background (theme2 chapter/part number).
-    [`${prefix}-pad`]: hasBadgeBackground ? '0.2rem 0.6rem' : '0',
+    [`${prefix}-pad`]: padValue,
     [`${prefix}-weight`]: style.bold ? '700' : '400',
     [`${prefix}-style`]: style.italic ? 'italic' : 'normal',
     // Always reset transform so theme1 uppercase cannot stick on theme2.

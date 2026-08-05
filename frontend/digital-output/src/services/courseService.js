@@ -1,12 +1,15 @@
 import { mapTreeOutputJson } from '../utils/jsonMapper';
-import { getLocalFormatDocument } from '../../../../shared/layout-formats.js';
+import {
+  getLocalFormatDocument,
+  normalizeAppearanceId,
+} from '../../../../shared/layout-formats.js';
 
 const DEFAULT_CONTEXT = {
   outputId: import.meta.env.VITE_DEFAULT_OUTPUT_ID || '',
   tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID || '',
   documentId: import.meta.env.VITE_DEFAULT_DOCUMENT_ID || '',
   clientName: import.meta.env.VITE_DEFAULT_CLIENT_NAME || '',
-  templateId: import.meta.env.VITE_DEFAULT_TEMPLATE_ID || 'theme2',
+  templateId: normalizeAppearanceId(import.meta.env.VITE_DEFAULT_TEMPLATE_ID || '2', '2'),
 };
 
 const getApiBaseUrl = () =>
@@ -112,11 +115,13 @@ export const getRouteContext = () => {
       storedContext.documentId ||
       DEFAULT_CONTEXT.documentId,
     clientName: searchParams.get('clientName') || storedContext.clientName || DEFAULT_CONTEXT.clientName,
-    templateId:
+    templateId: normalizeAppearanceId(
       searchParams.get('templateId') ||
-      storedContext.templateId ||
-      DEFAULT_CONTEXT.templateId ||
-      'theme2',
+        storedContext.templateId ||
+        DEFAULT_CONTEXT.templateId ||
+        '2',
+      '2'
+    ),
   };
 
   if (context.outputId || (context.tenantId && context.documentId)) {
@@ -159,7 +164,10 @@ export const getCourseData = async (inputContext = null) => {
 
   const payload = await response.json();
   const resolvedTenantId = payload.tenantId || context.tenantId;
-  const resolvedTemplateId = payload.templateId || context.templateId || 'theme2';
+  const resolvedTemplateId = normalizeAppearanceId(
+    payload.templateId || context.templateId,
+    '2'
+  );
   const sourceData =
     payload?.data?.data ??
     payload?.data?.document ??

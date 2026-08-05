@@ -253,12 +253,14 @@ const LessonRenderer = ({
       <div className={styles.pageBody}>
         {segments.map((segment, segmentIndex) => {
           if (segment.columns === 2) {
+            // Component-level 2-col (e.g. opener LessonOverview): grid across
+            // both columns. Do not use page-height fill-left packing — short
+            // lists would all stay in the left column and look single-column.
             return (
-              <div key={`segment-${segmentIndex}`} className={styles.twoColumnLesson}>
-                <TwoColumnPageSheet
-                  components={segment.components}
-                  pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
-                />
+              <div key={`segment-${segmentIndex}`} className={styles.componentTwoColumn}>
+                {segment.components.map((component, index) => (
+                  <DynamicComponent key={component.id || index} component={component} />
+                ))}
               </div>
             );
           }

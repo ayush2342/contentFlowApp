@@ -17,13 +17,16 @@
 }
 
 .chapterNumber {
-  display: inline-block;
-  /* theme1 (no bg) → pad 0; theme2 (badge bg) → 0.2rem 0.6rem */
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  /* theme1 (no bg) → pad 0; theme2 (full-width bar) → vertical pad via CSS var */
   padding: var(
     --typography-chapterNumber-pad,
     var(--typography-chapterHeading-pad, 0)
   );
-  border-radius: 0.2rem;
+  border-radius: 0;
   font-family: var(--typography-chapterNumber-font, var(--typography-chapterHeading-font));
   font-size: var(--typography-chapterNumber-size, var(--typography-chapterHeading-size));
   font-weight: var(--typography-chapterNumber-weight, var(--typography-chapterHeading-weight));

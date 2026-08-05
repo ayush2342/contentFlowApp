@@ -32,7 +32,7 @@ var POPULATE_SCRIPT_VERSION = "dynamic-v24";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
-var LAYOUT_FORMAT = null; // from layout-format.json (format2 default locally)
+var LAYOUT_FORMAT = null; // from layout-format.json (format id 2 default locally)
 
 // -----------------------------------------------------------------------------
 // Run headless (no popups/dialogs on server)
@@ -640,8 +640,8 @@ function loadTypographyConfig(scriptFolderPath) {
 function loadLayoutFormat(scriptFolderPath) {
     var configPaths = [
         scriptFolderPath + "/layout-format.json",
-        scriptFolderPath + "/../../shared/formats/format2.json",
-        scriptFolderPath + "/../../../shared/formats/format2.json"
+        scriptFolderPath + "/../../shared/formats/2.json",
+        scriptFolderPath + "/../../../shared/formats/2.json"
     ];
     var configFile;
     var i;
@@ -1890,6 +1890,13 @@ function applyFrameStyle(textFrame, style) {
         }
     }
 
+    // Chapter number bar: center text to match opener reference layout.
+    if (style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading) {
+        try {
+            story.paragraphs[0].justification = Justification.CENTER_ALIGN;
+        } catch (justifyError) {}
+    }
+
     applyFrameFillColor(textFrame, style);
 }
 
@@ -2282,6 +2289,80 @@ function createTextFrameOnPage(page, layoutBounds, top, height) {
     assignFrameToContentLayer(frame);
     clearRuntimeLabel(frame);
     return frame;
+}
+
+function isOpenerLayoutPage(layoutState) {
+    var raw = trimString((layoutState && layoutState.pageType) || CURRENT_PAGE_TYPE || "opener").toLowerCase();
+    return !(raw === "non_opener" || raw === "non-opener" || raw === "nonopener");
+}
+
+/** Opener only: PartNumber badge overlaid on top-left of the last hero image. */
+function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
+    var imageBounds;
+    var page;
+    var pointSize;
+    var padX;
+    var padY;
+    var width;
+    var height;
+    var top;
+    var left;
+    var frame;
+    var story;
+
+    if (!imageFrame || !text) {
+        return;
+    }
+
+    try {
+        imageBounds = imageFrame.geometricBounds;
+        page = imageFrame.parentPage || (layoutState && layoutState.page);
+    } catch (boundsError) {
+        warnings.push("Could not read image bounds for PartNumber overlay.");
+        return;
+    }
+
+    if (!page) {
+        return;
+    }
+
+    pointSize = (style && style.pointSize) || 24;
+    padX = 14;
+    padY = 8;
+    width = Math.max(72, text.length * pointSize * 0.58 + padX * 2);
+    height = pointSize + padY * 2;
+    top = imageBounds[0] + 12;
+    left = imageBounds[1];
+
+    // Keep overlay inside the image.
+    if (left + width > imageBounds[3]) {
+        width = Math.max(48, imageBounds[3] - left);
+    }
+    if (top + height > imageBounds[2]) {
+        height = Math.max(pointSize, imageBounds[2] - top);
+    }
+
+    try {
+        frame = page.textFrames.add({
+            geometricBounds: [top, left, top + height, left + width]
+        });
+        assignFrameToContentLayer(frame);
+        clearRuntimeLabel(frame);
+        frame.contents = text;
+        applyFrameStyle(frame, style || FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber);
+        try {
+            story = frame.parentStory;
+            if (story && story.paragraphs.length) {
+                story.paragraphs[0].justification = Justification.LEFT_ALIGN;
+                story.paragraphs[0].spaceBefore = 0;
+                story.paragraphs[0].spaceAfter = 0;
+            }
+        } catch (paraError) {}
+        populatedCount += 1;
+        appendRenderLog("PartNumber overlay placed on opener image (top-left)");
+    } catch (overlayError) {
+        warnings.push("Could not place PartNumber overlay: " + overlayError.message);
+    }
 }
 
 function createGraphicFrameOnPage(page, layoutBounds, top, height) {
@@ -2909,7 +2990,8 @@ function createLayoutState(document, page) {
         currentColumn: 0,
         gutter: 18,
         pageType: "opener",
-        footerReserve: 0
+        footerReserve: 0,
+        lastImageFrame: null
     };
 }
 
@@ -3171,6 +3253,21 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
         return;
     }
 
+    // Opener only: PartNumber sits on the hero image (top-left), not in flow.
+    if (
+        itemType === "PartNumber" &&
+        isOpenerLayoutPage(layoutState) &&
+        layoutState.lastImageFrame
+    ) {
+        placeOpenerPartNumberOverlay(
+            layoutState,
+            layoutState.lastImageFrame,
+            cleanText,
+            registryEntry.style
+        );
+        return;
+    }
+
     protoResult = resolveTextPrototype(document, protoLabel);
     if (protoResult === null) {
         appendRenderLog("Prototype found: no");
@@ -3348,6 +3445,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             return;
         }
         populatedCount += 1;
+        layoutState.lastImageFrame = imageFrame;
         appendRenderLog("Resolved image file: " + imageFile.fsName);
         appendRenderLog("Image status: populated (dynamic frame created on Content layer)");
 
@@ -4454,6 +4552,7 @@ function main() {
                 jsonPage.page_type || "opener";
 
             CURRENT_PAGE_TYPE = layoutState.pageType;
+            layoutState.lastImageFrame = null;
 
             initializeStylesFromConfig(scriptFolderPath);
 

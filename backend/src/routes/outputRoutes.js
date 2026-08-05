@@ -211,8 +211,8 @@ router.get('/media', async (req, res, next) => {
 
 /**
  * Resolve theme + format for a templateId.
- * Theme:  THEME_S3_KEY_TEMPLATE  → {env}/appearance/theme/{id}.json
- * Format: FORMAT_S3_KEY_TEMPLATE → {env}/appearance/format/{id}.json
+ * Theme:  THEME_S3_KEY_TEMPLATE  → {env}/appearance/theme/{id}.json (e.g. …/theme/2.json)
+ * Format: FORMAT_S3_KEY_TEMPLATE → {env}/appearance/format/{id}.json (e.g. …/format/2.json)
  * Falls back to local shared/themes and shared/formats.
  */
 router.get('/stylesheet', async (req, res, next) => {

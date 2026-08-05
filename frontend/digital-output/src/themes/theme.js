@@ -4,6 +4,7 @@ import {
   clearTypographyCssVariables,
   resolveTypographyStylesFromPayload,
   DEFAULT_THEME_ID,
+  normalizeThemeId,
 } from '../../../../shared/typography-styles.js';
 
 const getSectionTitleColor = (styles) =>
@@ -24,7 +25,11 @@ export const applyTheme = (
   templateId = DEFAULT_THEME_ID,
   typographyPayload = null
 ) => {
-  const typographyStyles = resolveTypographyStylesFromPayload(typographyPayload, templateId);
+  const resolvedTemplateId = normalizeThemeId(templateId, DEFAULT_THEME_ID);
+  const typographyStyles = resolveTypographyStylesFromPayload(
+    typographyPayload,
+    resolvedTemplateId
+  );
   const sectionTitleColor = getSectionTitleColor(typographyStyles);
 
   // Drop previous theme's typography vars before applying the new set.
@@ -59,7 +64,7 @@ export const applyTheme = (
   );
   root.style.setProperty('--body-bg', '#ffffff');
   root.style.setProperty('--card-shadow', '0 4px 12px rgba(0, 85, 170, 0.15)');
-  root.dataset.templateId = String(templateId || DEFAULT_THEME_ID);
+  root.dataset.templateId = resolvedTemplateId;
 
   const typographyVars = generateAllCssVariables(typographyStyles);
   Object.entries(typographyVars).forEach(([varName, value]) => {

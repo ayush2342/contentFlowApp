@@ -39,12 +39,20 @@ export const getDocumentFromS3 = async (tenantId, documentId) => {
   ]);
 
   const rawText = await streamToString(getResult.Body);
+  const data = JSON.parse(rawText);
+
+  // TODO(temp): remove when transformation sends page_type=opener for chapter openers.
+  for (const page of data?.pages || []) {
+    if ((page.content || []).some((b) => String(b?.type || '').replace(/[\s_-]+/g, '').toLowerCase() === 'chapternumber')) {
+      page.page_type = 'opener';
+    }
+  }
 
   return {
     key,
     etag: headResult.ETag?.replaceAll('"', '') ?? null,
     lastModified: headResult.LastModified?.toISOString() ?? null,
-    data: JSON.parse(rawText),
+    data,
   };
 };
 

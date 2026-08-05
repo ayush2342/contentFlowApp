@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import { env } from '../config/env.js';
 import { getMediaStreamFromS3 } from './s3Service.js';
 import { resolveStylesheet, toPdfTypographyConfig } from './stylesheetService.js';
+import { normalizeAppearanceId } from '../../../shared/layout-formats.js';
 
 const pdfCache = new Map();
 const defaultPdfSourceDir = path.resolve(process.cwd(), '..', 'frontend', 'pdf-output');
@@ -130,7 +131,10 @@ const runInDesignScript = async ({ scriptPath }) =>
  * Phase 1 keeps a short-lived in-memory cache; persistent/shared cache can be added later.
  */
 export const generatePdf = async ({ tenantId, documentId, etag, templateId, data }) => {
-  const resolvedTemplateId = templateId || env.defaultThemeId || 'theme2';
+  const resolvedTemplateId = normalizeAppearanceId(
+    templateId || env.defaultThemeId,
+    '2'
+  );
   const cacheKey = `${tenantId}:${documentId}:${etag || 'no-etag'}:${resolvedTemplateId}`;
   const cached = getCacheRecord(cacheKey);
   if (cached) {

@@ -1,7 +1,7 @@
 /**
  * Layout formats (column rules) for web + PDF.
- * Local formats: any shared/formats/{formatId}.json (format1, format2, format3, …).
- * Resolved from templateId like themes: themeN → formatN; default format2.
+ * Local formats: any shared/formats/{n}.json (1, 2, 3, …).
+ * Resolved from templateId: theme2|format2|2 → 2. Default: 2.
  * S3 stylesheet may embed layout under `layout` / `FORMAT` / `format`.
  *
  * Backend also loads formats from disk by id (not limited to this bundle).
@@ -29,32 +29,32 @@ const buildLocalFormats = () => {
 export const LOCAL_FORMATS = buildLocalFormats();
 
 export const DEFAULT_FORMAT_ID =
-  LOCAL_FORMATS.format2 ? 'format2' : Object.keys(LOCAL_FORMATS)[0] || 'format2';
+  LOCAL_FORMATS['2'] ? '2' : Object.keys(LOCAL_FORMATS)[0] || '2';
 
 export const listLocalFormatIds = () => Object.keys(LOCAL_FORMATS);
 
-const sanitizeId = (value) => {
+/**
+ * Normalize appearance ids for S3 + local files.
+ * theme1 / "theme 1" / format1 / 1 → "1"; theme2 / 2 → "2".
+ * Always strips theme/format prefix — never looks up theme1.json / format1.json.
+ */
+export const normalizeAppearanceId = (value, fallback = DEFAULT_FORMAT_ID) => {
   const raw = String(value || '')
     .trim()
     .toLowerCase()
     .replace(/[\s_]+/g, '');
-  if (!raw || !/^[a-z0-9-]+$/.test(raw)) return null;
-  return raw;
+  if (!raw) return fallback;
+  const prefixed = raw.match(/^(?:theme|format)[-]?(\d+)$/);
+  if (prefixed) return prefixed[1];
+  if (/^\d+$/.test(raw)) return raw;
+  return fallback;
 };
 
 /**
- * Map templateId → format id by convention (not a fixed list of 2).
- * theme3 → format3, format4 → format4, 5 → format5.
- * Unknown shapes fall back to DEFAULT_FORMAT_ID.
+ * Map templateId → format id (numeric): theme3|format3|3 → "3".
  */
-export const templateIdToFormatId = (templateId) => {
-  const id = sanitizeId(templateId);
-  if (!id) return DEFAULT_FORMAT_ID;
-  if (id.startsWith('format')) return id;
-  if (id.startsWith('theme')) return id.replace(/^theme/, 'format');
-  if (/^\d+$/.test(id)) return `format${id}`;
-  return DEFAULT_FORMAT_ID;
-};
+export const templateIdToFormatId = (templateId) =>
+  normalizeAppearanceId(templateId, DEFAULT_FORMAT_ID);
 
 export const getLocalFormatDocument = (templateIdOrFormatId = DEFAULT_FORMAT_ID) => {
   const formatId = templateIdToFormatId(templateIdOrFormatId);

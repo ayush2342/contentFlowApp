@@ -366,6 +366,50 @@ const findFirstTypeText = (pages, wantedType) => {
   return '';
 };
 
+/** Opener only: fold PartNumber into the nearest preceding ImageBlock as an overlay. */
+const attachOpenerPartNumberOverlay = (components) => {
+  const list = Array.isArray(components) ? components : [];
+  const result = [];
+
+  for (const component of list) {
+    const isPartNumberHeading =
+      component?.type === 'Heading' &&
+      (component?.props?.variant === 'partNumber' || component?.contentType === 'PartNumber');
+
+    if (isPartNumberHeading) {
+      const overlayText = normalizeText(component?.props?.text);
+      let attached = false;
+      for (let i = result.length - 1; i >= 0; i -= 1) {
+        if (result[i]?.type === 'ImageBlock') {
+          if (overlayText) {
+            result[i] = {
+              ...result[i],
+              props: {
+                ...result[i].props,
+                partNumberOverlay: overlayText,
+              },
+            };
+          }
+          attached = true;
+          break;
+        }
+      }
+      if (attached) continue;
+    }
+
+    result.push(component);
+  }
+
+  return result;
+};
+
+const pageHasChapterNumber = (page) => {
+  const blocks = Array.isArray(page?.content) ? page.content : [];
+  return blocks.some(
+    (block) => toCanonicalClassType(normalizeClassTemplateRawType(block?.type)) === 'ChapterNumber'
+  );
+};
+
 const mapPagedBlockToComponent = (block, index, ctx) => {
   const rawType = normalizeClassTemplateRawType(block?.type);
   const type = toCanonicalClassType(rawType);
@@ -681,6 +725,10 @@ const mapPagedTemplateJson = (pages, options = {}) => {
     mediaIndex = ctx.mediaIndex;
     const pageNo = page?.page_no ?? index + 1;
     const pageType = normalizeText(page?.page_type).toLowerCase() || 'opener';
+    const isOpener = pageType === 'opener' || pageHasChapterNumber(page);
+    const mappedComponents = isOpener
+      ? attachOpenerPartNumberOverlay(components)
+      : components;
     const pageColumns = getPageColumns(options.layout, pageType);
     const layout = pageColumns === 2 ? 'two-column' : 'single-column';
     const lessonKey = `page-${pageNo}`;
@@ -699,7 +747,7 @@ const mapPagedTemplateJson = (pages, options = {}) => {
           pageType,
           pageColumns,
           layout,
-          components,
+          components: mappedComponents,
         },
       ],
     };
