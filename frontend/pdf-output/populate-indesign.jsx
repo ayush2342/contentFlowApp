@@ -2152,19 +2152,66 @@ function parseCssBorder(borderValue) {
     };
 }
 
+function styleHasBorders(style) {
+    if (!style) {
+        return false;
+    }
+    return Boolean(parseCssBorder(style.borderTop) || parseCssBorder(style.borderBottom));
+}
+
+function isBorderedTextFrame(textFrame) {
+    try {
+        return trimString(textFrame.extractLabel("runtimeBordered")) === "1";
+    } catch (labelError) {
+        return false;
+    }
+}
+
+function removeRuntimeBorderLines(textFrame) {
+    var page;
+    var items;
+    var i;
+    var item;
+    var label;
+
+    try {
+        page = textFrame.parentPage;
+        if (!page) {
+            return;
+        }
+        items = page.allPageItems;
+        for (i = items.length - 1; i >= 0; i--) {
+            item = items[i];
+            try {
+                label = trimString(item.extractLabel("runtimeBorderLine"));
+                if (label === "1") {
+                    // Only remove lines tagged for this frame id.
+                    if (trimString(item.extractLabel("runtimeBorderOwner")) ===
+                        trimString(textFrame.extractLabel("runtimeBorderId"))) {
+                        item.remove();
+                    }
+                }
+            } catch (itemError) {}
+        }
+    } catch (removeError) {}
+}
+
 /**
- * Apply theme borderTop / borderBottom to any text frame via paragraph rules
- * (matches web: text sandwiched between full-column orange rules).
+ * Draw full-column-width border lines (match web). Uses frame bounds so lines
+ * stay full width even when paragraph RuleWidth falls back to text width.
  */
-function applyFrameBorders(textFrame, style) {
-    var story;
-    var para;
+function drawFrameBorderLines(textFrame, style) {
+    var bounds;
+    var page;
+    var doc;
     var topBorder;
     var bottomBorder;
-    var doc;
     var color;
     var colorName;
-    var offsetPts;
+    var line;
+    var weight;
+    var pad;
+    var borderId;
 
     if (!textFrame || !style) {
         return;
@@ -2177,46 +2224,156 @@ function applyFrameBorders(textFrame, style) {
     }
 
     try {
-        story = textFrame.parentStory;
-        if (!story || !story.paragraphs.length) {
-            return;
-        }
-        para = story.paragraphs[0];
+        bounds = textFrame.geometricBounds;
+        page = textFrame.parentPage;
         doc = app.activeDocument;
-        offsetPts = 4;
-
-        if (topBorder) {
-            colorName = "JSON_BORDER_" + topBorder.colorRgb.join("_");
-            color = ensureDocumentColor(doc, colorName, topBorder.colorRgb);
-            para.ruleAbove = true;
-            para.ruleAboveLineWeight = topBorder.weight;
-            para.ruleAboveOffset = offsetPts;
-            para.ruleAboveTint = 100;
-            try {
-                para.ruleAboveWidth = RuleWidth.COLUMN_WIDTH;
-            } catch (widthError) {}
-            if (color !== null) {
-                para.ruleAboveColor = color;
-            }
-        }
-
-        if (bottomBorder) {
-            colorName = "JSON_BORDER_" + bottomBorder.colorRgb.join("_");
-            color = ensureDocumentColor(doc, colorName, bottomBorder.colorRgb);
-            para.ruleBelow = true;
-            para.ruleBelowLineWeight = bottomBorder.weight;
-            para.ruleBelowOffset = offsetPts;
-            para.ruleBelowTint = 100;
-            try {
-                para.ruleBelowWidth = RuleWidth.COLUMN_WIDTH;
-            } catch (widthError) {}
-            if (color !== null) {
-                para.ruleBelowColor = color;
-            }
-        }
-    } catch (borderError) {
-        warnings.push("Could not apply frame borders: " + borderError.message);
+    } catch (boundsError) {
+        return;
     }
+
+    if (!page) {
+        return;
+    }
+
+    pad = 0;
+    borderId = trimString(textFrame.extractLabel("runtimeBorderId"));
+    if (!borderId) {
+        borderId = "b" + String(Math.floor(Math.random() * 100000000));
+        try {
+            textFrame.insertLabel("runtimeBorderId", borderId);
+        } catch (idError) {}
+    }
+
+    removeRuntimeBorderLines(textFrame);
+
+    if (topBorder) {
+        weight = Math.max(topBorder.weight, 1);
+        colorName = "JSON_BORDER_" + topBorder.colorRgb.join("_");
+        color = ensureDocumentColor(doc, colorName, topBorder.colorRgb);
+        try {
+            line = page.rectangles.add({
+                geometricBounds: [
+                    bounds[0] + pad,
+                    bounds[1],
+                    bounds[0] + pad + weight,
+                    bounds[3]
+                ]
+            });
+            assignFrameToContentLayer(line);
+            if (color !== null) {
+                line.fillColor = color;
+            }
+            try {
+                line.strokeWeight = 0;
+            } catch (strokeError) {}
+            try {
+                line.insertLabel("runtimeBorderLine", "1");
+                line.insertLabel("runtimeBorderOwner", borderId);
+            } catch (labelError) {}
+        } catch (topLineError) {
+            warnings.push("Could not draw top border line: " + topLineError.message);
+        }
+    }
+
+    if (bottomBorder) {
+        weight = Math.max(bottomBorder.weight, 1);
+        colorName = "JSON_BORDER_" + bottomBorder.colorRgb.join("_");
+        color = ensureDocumentColor(doc, colorName, bottomBorder.colorRgb);
+        try {
+            line = page.rectangles.add({
+                geometricBounds: [
+                    bounds[2] - pad - weight,
+                    bounds[1],
+                    bounds[2] - pad,
+                    bounds[3]
+                ]
+            });
+            assignFrameToContentLayer(line);
+            if (color !== null) {
+                line.fillColor = color;
+            }
+            try {
+                line.strokeWeight = 0;
+            } catch (strokeError) {}
+            try {
+                line.insertLabel("runtimeBorderLine", "1");
+                line.insertLabel("runtimeBorderOwner", borderId);
+            } catch (labelError) {}
+        } catch (bottomLineError) {
+            warnings.push("Could not draw bottom border line: " + bottomLineError.message);
+        }
+    }
+}
+
+/**
+ * Apply theme borderTop / borderBottom: keep full column width + padding,
+ * then draw full-width rules (match web section title).
+ */
+function applyFrameBorders(textFrame, style) {
+    var story;
+    var para;
+    var topBorder;
+    var bottomBorder;
+    var padPts;
+
+    if (!textFrame || !style) {
+        return;
+    }
+
+    topBorder = parseCssBorder(style.borderTop);
+    bottomBorder = parseCssBorder(style.borderBottom);
+    if (!topBorder && !bottomBorder) {
+        return;
+    }
+
+    padPts = 8;
+
+    try {
+        textFrame.insertLabel("runtimeBordered", "1");
+        if (style.borderTop) {
+            textFrame.insertLabel("runtimeBorderTop", String(style.borderTop));
+        }
+        if (style.borderBottom) {
+            textFrame.insertLabel("runtimeBorderBottom", String(style.borderBottom));
+        }
+    } catch (tagError) {}
+
+    // Space between rules and text (match web pad-block).
+    try {
+        textFrame.textFramePreferences.insetSpacing = [padPts, 0, padPts, 0];
+    } catch (insetError) {}
+
+    try {
+        story = textFrame.parentStory;
+        if (story && story.paragraphs.length) {
+            para = story.paragraphs[0];
+            para.spaceBefore = 0;
+            para.spaceAfter = 0;
+        }
+    } catch (paraError) {}
+
+    drawFrameBorderLines(textFrame, style);
+}
+
+function refreshFrameBordersFromLabels(textFrame) {
+    var style;
+
+    if (!isBorderedTextFrame(textFrame)) {
+        return;
+    }
+
+    style = {
+        borderTop: null,
+        borderBottom: null
+    };
+    try {
+        style.borderTop = textFrame.extractLabel("runtimeBorderTop") || null;
+    } catch (topError) {}
+    try {
+        style.borderBottom = textFrame.extractLabel("runtimeBorderBottom") || null;
+    } catch (bottomError) {}
+
+    drawFrameBorderLines(textFrame, style);
 }
 
 // Applies size/font/weight/color from a centralized style to a specific text
@@ -2871,7 +3028,10 @@ function tightenTextFrameToRenderedContent(textFrame, options) {
     var savedRight;
     var savedTop;
     var preserveFullWidth = options && options.preserveFullWidth;
+    var preserveColumnWidth = options && options.preserveColumnWidth;
     var minBarHeight = options && options.minBarHeight ? Number(options.minBarHeight) : 0;
+    var borderPad = options && options.borderPad ? Number(options.borderPad) : 10;
+    var contentBottom;
 
     try {
         bounds = textFrame.geometricBounds;
@@ -2921,6 +3081,45 @@ function tightenTextFrameToRenderedContent(textFrame, options) {
         return;
     }
 
+    // Bordered blocks (e.g. sectionTitle): keep full column width, only shrink height.
+    if (preserveColumnWidth && savedLeft !== null && savedRight !== null) {
+        try {
+            story = textFrame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeBorderError) {}
+
+        try {
+            contentBottom = getTextFrameBottomY(textFrame) + borderPad;
+            bounds = textFrame.geometricBounds;
+            if (contentBottom <= bounds[0] + 12) {
+                contentBottom = bounds[0] + Math.max(24, borderPad * 2 + 14);
+            }
+            textFrame.geometricBounds = [
+                savedTop !== null ? savedTop : bounds[0],
+                savedLeft,
+                contentBottom,
+                savedRight
+            ];
+        } catch (borderSizeError) {}
+
+        try {
+            if (textFrame.overflows === true) {
+                bounds = textFrame.geometricBounds;
+                textFrame.geometricBounds = [
+                    bounds[0],
+                    savedLeft,
+                    bounds[2] + 12,
+                    savedRight
+                ];
+            }
+        } catch (growBorderError) {}
+
+        refreshFrameBordersFromLabels(textFrame);
+        return;
+    }
+
     for (fitPass = 0; fitPass < 2; fitPass++) {
         try {
             fitTextFrameToContent(textFrame);
@@ -2955,6 +3154,7 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     var tailPadding = 1;
     var preserveFullWidth =
         style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading;
+    var preserveColumnWidth = !preserveFullWidth && styleHasBorders(style);
     var chapterBarHeight = preserveFullWidth
         ? Math.max(((style && style.pointSize) || 36) + 20, 52)
         : 0;
@@ -3128,8 +3328,13 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     if (!textFrameOverflows(chainEnd) && !chainEnd.nextTextFrame) {
         tightenTextFrameToRenderedContent(chainEnd, {
             preserveFullWidth: preserveFullWidth,
-            minBarHeight: chapterBarHeight
+            preserveColumnWidth: preserveColumnWidth,
+            minBarHeight: chapterBarHeight,
+            borderPad: 10
         });
+        if (preserveColumnWidth) {
+            refreshFrameBordersFromLabels(chainEnd);
+        }
         try {
             story = chainEnd.parentStory;
             if (story) {
@@ -3461,7 +3666,14 @@ function advanceLayoutCursor(layoutState, frame, gapAfter) {
 
     try {
         if (chainEnd.contents !== undefined && !chainEnd.nextTextFrame && !textFrameOverflows(chainEnd)) {
-            tightenTextFrameToRenderedContent(chainEnd);
+            if (isBorderedTextFrame(chainEnd)) {
+                tightenTextFrameToRenderedContent(chainEnd, {
+                    preserveColumnWidth: true,
+                    borderPad: 10
+                });
+            } else {
+                tightenTextFrameToRenderedContent(chainEnd);
+            }
         }
     } catch (textTightenError) {}
 
@@ -3478,8 +3690,14 @@ function advanceLayoutCursor(layoutState, frame, gapAfter) {
     bounds = chainEnd.geometricBounds;
 
     if (chainEnd.contents !== undefined && !chainEnd.nextTextFrame && !textFrameOverflows(chainEnd)) {
-        shrinkTextFrameToContentBottom(chainEnd);
-        layoutState.cursorY = getTextFrameBottomY(chainEnd) + gap;
+        if (isBorderedTextFrame(chainEnd)) {
+            // Keep full column width; only nudge cursor from final bordered frame bottom.
+            refreshFrameBordersFromLabels(chainEnd);
+            layoutState.cursorY = chainEnd.geometricBounds[2] + gap;
+        } else {
+            shrinkTextFrameToContentBottom(chainEnd);
+            layoutState.cursorY = getTextFrameBottomY(chainEnd) + gap;
+        }
     } else {
         layoutState.cursorY = bounds[2] + gap;
     }
