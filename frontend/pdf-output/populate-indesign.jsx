@@ -61,6 +61,8 @@ function writeTextFile(filePath, content) {
         }
     } catch (folderError) {}
 
+    // Always write UTF-8 so smart quotes / dashes round-trip correctly.
+    f.encoding = "UTF-8";
     if (f.open("w")) {
         f.write(content);
         f.close();
@@ -68,6 +70,83 @@ function writeTextFile(filePath, content) {
     }
 
     return false;
+}
+
+/** Read a text file as UTF-8 (required for curly quotes, em dashes, NBSP, etc.). */
+function readTextFileUtf8(fileOrPath) {
+    var f = fileOrPath instanceof File ? fileOrPath : File(fileOrPath);
+    var content;
+
+    if (!f || !f.exists) {
+        return null;
+    }
+
+    f.encoding = "UTF-8";
+    if (!f.open("r")) {
+        return null;
+    }
+
+    content = f.read();
+    f.close();
+    return content;
+}
+
+/**
+ * Repair common UTF-8→Latin-1 mojibake (â€™, â€œ, â€”, Â…) if a file
+ * was previously read without UTF-8 encoding.
+ */
+function fixUtf8Mojibake(text) {
+    var s = String(text == null ? "" : text);
+    if (s.indexOf("\u00e2") < 0 && s.indexOf("\u00c2") < 0) {
+        return s;
+    }
+    return s
+        .replace(/\u00e2\u20ac\u2122/g, "\u2019")
+        .replace(/\u00e2\u20ac\u0160/g, "\u2018")
+        .replace(/\u00e2\u20ac\u0153/g, "\u201C")
+        .replace(/\u00e2\u20ac\u009d/g, "\u201D")
+        .replace(/\u00e2\u20ac\u201c/g, "\u201C")
+        .replace(/\u00e2\u20ac\u201d/g, "\u201D")
+        .replace(/\u00e2\u20ac\u2013/g, "\u2013")
+        .replace(/\u00e2\u20ac\u2014/g, "\u2014")
+        .replace(/\u00e2\u20ac\u00a6/g, "\u2026")
+        .replace(/\u00e2\u20ac\u2122/g, "\u2019")
+        .replace(/â€™/g, "\u2019")
+        .replace(/â€˜/g, "\u2018")
+        .replace(/â€œ/g, "\u201C")
+        .replace(/â€/g, "\u201D")
+        .replace(/â€“/g, "\u2013")
+        .replace(/â€”/g, "\u2014")
+        .replace(/â€¦/g, "\u2026")
+        .replace(/\u00c2\u00a0/g, "\u00a0")
+        .replace(/\u00c2 /g, " ")
+        .replace(/\u00c2/g, "");
+}
+
+function sanitizeJsonStrings(value) {
+    var i;
+    var key;
+
+    if (value == null) {
+        return value;
+    }
+    if (typeof value === "string") {
+        return fixUtf8Mojibake(value);
+    }
+    if (value.length !== undefined) {
+        for (i = 0; i < value.length; i++) {
+            value[i] = sanitizeJsonStrings(value[i]);
+        }
+        return value;
+    }
+    if (typeof value === "object") {
+        for (key in value) {
+            if (value.hasOwnProperty(key)) {
+                value[key] = sanitizeJsonStrings(value[key]);
+            }
+        }
+    }
+    return value;
 }
 
 function buildRenderLogText(status, extraLines) {
@@ -391,7 +470,11 @@ function convertTypographyStyle(style) {
         leftIndent: style.leftIndent || 0,
         color: colorValue,
         backgroundColor: style.backgroundColor || null,
-        altBackgroundColor: style.altBackgroundColor || style.altbackgroundColor || null
+        altBackgroundColor: style.altBackgroundColor || style.altbackgroundColor || null,
+        // Theme-driven rules (e.g. sectionTitle "2px solid #CA5021") — any block.
+        borderTop: style.borderTop || null,
+        borderBottom: style.borderBottom || null,
+        textTransform: style.textTransform || null
     };
 }
 
@@ -548,7 +631,7 @@ function buildCanonicalStyleMap(styleSet) {
     var chapterNumber = pickTypographyEntry(styleSet, ["chapterNumber", "chapterHeading"]);
     var chapterTitle = pickTypographyEntry(styleSet, ["chapterTitle"]);
     var chapterOverview = pickTypographyEntry(styleSet, ["chapterOverview"]);
-    var lessonOverview = pickTypographyEntry(styleSet, ["lessonOverview", "topic"]);
+    var lessonOverview = pickRawTypographyEntry(styleSet, ["lessonOverview", "topic"]);
     var lessonTitle = pickTypographyEntry(styleSet, ["lessonTitle"]);
     var learningObjectives = pickTypographyEntry(styleSet, ["learningObjectives"]);
     var sectionTitle = pickRawTypographyEntry(styleSet, ["sectionTitle"]);
@@ -620,14 +703,12 @@ function loadTypographyConfig(scriptFolderPath) {
     if (!configFile || !configFile.exists) {
         return null;
     }
-    
-    if (!configFile.open("r")) {
+
+    rawJson = readTextFileUtf8(configFile);
+    if (rawJson === null) {
         return null;
     }
-    
-    rawJson = configFile.read();
-    configFile.close();
-    
+
     try {
         config = parseJSON(rawJson);
         config.__loadedFrom = loadedPath;
@@ -656,12 +737,14 @@ function loadLayoutFormat(scriptFolderPath) {
         configFile = null;
     }
 
-    if (!configFile || !configFile.exists || !configFile.open("r")) {
+    if (!configFile || !configFile.exists) {
         return null;
     }
 
-    rawJson = configFile.read();
-    configFile.close();
+    rawJson = readTextFileUtf8(configFile);
+    if (rawJson === null) {
+        return null;
+    }
 
     try {
         config = parseJSON(rawJson);
@@ -1954,10 +2037,24 @@ function applyCompositeStyle(textFrame, compositeStyle) {
     textFrame.contents = parts.number + " " + parts.text;
     numberEnd = parts.number.length;
 
+    // Base text style first, then overlay number color/weight (theme2 lessonOverview).
     try {
-        numberRange = story.characters.itemByRange(0, numberEnd);
+        applyFrameStyle(textFrame, compositeStyle.text || compositeStyle);
+    } catch (baseStyleError) {}
+
+    try {
+        story = textFrame.parentStory;
+        if (story) {
+            story.recompose();
+        }
+    } catch (recomposeError) {}
+
+    try {
+        numberRange = story.characters.itemByRange(0, Math.max(0, numberEnd - 1));
         applyTextRangeStyle(numberRange, compositeStyle.number);
-    } catch (numberStyleError) {}
+    } catch (numberStyleError) {
+        warnings.push("Could not style composite number: " + numberStyleError.message);
+    }
 
     try {
         if (story.characters.length > numberEnd + 1) {
@@ -2021,6 +2118,105 @@ function applyFrameStyle(textFrame, style) {
     }
 
     applyFrameFillColor(textFrame, style);
+    applyFrameBorders(textFrame, style);
+}
+
+/** Parse CSS-like border: "2px solid #CA5021" → { weight, colorRgb }. */
+function parseCssBorder(borderValue) {
+    var raw;
+    var match;
+    var weight;
+    var hex;
+
+    raw = trimString(borderValue || "");
+    if (!raw || raw === "none") {
+        return null;
+    }
+
+    match = raw.match(/^([\d.]+)\s*px\s+solid\s+(#[0-9A-Fa-f]{3,8})$/i);
+    if (!match) {
+        match = raw.match(/^([\d.]+)\s*pt\s+solid\s+(#[0-9A-Fa-f]{3,8})$/i);
+    }
+    if (!match) {
+        return null;
+    }
+
+    weight = parseFloat(match[1]);
+    if (!weight || weight <= 0) {
+        return null;
+    }
+    hex = match[2];
+    return {
+        weight: weight,
+        colorRgb: hexToRgb(hex)
+    };
+}
+
+/**
+ * Apply theme borderTop / borderBottom to any text frame via paragraph rules
+ * (matches web: text sandwiched between full-column orange rules).
+ */
+function applyFrameBorders(textFrame, style) {
+    var story;
+    var para;
+    var topBorder;
+    var bottomBorder;
+    var doc;
+    var color;
+    var colorName;
+    var offsetPts;
+
+    if (!textFrame || !style) {
+        return;
+    }
+
+    topBorder = parseCssBorder(style.borderTop);
+    bottomBorder = parseCssBorder(style.borderBottom);
+    if (!topBorder && !bottomBorder) {
+        return;
+    }
+
+    try {
+        story = textFrame.parentStory;
+        if (!story || !story.paragraphs.length) {
+            return;
+        }
+        para = story.paragraphs[0];
+        doc = app.activeDocument;
+        offsetPts = 4;
+
+        if (topBorder) {
+            colorName = "JSON_BORDER_" + topBorder.colorRgb.join("_");
+            color = ensureDocumentColor(doc, colorName, topBorder.colorRgb);
+            para.ruleAbove = true;
+            para.ruleAboveLineWeight = topBorder.weight;
+            para.ruleAboveOffset = offsetPts;
+            para.ruleAboveTint = 100;
+            try {
+                para.ruleAboveWidth = RuleWidth.COLUMN_WIDTH;
+            } catch (widthError) {}
+            if (color !== null) {
+                para.ruleAboveColor = color;
+            }
+        }
+
+        if (bottomBorder) {
+            colorName = "JSON_BORDER_" + bottomBorder.colorRgb.join("_");
+            color = ensureDocumentColor(doc, colorName, bottomBorder.colorRgb);
+            para.ruleBelow = true;
+            para.ruleBelowLineWeight = bottomBorder.weight;
+            para.ruleBelowOffset = offsetPts;
+            para.ruleBelowTint = 100;
+            try {
+                para.ruleBelowWidth = RuleWidth.COLUMN_WIDTH;
+            } catch (widthError) {}
+            if (color !== null) {
+                para.ruleBelowColor = color;
+            }
+        }
+    } catch (borderError) {
+        warnings.push("Could not apply frame borders: " + borderError.message);
+    }
 }
 
 // Applies size/font/weight/color from a centralized style to a specific text
@@ -2168,7 +2364,7 @@ function getBlockText(data) {
     if (data.items && data.items.length !== undefined) {
         bulletLines = [];
         for (i = 0; i < data.items.length; i++) {
-            bulletText = trimString(data.items[i]);
+            bulletText = fixUtf8Mojibake(trimString(data.items[i]));
             if (bulletText) {
                 bulletLines.push("\u2022 " + bulletText);
             }
@@ -2181,7 +2377,7 @@ function getBlockText(data) {
     fields = ["text", "title", "label", "content", "value"];
     for (i = 0; i < fields.length; i++) {
         if (data[fields[i]] !== undefined && data[fields[i]] !== null) {
-            value = trimString(data[fields[i]]);
+            value = fixUtf8Mojibake(trimString(data[fields[i]]));
             if (value) {
                 return value;
             }
@@ -2457,8 +2653,8 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
     // Approximate web badge: padding + text width (Arial ~0.55em average).
     width = Math.max(90, text.length * pointSize * 0.55 + padX * 2);
     height = Math.max(pointSize + padY * 2, 34);
-    // Flush to the image's top-left edge (no gap inside the photo).
-    top = imageBounds[0];
+    // Inset slightly from the image top-left (match web gap).
+    top = imageBounds[0] + 10;
     left = imageBounds[1];
 
     if (left + width > imageBounds[3]) {
@@ -4813,18 +5009,19 @@ function main() {
         throw new Error("tree_output.json not found at: " + dataFile.fsName);
     }
 
-    if (!dataFile.open("r")) {
+    rawJson = readTextFileUtf8(dataFile);
+    if (rawJson === null) {
         throw new Error("Could not open tree_output.json for reading.");
     }
-
-    rawJson = dataFile.read();
-    dataFile.close();
 
     parsedJson = parseJSON(rawJson);
 
     if (!parsedJson) {
         throw new Error("tree_output.json is empty or invalid.");
     }
+
+    // Ensure curly quotes / dashes are correct even if encoding was wrong once.
+    parsedJson = sanitizeJsonStrings(parsedJson);
     if (parsedJson.length !== undefined) {
         contentItems = parsedJson;
     }

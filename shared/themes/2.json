@@ -3,71 +3,73 @@
   "label": "Theme 2",
   "STYLES": {
     "chapterNumber": {
-      "font": "Arial",
+      "font": "Neue Kabel Medium",
       "size": 36,
       "color": "#FFFFFF",
       "bold": false,
       "backgroundColor": "#CA5027"
     },
     "chapterHeading": {
-      "font": "Arial",
+      "font": "Neue Kabel Medium",
       "size": 36,
       "color": "#FFFFFF",
       "bold": false,
       "backgroundColor": "#CA5027"
     },
     "chapterTitle": {
-      "font": "Arial",
+      "font": "Neue Kabel Medium",
       "size": 44,
       "color": "#214880",
       "bold": false
     },
     "chapterOverview": {
-      "font": "Arial",
+      "font": "Neue Kabel Medium",
       "size": 15,
       "color": "#CA5027",
       "bold": true
     },
     "lessonOverview": {
       "text": {
-        "font": "Arial",
+        "font": "Neue Kabel",
         "size": 11,
         "color": "#000000",
         "bold": false
       },
       "number": {
-        "font": "Arial",
+        "font": "Neue Kabel",
         "size": 11,
         "color": "#CA5027",
         "bold": true
       }
     },
     "lessonTitle": {
-      "font": "Arial",
+      "font": "Futura Std",
       "size": 18,
       "color": "#214880",
       "bold": true
     },
     "sectionTitle": {
-      "font": "Arial",
+      "font": "Neue Kabel Regular",
       "size": 10,
       "color": "#000000",
-      "bold": false
+      "bold": false,
+      "borderTop": "2px solid #CA5021",
+      "borderBottom": "2px solid #CA5021"
     },
     "subSectionTitle": {
-      "font": "Arial",
+      "font": "Neue Kabel",
       "size": 15,
       "color": "#00854A",
       "bold": true
     },
     "greenSubSectionTitle": {
-      "font": "Arial",
+      "font": "Neue Kabel",
       "size": 15,
       "color": "#00854A",
       "bold": true
     },
     "learningObjectives": {
-      "font": "Arial",
+      "font": "Neue Kabel Medium",
       "size": 15,
       "color": "#CA5027",
       "bold": true
@@ -81,20 +83,20 @@
     },
     "subTitlesList": {
       "text": {
-        "font": "Arial",
+        "font": "Neue Kabel",
         "size": 11,
         "color": "#000000",
         "bold": false
       },
       "number": {
-        "font": "Arial",
+        "font": "Neue Kabel",
         "size": 11,
         "color": "#CA5027",
         "bold": true
       }
     },
     "paragraphText": {
-      "font": "Neue Kabel",
+      "font": "Neue Kabel Regular",
       "size": 10,
       "color": "#000000",
       "bold": false
@@ -119,13 +121,13 @@
     },
     "quotation": {
       "text": {
-        "font": "Arial",
+        "font": "Neue Kabel Regular",
         "size": 13,
         "color": "#000000",
         "bold": false
       },
       "author": {
-        "font": "Arial",
+        "font": "Neue Kabel Regular",
         "size": 10,
         "color": "#000000",
         "bold": false

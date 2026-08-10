@@ -264,6 +264,25 @@ export const toCssVariables = (key, style) => {
     [`${prefix}-style`]: style.italic ? 'italic' : 'normal',
     // Always reset transform so theme1 uppercase cannot stick on theme2.
     [`${prefix}-transform`]: style.textTransform || 'none',
+    // Optional theme borders (any block). Reset when absent so theme switches stay clean.
+    [`${prefix}-border-top`]: style.borderTop || 'none',
+    [`${prefix}-border-bottom`]: style.borderBottom || 'none',
+    [`${prefix}-pad-block`]:
+      style.borderTop || style.borderBottom ? '0.35em' : '0',
+  };
+};
+
+/**
+ * Inline border styles from theme CSS vars for any block/component root.
+ * When the theme style has no borders, vars resolve to none / 0.
+ */
+export const getTypographyBorderStyle = (styleKey) => {
+  if (!styleKey) return undefined;
+  const prefix = `--typography-${styleKey}`;
+  return {
+    borderTop: `var(${prefix}-border-top, none)`,
+    borderBottom: `var(${prefix}-border-bottom, none)`,
+    paddingBlock: `var(${prefix}-pad-block, 0)`,
   };
 };
 

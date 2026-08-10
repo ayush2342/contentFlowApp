@@ -1,3 +1,4 @@
+import { getTypographyBorderStyle } from '../../../../../shared/typography-styles.js';
 import styles from './Quote.module.scss';
 
 const Quote = ({ text, author, children }) => {
@@ -5,7 +6,7 @@ const Quote = ({ text, author, children }) => {
   if (!quoteText && !author) return null;
 
   return (
-    <blockquote className={styles.quote}>
+    <blockquote className={styles.quote} style={getTypographyBorderStyle('quotation')}>
       {quoteText ? <p className={styles.text}>{quoteText}</p> : null}
       {author ? <cite className={styles.author}>{author}</cite> : null}
     </blockquote>

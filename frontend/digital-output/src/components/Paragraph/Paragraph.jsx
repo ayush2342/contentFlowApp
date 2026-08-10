@@ -1,3 +1,4 @@
+import { getTypographyBorderStyle } from '../../../../../shared/typography-styles.js';
 import styles from './Paragraph.module.scss';
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -38,7 +39,7 @@ const splitIntroductionPrefix = (text) => {
 const Paragraph = ({ text, items }) => {
   if (Array.isArray(items) && items.length) {
     return (
-      <ul className={styles.bulletList}>
+      <ul className={styles.bulletList} style={getTypographyBorderStyle('bulletList')}>
         {items.map((item, index) => (
           <li key={`bullet-${index}`}>{renderWithLinks(item)}</li>
         ))}
@@ -47,17 +48,22 @@ const Paragraph = ({ text, items }) => {
   }
 
   const intro = splitIntroductionPrefix(text);
+  const borderStyle = getTypographyBorderStyle('paragraphText');
 
   if (intro) {
     return (
-      <p className={styles.paragraph}>
+      <p className={styles.paragraph} style={borderStyle}>
         <strong className={styles.leadLabel}>{intro.label}</strong>{' '}
         {renderWithLinks(intro.rest)}
       </p>
     );
   }
 
-  return <p className={styles.paragraph}>{renderWithLinks(text)}</p>;
+  return (
+    <p className={styles.paragraph} style={borderStyle}>
+      {renderWithLinks(text)}
+    </p>
+  );
 };
 
 export default Paragraph;

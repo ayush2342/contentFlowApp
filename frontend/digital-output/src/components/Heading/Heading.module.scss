@@ -2,6 +2,7 @@
 .heading {
   margin: 0 0 1rem;
   line-height: 1.2;
+  box-sizing: border-box;
 }
 
 .partNumber {
@@ -64,6 +65,7 @@
   font-size: var(--typography-sectionTitle-size);
   font-weight: var(--typography-sectionTitle-weight);
   color: var(--typography-sectionTitle-color);
+  /* Borders come from getTypographyBorderStyle(variant) — any theme key can set them */
 
   .compositeNumber {
     font-family: var(--typography-sectionTitleNumber-font, var(--typography-sectionTitle-font));

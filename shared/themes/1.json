@@ -47,13 +47,13 @@
     },
     "subSectionTitle": {
       "font": "Arial",
-      "size": 11,
+      "size": 9,
       "color": "#0074BC",
       "bold": false
     },
     "greenSubSectionTitle": {
       "font": "Arial",
-      "size": 11,
+      "size": 9,
       "color": "#0074BC",
       "bold": false
     },
