@@ -829,8 +829,8 @@ function placeTwoColumnTextGroup(layoutState, document, items, registryEntry) {
     startY = layoutState.cursorY;
     savedColumnCount = layoutState.columnCount;
     savedColumn = layoutState.currentColumn;
-    // Extra air between LO rows (web uses ~0.5rem grid gap + heading margin).
-    spacing = Math.max(resolveBlockSpacing(registryEntry), 14);
+    // Extra air between LO rows (web: ~1rem heading margin + 0.5rem row-gap).
+    spacing = Math.max(resolveBlockSpacing(registryEntry), 24);
 
     protoResult = resolveTextPrototype(document, registryEntry.prototype);
     protoHeight = protoResult
@@ -1097,8 +1097,8 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.lessonOverview,
         kind: "text",
         prototype: "proto:lessonOverview",
-        // Match web heading margin (~1rem) between LO items in 2-col opener grid.
-        spacingAfter: 14
+        // Match web heading margin (~1rem+) between LO items in 2-col opener grid.
+        spacingAfter: 24
     },
     ParagraphText: {
         label: "paragraphText",
@@ -2224,10 +2224,11 @@ function applyCompositeStyle(textFrame, compositeStyle) {
         story.recompose();
     } catch (recomposeAfterError) {}
 
-    // Slightly roomier leading for wrapped LO lines (match web line-height ~1.2+).
+    // Slightly roomier leading for wrapped LO lines (match web line-height).
     try {
         if (story.paragraphs.length) {
-            story.paragraphs[0].autoLeading = 145;
+            story.paragraphs[0].justification = Justification.LEFT_ALIGN;
+            story.paragraphs[0].autoLeading = 160;
             story.paragraphs[0].spaceAfter = 0;
             story.paragraphs[0].spaceBefore = 0;
         }
@@ -2237,6 +2238,8 @@ function applyCompositeStyle(textFrame, compositeStyle) {
 function applyFrameStyle(textFrame, style) {
     var story;
     var textRange;
+    var p;
+    var i;
 
     if (!textFrame || !style) return;
 
@@ -2263,11 +2266,23 @@ function applyFrameStyle(textFrame, style) {
     ", bold=" + style.bold +
     ", italic=" + style.italic
 );
-    if (style.leftIndent) {
-        try {
-            story.paragraphs[0].leftIndent = style.leftIndent;
-        } catch (indentError) {
-            warnings.push("Could not set left indent.");
+
+    // Match web: left-align (avoid full-justify stretching short lines / titles).
+    try {
+        for (i = 0; i < story.paragraphs.length; i++) {
+            p = story.paragraphs[i];
+            p.justification = Justification.LEFT_ALIGN;
+            if (style.leftIndent) {
+                p.leftIndent = style.leftIndent;
+            }
+        }
+    } catch (justifyError) {
+        if (style.leftIndent) {
+            try {
+                story.paragraphs[0].leftIndent = style.leftIndent;
+            } catch (indentError) {
+                warnings.push("Could not set left indent.");
+            }
         }
     }
 
@@ -2279,7 +2294,7 @@ function applyFrameStyle(textFrame, style) {
             story.paragraphs[0].spaceBefore = 0;
             story.paragraphs[0].spaceAfter = 0;
             story.paragraphs[0].leftIndent = 10;
-        } catch (justifyError) {}
+        } catch (chJustifyError) {}
         try {
             textFrame.textFramePreferences.verticalJustification =
                 VerticalJustification.CENTER_ALIGN;
