@@ -465,8 +465,9 @@ function convertTypographyStyle(style) {
     return {
         fontFamily: style.font || style.fontFamily || "",
         pointSize: style.size || style.pointSize || 12,
-        bold: style.bold === true,
-        italic: style.italic === true,
+        // Accept true / "true" / 1 so any theme component bold/italic works.
+        bold: isTruthyFlag(style.bold),
+        italic: isTruthyFlag(style.italic),
         leftIndent: style.leftIndent || 0,
         color: colorValue,
         backgroundColor: style.backgroundColor || null,
@@ -476,6 +477,11 @@ function convertTypographyStyle(style) {
         borderBottom: style.borderBottom || null,
         textTransform: style.textTransform || null
     };
+}
+
+function isTruthyFlag(value) {
+    return value === true || value === 1 || value === "1" ||
+        String(value || "").toLowerCase() === "true";
 }
 
 function isQuotationStyle(value) {
@@ -823,7 +829,8 @@ function placeTwoColumnTextGroup(layoutState, document, items, registryEntry) {
     startY = layoutState.cursorY;
     savedColumnCount = layoutState.columnCount;
     savedColumn = layoutState.currentColumn;
-    spacing = resolveBlockSpacing(registryEntry);
+    // Extra air between LO rows (web uses ~0.5rem grid gap + heading margin).
+    spacing = Math.max(resolveBlockSpacing(registryEntry), 14);
 
     protoResult = resolveTextPrototype(document, registryEntry.prototype);
     protoHeight = protoResult
@@ -1090,7 +1097,8 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.lessonOverview,
         kind: "text",
         prototype: "proto:lessonOverview",
-        spacingAfter: 6
+        // Match web heading margin (~1rem) between LO items in 2-col opener grid.
+        spacingAfter: 14
     },
     ParagraphText: {
         label: "paragraphText",
@@ -1776,6 +1784,7 @@ function placeImageContentInFrame(frame, imageFile) {
     appendRenderLog("Image fitting result: " + fittingResult);
 
     ensureGraphicFrameVisible(frame);
+    clearImageFrameStroke(frame);
     logImagePlacementDiagnostics(frame, "after fit");
 
     try {
@@ -1881,81 +1890,224 @@ function applyTextColor(textRange, style) {
     }
 }
 
+function getFontStyleCandidates(bold, italic) {
+    if (bold && italic) {
+        return [
+            "Bold Italic",
+            "BoldItalic",
+            "Bold Oblique",
+            "BoldIt",
+            "Demi Bold Italic",
+            "Heavy Italic",
+            "Black Italic"
+        ];
+    }
+    if (bold) {
+        return [
+            "Bold",
+            "Heavy",
+            "Black",
+            "Extra Bold",
+            "ExtraBold",
+            "Semibold",
+            "SemiBold",
+            "Demi Bold",
+            "DemiBold",
+            "Medium",
+            "Bold Condensed"
+        ];
+    }
+    if (italic) {
+        return ["Italic", "Oblique", "It", "Slanted"];
+    }
+    return ["Regular", "Roman", "Book", "Normal", "Light", "Plain"];
+}
+
 function applyFontStyleSafe(textRange, bold, italic) {
-    var candidates = [];
+    var candidates = getFontStyleCandidates(bold, italic);
     var i;
     var family;
     var styleName;
 
-    if (bold && italic) {
-        candidates = ["Bold Italic", "BoldItalic", "Bold Oblique", "BoldIt", "Demi Bold Italic"];
-    } else if (bold) {
-        candidates = ["Bold", "Semibold", "SemiBold", "Medium", "Demi Bold", "Black"];
-    } else if (italic) {
-        candidates = ["Italic", "Oblique", "It", "Slanted"];
-    } else {
-        candidates = ["Regular", "Roman", "Book", "Normal", "Light", "Plain"];
-    }
-
     for (i = 0; i < candidates.length; i++) {
         try {
             textRange.fontStyle = candidates[i];
-            return;
+            return true;
         } catch (styleError) {}
     }
 
     try {
-        family = textRange.fontFamily;
+        family = textRange.fontFamily || textRange.appliedFont.fontFamily;
     } catch (familyError) {
-        return;
+        return false;
     }
 
     for (i = 0; i < candidates.length; i++) {
         try {
             styleName = family + "\t" + candidates[i];
             textRange.appliedFont = app.fonts.item(styleName);
-            return;
+            return true;
         } catch (fontError) {}
     }
-}
-
-function applyConfiguredFontFamily(textRange, style) {
-    var family;
-    var candidates = [];
-    var i;
-
-    if (!textRange || !style || !style.fontFamily) {
-        return false;
-    }
-
-    family = trimString(style.fontFamily);
-    if (!family) {
-        return false;
-    }
-
-    if (style.bold && style.italic) {
-        candidates = ["Bold Italic", "BoldItalic", "Bold Oblique", "BoldIt", "Demi Bold Italic"];
-    } else if (style.bold) {
-        candidates = ["Bold", "Semibold", "SemiBold", "Medium", "Demi Bold", "Black"];
-    } else if (style.italic) {
-        candidates = ["Italic", "Oblique", "It", "Slanted"];
-    } else {
-        candidates = ["Regular", "Roman", "Book", "Normal", "Light", "Plain"];
-    }
-
-    for (i = 0; i < candidates.length; i++) {
-        try {
-            textRange.appliedFont = app.fonts.item(family + "\t" + candidates[i]);
-            return true;
-        } catch (fontByStyleError) {}
-    }
-
-    try {
-        textRange.appliedFont = app.fonts.item(family);
-        return true;
-    } catch (fontFamilyError) {}
 
     return false;
+}
+
+/**
+ * Generic theme font + bold/italic for ANY block (frames or character ranges).
+ * Matches web: if theme says bold/italic, PDF must show it — not component-specific.
+ */
+function applyThemeFontAndEmphasis(textRange, style) {
+    var family;
+    var wantBold;
+    var wantItalic;
+    var candidates;
+    var i;
+    var applied;
+    var styleApplied;
+    var altFamilies;
+    var doc;
+    var color;
+    var names;
+
+    if (!textRange || !style) {
+        return false;
+    }
+
+    wantBold = isTruthyFlag(style.bold);
+    wantItalic = isTruthyFlag(style.italic);
+    family = trimString(style.fontFamily || style.font || "");
+    applied = false;
+    styleApplied = false;
+
+    if (family) {
+        candidates = getFontStyleCandidates(wantBold, wantItalic);
+
+        for (i = 0; i < candidates.length; i++) {
+            try {
+                textRange.appliedFont = app.fonts.item(family + "\t" + candidates[i]);
+                applied = true;
+                styleApplied = true;
+                break;
+            } catch (fontByStyleError) {}
+        }
+
+        if (!applied && wantBold) {
+            altFamilies = [
+                family + " Bold",
+                family + "-Bold",
+                family.replace(/\s+Regular$/i, "") + " Bold",
+                family.replace(/\s+Medium$/i, "") + " Bold"
+            ];
+            for (i = 0; i < altFamilies.length; i++) {
+                try {
+                    textRange.appliedFont = app.fonts.item(altFamilies[i]);
+                    applied = true;
+                    styleApplied = wantBold && !wantItalic;
+                    break;
+                } catch (altFamilyError) {}
+                try {
+                    textRange.appliedFont = app.fonts.item(altFamilies[i] + "\tRegular");
+                    applied = true;
+                    break;
+                } catch (altRegularError) {}
+            }
+        }
+
+        if (!applied && wantItalic && !wantBold) {
+            altFamilies = [family + " Italic", family + "-Italic"];
+            for (i = 0; i < altFamilies.length; i++) {
+                try {
+                    textRange.appliedFont = app.fonts.item(altFamilies[i]);
+                    applied = true;
+                    styleApplied = true;
+                    break;
+                } catch (italicFamilyError) {}
+            }
+        }
+
+        if (!applied) {
+            try {
+                textRange.appliedFont = app.fonts.item(family);
+                applied = true;
+            } catch (fontFamilyError) {
+                try {
+                    textRange.appliedFont = app.fonts.item(family + "\tRegular");
+                    applied = true;
+                } catch (regularError) {}
+            }
+        }
+    }
+
+    // Always apply weight/style from theme flags (works even without a family).
+    if (!styleApplied) {
+        styleApplied = applyFontStyleSafe(textRange, wantBold, wantItalic);
+    } else if (wantBold || wantItalic) {
+        // Face may already be correct; still try style name for stubborn ranges.
+        applyFontStyleSafe(textRange, wantBold, wantItalic);
+        styleApplied = true;
+    }
+
+    if (wantBold && !styleApplied) {
+        names = [
+            (family || "Arial") + "\tBold",
+            "Arial\tBold",
+            (family || "Arial") + " Bold",
+            "Arial Bold"
+        ];
+        for (i = 0; i < names.length; i++) {
+            try {
+                textRange.appliedFont = app.fonts.item(names[i]);
+                styleApplied = true;
+                break;
+            } catch (boldNameError) {}
+        }
+    }
+
+    // Faux bold when Bold face is missing (web can fake weight; InDesign cannot).
+    if (wantBold && !styleApplied) {
+        try {
+            doc = app.activeDocument;
+            textRange.strokeWeight = 0.4;
+            if (style.color && style.color.length) {
+                color = ensureDocumentColor(
+                    doc,
+                    "JSON_" + style.color[0] + "_" + style.color[1] + "_" + style.color[2],
+                    style.color
+                );
+                if (color !== null) {
+                    textRange.strokeColor = color;
+                }
+            }
+            styleApplied = true;
+            appendRenderLog(
+                "Theme bold fallback (faux stroke) for font=\"" + (family || "(default)") + "\""
+            );
+        } catch (fauxBoldError) {
+            warnings.push(
+                'Could not apply bold for font "' + (family || "(default)") + '".'
+            );
+        }
+    } else if (!wantBold) {
+        try {
+            textRange.strokeWeight = 0;
+        } catch (clearStrokeError) {}
+    }
+
+    return applied || styleApplied;
+}
+
+/** @deprecated Use applyThemeFontAndEmphasis — kept as alias for older call sites. */
+function applyConfiguredFontFamily(textRange, style) {
+    return applyThemeFontAndEmphasis(textRange, style);
+}
+
+/** @deprecated Use applyThemeFontAndEmphasis */
+function forceBoldOnRange(textRange, style) {
+    if (!textRange || !style) {
+        return false;
+    }
+    return applyThemeFontAndEmphasis(textRange, style);
 }
 
 function isCompositeStyle(style) {
@@ -2052,6 +2204,11 @@ function applyCompositeStyle(textFrame, compositeStyle) {
     try {
         numberRange = story.characters.itemByRange(0, Math.max(0, numberEnd - 1));
         applyTextRangeStyle(numberRange, compositeStyle.number);
+        appendRenderLog(
+            "Composite number styled: \"" + parts.number +
+            "\" bold=" + (compositeStyle.number && compositeStyle.number.bold) +
+            " italic=" + (compositeStyle.number && compositeStyle.number.italic)
+        );
     } catch (numberStyleError) {
         warnings.push("Could not style composite number: " + numberStyleError.message);
     }
@@ -2062,6 +2219,19 @@ function applyCompositeStyle(textFrame, compositeStyle) {
             applyTextRangeStyle(textRange, compositeStyle.text);
         }
     } catch (textStyleError) {}
+
+    try {
+        story.recompose();
+    } catch (recomposeAfterError) {}
+
+    // Slightly roomier leading for wrapped LO lines (match web line-height ~1.2+).
+    try {
+        if (story.paragraphs.length) {
+            story.paragraphs[0].autoLeading = 145;
+            story.paragraphs[0].spaceAfter = 0;
+            story.paragraphs[0].spaceBefore = 0;
+        }
+    } catch (leadingError) {}
 }
 
 function applyFrameStyle(textFrame, style) {
@@ -2083,15 +2253,15 @@ function applyFrameStyle(textFrame, style) {
         }
     }
 
-    applyConfiguredFontFamily(textRange, style);
-    applyFontStyleSafe(textRange, style.bold, style.italic);
+    applyThemeFontAndEmphasis(textRange, style);
     applyTextColor(textRange, style);
     appendRenderLog(
     "Applied Style => " +
-    "font=" + style.font +
+    "font=" + (style.fontFamily || style.font) +
     ", size=" + style.pointSize +
     ", color=" + style.color +
-    ", bold=" + style.bold
+    ", bold=" + style.bold +
+    ", italic=" + style.italic
 );
     if (style.leftIndent) {
         try {
@@ -2377,7 +2547,7 @@ function refreshFrameBordersFromLabels(textFrame) {
 }
 
 // Applies size/font/weight/color from a centralized style to a specific text
-// range (not the whole frame). Used to recolor the "FIGURE x.x" caption prefix.
+// range (not the whole frame). Used for LO numbers / FIGURE caption prefixes / any ranged style.
 function applyTextRangeStyle(textRange, style) {
     if (!textRange || !style) {
         return;
@@ -2389,8 +2559,11 @@ function applyTextRangeStyle(textRange, style) {
         } catch (sizeError) {}
     }
 
-    applyConfiguredFontFamily(textRange, style);
-    applyFontStyleSafe(textRange, style.bold, style.italic);
+    // Normalize so font / fontFamily / bold / italic all flow through one path.
+    if (!style.fontFamily && style.font) {
+        style.fontFamily = style.font;
+    }
+    applyThemeFontAndEmphasis(textRange, style);
     applyTextColor(textRange, style);
 }
 
@@ -2868,6 +3041,7 @@ function createGraphicFrameOnPage(page, layoutBounds, top, height) {
 
     assignFrameToContentLayer(frame);
     clearRuntimeLabel(frame);
+    clearImageFrameStroke(frame);
 
     appendRenderLog(
         "Dynamic image frame created width=" +
@@ -2875,6 +3049,37 @@ function createGraphicFrameOnPage(page, layoutBounds, top, height) {
     );
 
     return frame;
+}
+
+/** Match web: no border/stroke around images. */
+function clearImageFrameStroke(frame) {
+    var i;
+    var graphic;
+
+    if (!frame) {
+        return;
+    }
+
+    try {
+        frame.strokeWeight = 0;
+    } catch (strokeWeightError) {}
+
+    try {
+        frame.strokeColor = app.activeDocument.swatches.itemByName("None");
+    } catch (strokeColorError) {
+        try {
+            frame.strokeTint = 0;
+        } catch (tintError) {}
+    }
+
+    try {
+        for (i = 0; i < frame.graphics.length; i++) {
+            graphic = frame.graphics[i];
+            try {
+                graphic.strokeWeight = 0;
+            } catch (graphicStrokeError) {}
+        }
+    } catch (graphicsError) {}
 }
 
 function getAvailableColumnHeight(layoutState) {
@@ -3895,8 +4100,7 @@ function placeChapterNumberBar(layoutState, text, style) {
             if (appliedStyle.pointSize) {
                 textRange.pointSize = appliedStyle.pointSize;
             }
-            applyConfiguredFontFamily(textRange, appliedStyle);
-            applyFontStyleSafe(textRange, appliedStyle.bold, appliedStyle.italic);
+            applyThemeFontAndEmphasis(textRange, appliedStyle);
             applyTextColor(textRange, appliedStyle);
             if (story.paragraphs.length) {
                 story.paragraphs[0].justification = Justification.LEFT_ALIGN;
