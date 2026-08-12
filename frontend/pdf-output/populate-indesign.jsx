@@ -1890,6 +1890,215 @@ function applyTextColor(textRange, style) {
     }
 }
 
+function getFontBaseName(family) {
+    var trimmed = trimString(family || "");
+
+    if (!trimmed) {
+        return "";
+    }
+
+    return trimmed.replace(
+        /\s+(Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Oblique|Condensed)$/i,
+        ""
+    );
+}
+
+function getEmbeddedFontWeight(family) {
+    var trimmed = trimString(family || "");
+    var match = trimmed.match(
+        /\s+(Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Condensed)$/i
+    );
+
+    return match ? match[1] : "";
+}
+
+function normalizeFontToken(value) {
+    return trimString(value || "").toLowerCase().replace(/[\s\-_]+/g, "");
+}
+
+function buildFontCandidateNames(style) {
+    var family = trimString(style.fontFamily || style.font || "");
+    var baseName = getFontBaseName(family);
+    var embedded = getEmbeddedFontWeight(family);
+    var styleNames = getFontStyleCandidates(
+        isTruthyFlag(style.bold),
+        isTruthyFlag(style.italic)
+    );
+    var results = [];
+    var seen = {};
+    var i;
+
+    function pushCandidate(name) {
+        if (!name || seen[name]) {
+            return;
+        }
+        seen[name] = true;
+        results.push(name);
+    }
+
+    pushCandidate(family);
+
+    if (embedded && baseName) {
+        pushCandidate(baseName + "\t" + embedded);
+        pushCandidate(baseName + " " + embedded);
+    }
+
+    for (i = 0; i < styleNames.length; i++) {
+        if (baseName) {
+            pushCandidate(baseName + "\t" + styleNames[i]);
+            pushCandidate(baseName + " " + styleNames[i]);
+        }
+        if (family && family !== baseName) {
+            pushCandidate(family + "\t" + styleNames[i]);
+        }
+    }
+
+    pushCandidate(baseName);
+
+    return results;
+}
+
+function describeAppliedFont(textRange) {
+    var font;
+
+    try {
+        font = textRange.appliedFont;
+        if (!font) {
+            return "(none)";
+        }
+        return (font.fontFamily || font.name || "(unknown)") +
+            " / " + (font.fontStyle || font.name || "");
+    } catch (describeError) {
+        try {
+            return String(textRange.fontFamily || "(unknown)") + " / " +
+                String(textRange.fontStyle || "");
+        } catch (fallbackDescribeError) {
+            return "(unknown)";
+        }
+    }
+}
+
+function findInstalledFont(style) {
+    var candidates = buildFontCandidateNames(style);
+    var i;
+    var font;
+    var target;
+    var j;
+    var fonts;
+    var normName;
+    var wantBold = isTruthyFlag(style.bold);
+    var wantItalic = isTruthyFlag(style.italic);
+    var family = trimString(style.fontFamily || style.font || "");
+    var baseName = getFontBaseName(family);
+    var bestMatch = null;
+    var bestScore = -1;
+    var score;
+    var normFamily;
+    var normStyle;
+
+    for (i = 0; i < candidates.length; i++) {
+        try {
+            font = app.fonts.item(candidates[i]);
+            if (font) {
+                return { font: font, name: candidates[i] };
+            }
+        } catch (candidateError) {}
+    }
+
+    target = normalizeFontToken(baseName || family);
+    if (!target) {
+        return null;
+    }
+
+    try {
+        fonts = app.fonts;
+    } catch (fontsError) {
+        return null;
+    }
+
+    for (j = 0; j < fonts.length; j++) {
+        font = fonts[j];
+        try {
+            normFamily = normalizeFontToken(font.fontFamily);
+            normName = normalizeFontToken(font.name);
+            normStyle = normalizeFontToken(font.fontStyle);
+            score = 0;
+
+            if (normFamily === target || normName === target) {
+                score += 10;
+            } else if (normName.indexOf(target) === 0 || normFamily.indexOf(target) === 0) {
+                score += 6;
+            } else {
+                continue;
+            }
+
+            if (wantBold && (normStyle.indexOf("bold") >= 0 || normName.indexOf("bold") >= 0)) {
+                score += 4;
+            } else if (!wantBold && normStyle.indexOf("bold") < 0 && normName.indexOf("bold") < 0) {
+                score += 2;
+            }
+
+            if (wantItalic && (normStyle.indexOf("italic") >= 0 || normStyle.indexOf("oblique") >= 0)) {
+                score += 2;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = { font: font, name: font.name };
+            }
+        } catch (scanError) {}
+    }
+
+    return bestMatch;
+}
+
+function prepareStoryForDirectFormatting(story) {
+    var doc;
+    var basicStyle;
+    var noneCharacterStyle;
+
+    if (!story) {
+        return;
+    }
+
+    try {
+        doc = story.parent;
+        basicStyle = doc.paragraphStyles.itemByPath("[Basic Paragraph]");
+        story.paragraphs.everyItem().appliedParagraphStyle = basicStyle;
+    } catch (basicStyleError) {
+        try {
+            story.paragraphs.everyItem().appliedParagraphStyle = story.parent.paragraphStyles[0];
+        } catch (fallbackParagraphStyleError) {}
+    }
+
+    try {
+        noneCharacterStyle = story.parent.characterStyles.itemByPath("[None]");
+        story.characters.everyItem().appliedCharacterStyle = noneCharacterStyle;
+    } catch (noneCharacterStyleError) {}
+
+    try {
+        story.paragraphs.everyItem().clearOverrides(OverrideType.ALL);
+    } catch (clearOverridesError) {}
+}
+
+function logAppliedFontVerification(textRange, style, contextLabel) {
+    var requested = trimString(style.fontFamily || style.font || "(default)");
+    var actual = describeAppliedFont(textRange);
+    var label = contextLabel || "font";
+
+    appendRenderLog(
+        "Resolved " + label + ": requested=\"" + requested + "\" actual=\"" + actual + "\""
+    );
+
+    if (requested && requested !== "(default)" &&
+        actual.toLowerCase().indexOf("minion") >= 0 &&
+        requested.toLowerCase().indexOf("minion") < 0) {
+        warnings.push(
+            'Font mismatch for "' + requested + '": PDF text may render as "' + actual + '".'
+        );
+    }
+}
+
 function getFontStyleCandidates(bold, italic) {
     if (bold && italic) {
         return [
@@ -1969,6 +2178,7 @@ function applyThemeFontAndEmphasis(textRange, style) {
     var doc;
     var color;
     var names;
+    var resolved;
 
     if (!textRange || !style) {
         return false;
@@ -1980,62 +2190,59 @@ function applyThemeFontAndEmphasis(textRange, style) {
     applied = false;
     styleApplied = false;
 
-    if (family) {
-        candidates = getFontStyleCandidates(wantBold, wantItalic);
+    resolved = findInstalledFont(style);
+    if (resolved) {
+        try {
+            textRange.appliedFont = resolved.font;
+            applied = true;
+            styleApplied = true;
+        } catch (resolvedApplyError) {}
+    }
+
+    if (family && !applied) {
+        candidates = buildFontCandidateNames(style);
 
         for (i = 0; i < candidates.length; i++) {
             try {
-                textRange.appliedFont = app.fonts.item(family + "\t" + candidates[i]);
+                textRange.appliedFont = app.fonts.item(candidates[i]);
                 applied = true;
                 styleApplied = true;
                 break;
             } catch (fontByStyleError) {}
         }
+    }
 
-        if (!applied && wantBold) {
-            altFamilies = [
-                family + " Bold",
-                family + "-Bold",
-                family.replace(/\s+Regular$/i, "") + " Bold",
-                family.replace(/\s+Medium$/i, "") + " Bold"
-            ];
-            for (i = 0; i < altFamilies.length; i++) {
-                try {
-                    textRange.appliedFont = app.fonts.item(altFamilies[i]);
-                    applied = true;
-                    styleApplied = wantBold && !wantItalic;
-                    break;
-                } catch (altFamilyError) {}
-                try {
-                    textRange.appliedFont = app.fonts.item(altFamilies[i] + "\tRegular");
-                    applied = true;
-                    break;
-                } catch (altRegularError) {}
-            }
-        }
-
-        if (!applied && wantItalic && !wantBold) {
-            altFamilies = [family + " Italic", family + "-Italic"];
-            for (i = 0; i < altFamilies.length; i++) {
-                try {
-                    textRange.appliedFont = app.fonts.item(altFamilies[i]);
-                    applied = true;
-                    styleApplied = true;
-                    break;
-                } catch (italicFamilyError) {}
-            }
-        }
-
-        if (!applied) {
+    if (!applied && family && wantBold) {
+        altFamilies = [
+            family + " Bold",
+            family + "-Bold",
+            family.replace(/\s+Regular$/i, "") + " Bold",
+            family.replace(/\s+Medium$/i, "") + " Bold"
+        ];
+        for (i = 0; i < altFamilies.length; i++) {
             try {
-                textRange.appliedFont = app.fonts.item(family);
+                textRange.appliedFont = app.fonts.item(altFamilies[i]);
                 applied = true;
-            } catch (fontFamilyError) {
-                try {
-                    textRange.appliedFont = app.fonts.item(family + "\tRegular");
-                    applied = true;
-                } catch (regularError) {}
-            }
+                styleApplied = wantBold && !wantItalic;
+                break;
+            } catch (altFamilyError) {}
+            try {
+                textRange.appliedFont = app.fonts.item(altFamilies[i] + "\tRegular");
+                applied = true;
+                break;
+            } catch (altRegularError) {}
+        }
+    }
+
+    if (!applied && family && wantItalic && !wantBold) {
+        altFamilies = [family + " Italic", family + "-Italic"];
+        for (i = 0; i < altFamilies.length; i++) {
+            try {
+                textRange.appliedFont = app.fonts.item(altFamilies[i]);
+                applied = true;
+                styleApplied = true;
+                break;
+            } catch (italicFamilyError) {}
         }
     }
 
@@ -2043,7 +2250,6 @@ function applyThemeFontAndEmphasis(textRange, style) {
     if (!styleApplied) {
         styleApplied = applyFontStyleSafe(textRange, wantBold, wantItalic);
     } else if (wantBold || wantItalic) {
-        // Face may already be correct; still try style name for stubborn ranges.
         applyFontStyleSafe(textRange, wantBold, wantItalic);
         styleApplied = true;
     }
@@ -2092,6 +2298,10 @@ function applyThemeFontAndEmphasis(textRange, style) {
         try {
             textRange.strokeWeight = 0;
         } catch (clearStrokeError) {}
+    }
+
+    if (family && !applied && !styleApplied) {
+        warnings.push('Theme font not found in InDesign: "' + family + '".');
     }
 
     return applied || styleApplied;
@@ -2235,6 +2445,38 @@ function applyCompositeStyle(textFrame, compositeStyle) {
     } catch (leadingError) {}
 }
 
+function ensureFrameThemeStyle(textFrame, style) {
+    var story;
+    var textRange;
+
+    if (!textFrame || !style) {
+        return;
+    }
+
+    try {
+        story = textFrame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+
+    if (!story || !story.texts.length) {
+        return;
+    }
+
+    prepareStoryForDirectFormatting(story);
+    textRange = story.texts[0];
+
+    if (style.pointSize) {
+        try {
+            textRange.pointSize = style.pointSize;
+        } catch (sizeError) {}
+    }
+
+    applyThemeFontAndEmphasis(textRange, style);
+    applyTextColor(textRange, style);
+    logAppliedFontVerification(textRange, style, "frame font");
+}
+
 function applyFrameStyle(textFrame, style) {
     var story;
     var textRange;
@@ -2246,6 +2488,7 @@ function applyFrameStyle(textFrame, style) {
     story = textFrame.parentStory;
     if (!story || story.texts.length === 0) return;
 
+    prepareStoryForDirectFormatting(story);
     textRange = story.texts[0];
 
     if (style.pointSize) {
@@ -2259,13 +2502,14 @@ function applyFrameStyle(textFrame, style) {
     applyThemeFontAndEmphasis(textRange, style);
     applyTextColor(textRange, style);
     appendRenderLog(
-    "Applied Style => " +
-    "font=" + (style.fontFamily || style.font) +
-    ", size=" + style.pointSize +
-    ", color=" + style.color +
-    ", bold=" + style.bold +
-    ", italic=" + style.italic
-);
+        "Applied Style => " +
+        "font=" + (style.fontFamily || style.font) +
+        ", size=" + style.pointSize +
+        ", color=" + style.color +
+        ", bold=" + style.bold +
+        ", italic=" + style.italic
+    );
+    logAppliedFontVerification(textRange, style, "frame font");
 
     // Match web: left-align (avoid full-justify stretching short lines / titles).
     try {
@@ -2580,6 +2824,7 @@ function applyTextRangeStyle(textRange, style) {
     }
     applyThemeFontAndEmphasis(textRange, style);
     applyTextColor(textRange, style);
+    logAppliedFontVerification(textRange, style, "range font");
 }
 
 // Mirrors the web ImageBlock split: a leading "FIGURE 1.1" style prefix is
@@ -3416,6 +3661,12 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
         layoutState.document.recompose();
     } catch (recomposeDocError) {}
 
+    if (!isCompositeStyle(style)) {
+        ensureFrameThemeStyle(frame, style);
+    } else {
+        applyCompositeStyle(frame, style);
+    }
+
     firstFrame = frame;
     lastFrame = frame;
 
@@ -3567,6 +3818,10 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     }
 
     syncLayoutPageFromFrame(layoutState, chainEnd);
+
+    if (!isCompositeStyle(style)) {
+        ensureFrameThemeStyle(firstFrame, style);
+    }
 
     return chainEnd;
 }
