@@ -111,14 +111,16 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
     ? sectionTitleRaw
     : pickFlatStyle(styleSet, ['sectionTitle']);
   const subSectionTitle = pickFlatStyle(styleSet, ['subSectionTitle']);
-  const greenSubSectionTitle = pickFlatStyle(styleSet, ['greenSubSectionTitle', 'subSectionTitle']);
+  const greenSubSectionTitle = pickFlatStyle(styleSet, ['greenSubSectionTitle']);
   const subTitle = pickFlatStyle(styleSet, ['subTitle']);
-  const subTitlesListRaw = pickRawStyle(styleSet, ['subTitlesList', 'lessonOverview']);
+  const subTitlesListRaw = pickRawStyle(styleSet, ['subTitlesList']);
   const subTitlesList = isCompositeStyle(subTitlesListRaw)
     ? subTitlesListRaw
     : pickFlatStyle(styleSet, ['subTitlesList']);
   const paragraphText = pickFlatStyle(styleSet, ['paragraphText', 'paragrapghText', 'text']);
-  const bulletList = pickFlatStyle(styleSet, ['bulletList', 'bullestList', 'paragraphText']);
+  // Only resolve list/heading keys when the theme defines them — no inventing from other styles.
+  const bulletList = pickFlatStyle(styleSet, ['bulletList', 'bullestList']);
+  const numberedList = pickFlatStyle(styleSet, ['numberedList']);
   const imageFigureNumber = pickFlatStyle(styleSet, ['imageFigureNumber']);
   const imageFigureText = pickFlatStyle(styleSet, [
     'imageFigureText',
@@ -128,6 +130,7 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
   const quotationRaw = pickRawStyle(styleSet, ['quotation', 'quote']);
   const tableRaw = pickRawStyle(styleSet, ['table']);
   const footer = pickFlatStyle(styleSet, ['footer']);
+  const subSectionHeading = pickFlatStyle(styleSet, ['subSectionHeading', 'subsectionHeading']);
 
   return {
     chapterHeading,
@@ -139,10 +142,12 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
     sectionTitle,
     subSectionTitle,
     greenSubSectionTitle,
+    subSectionHeading,
     subTitle,
     subTitlesList,
     paragraphText,
     bulletList,
+    numberedList,
     imageFigureNumber,
     imageFigureText,
     chapterNumber,
@@ -324,12 +329,14 @@ export const blockTypeToStyleKey = {
   SectionTitle: 'sectionTitle',
   SubSectionTitle: 'subSectionTitle',
   GreenSubSectionTitle: 'greenSubSectionTitle',
+  SubSectionHeading: 'subSectionHeading',
   SubTitle: 'subTitle',
   SubTitlesList: 'subTitlesList',
   LearningObjectives: 'learningObjectives',
   ParagraphText: 'paragraphText',
   Text: 'text',
   BulletList: 'bulletList',
+  NumberedList: 'numberedList',
   Image: 'imageCaption',
   FigureCaption: 'figureCaption',
   LogoWithText: 'logoText',

@@ -43,7 +43,7 @@
       }
     },
     "lessonTitle": {
-      "font": "Futura Std",
+      "font": "Futura PT",
       "size": 18,
       "color": "#214880",
       "bold": true
@@ -53,8 +53,8 @@
       "size": 10,
       "color": "#000000",
       "bold": false,
-      "borderTop": "2px solid #CA5021",
-      "borderBottom": "2px solid #CA5021"
+      "borderTop": "1px solid #CA5021",
+      "borderBottom": "1px solid #CA5021"
     },
     "subSectionTitle": {
       "font": "Neue Kabel",
@@ -68,6 +68,12 @@
       "color": "#00854A",
       "bold": true
     },
+    "subSectionHeading": {
+      "font": "Neue Kabel Medium, Arial",
+      "size": 12,
+      "color": "#CA5027",
+      "bold": false
+    },
     "learningObjectives": {
       "font": "Neue Kabel Medium",
       "size": 15,
@@ -75,7 +81,7 @@
       "bold": true
     },
     "partNumber": {
-      "font": "Arial",
+      "font": "Neue Kabel Book",
       "size": 24,
       "color": "#FFFFFF",
       "bold": false,
@@ -102,8 +108,14 @@
       "bold": false
     },
     "bulletList": {
-      "font": "Arial",
-      "size": 9,
+      "font": "Adobe Garamond Pro Regular",
+      "size": 11,
+      "color": "#000000",
+      "bold": false
+    },
+    "numberedList": {
+      "font": "Adobe Garamond Pro Regular",
+      "size": 11,
       "color": "#000000",
       "bold": false
     },

@@ -74,7 +74,11 @@ const mapContentItem = (item, media, index, options = {}) => {
     return {
       id: `content-${index}`,
       type: 'Paragraph',
-      props: { text: item.text },
+      props: {
+        text: item.text,
+        items: item.items,
+        listType: item.listType || 'bullet',
+      },
     };
   }
 
@@ -288,6 +292,7 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   sectiontitle: 'SectionTitle',
   subsectiontitle: 'SubSectionTitle',
   greensubsectiontitle: 'GreenSubSectionTitle',
+  subsectionheading: 'SubSectionHeading',
   subtitleslist: 'SubTitlesList',
   subtitle: 'SubTitle',
   partnumber: 'PartNumber',
@@ -296,6 +301,8 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   paragrapghtext: 'ParagraphText',
   bulletlist: 'BulletList',
   bullestlist: 'BulletList',
+  numberedlist: 'NumberedList',
+  orderedlist: 'NumberedList',
   text: 'Text',
   image: 'Image',
   figureimage: 'Image',
@@ -342,7 +349,7 @@ const extractLearningObjectives = (text) => {
 };
 
 const normalizeBulletItem = (value) =>
-  normalizeText(value).replace(/^[\u2022•\-\*]\s*/, '');
+  normalizeText(value).replace(/^([\u2022•\-\*]|\d+[.)])\s*/, '');
 
 const parseSectionHeading = (text) => {
   const normalized = normalizeText(text);
@@ -428,6 +435,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     SectionTitle: 'sectionTitle',
     SubSectionTitle: 'subSectionTitle',
     GreenSubSectionTitle: 'greenSubSectionTitle',
+    SubSectionHeading: 'subSectionHeading',
     SubTitle: 'subTitle',
     SubTitlesList: 'subTitlesList',
   };
@@ -515,13 +523,13 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return component;
   }
 
-  if (type === 'BulletList') {
+  if (type === 'BulletList' || type === 'NumberedList') {
     const items = Array.isArray(block?.data?.items)
       ? block.data.items.map((item) => normalizeBulletItem(item)).filter(Boolean)
       : [];
     if (!items.length) return null;
 
-    if (ctx.pendingLearningObjective) {
+    if (type === 'BulletList' && ctx.pendingLearningObjective) {
       ctx.pendingLearningObjective.props.objectives = [
         ...(ctx.pendingLearningObjective.props.objectives || []),
         ...items,
@@ -532,8 +540,11 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     return {
       id: `content-${index}`,
       type: 'Paragraph',
-      contentType: 'BulletList',
-      props: { items },
+      contentType: type,
+      props: {
+        items,
+        listType: type === 'NumberedList' ? 'numbered' : 'bullet',
+      },
     };
   }
 
@@ -978,7 +989,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       return;
     }
 
-    if (rawType === 'BulletList') {
+    if (rawType === 'BulletList' || rawType === 'NumberedList') {
       pendingImageMediaId = null;
       const items = Array.isArray(node?.data?.items)
         ? node.data.items.map((item) => normalizeText(item)).filter(Boolean)
@@ -986,13 +997,15 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 
       if (!items.length) return;
 
-      if (captureLearningObjectives) {
+      if (rawType === 'BulletList' && captureLearningObjectives) {
         captureLearningObjectives.objectives.push(...items);
         return;
       }
 
-      items.forEach((item) => {
-        content.push({ type: 'paragraph', text: item });
+      content.push({
+        type: 'paragraph',
+        items,
+        listType: rawType === 'NumberedList' ? 'numbered' : 'bullet',
       });
       return;
     }
@@ -1022,6 +1035,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
     if (
       (type === 'SubSectionTitle' ||
         type === 'GreenSubSectionTitle' ||
+        type === 'SubSectionHeading' ||
         type === 'SubTitle' ||
         type === 'SubTitlesList') &&
       dataText
@@ -1031,6 +1045,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
       const variantMap = {
         SubSectionTitle: 'subSectionTitle',
         GreenSubSectionTitle: 'greenSubSectionTitle',
+        SubSectionHeading: 'subSectionHeading',
         SubTitle: 'subTitle',
         SubTitlesList: 'subTitlesList',
       };

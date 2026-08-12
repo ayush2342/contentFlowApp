@@ -36,14 +36,18 @@ const splitIntroductionPrefix = (text) => {
   };
 };
 
-const Paragraph = ({ text, items }) => {
+const Paragraph = ({ text, items, listType = 'bullet' }) => {
   if (Array.isArray(items) && items.length) {
+    const isNumbered = listType === 'numbered' || listType === 'ordered';
+    const ListTag = isNumbered ? 'ol' : 'ul';
+    const listClass = isNumbered ? styles.numberedList : styles.bulletList;
+    const styleKey = isNumbered ? 'numberedList' : 'bulletList';
     return (
-      <ul className={styles.bulletList} style={getTypographyBorderStyle('bulletList')}>
+      <ListTag className={listClass} style={getTypographyBorderStyle(styleKey)}>
         {items.map((item, index) => (
-          <li key={`bullet-${index}`}>{renderWithLinks(item)}</li>
+          <li key={`list-${index}`}>{renderWithLinks(item)}</li>
         ))}
-      </ul>
+      </ListTag>
     );
   }
 

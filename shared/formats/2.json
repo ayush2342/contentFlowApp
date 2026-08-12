@@ -24,7 +24,16 @@
     "SubSectionTitle": {
       "columns": 1
     },
+    "SubSectionHeading": {
+      "columns": 1
+    },
     "ParagraphText": {
+      "columns": 1
+    },
+    "BulletList": {
+      "columns": 1
+    },
+    "NumberedList": {
       "columns": 1
     },
     "PartNumber": {
@@ -66,7 +75,16 @@
     "SubSectionTitle": {
       "columns": 1
     },
+    "SubSectionHeading": {
+      "columns": 1
+    },
     "ParagraphText": {
+      "columns": 1
+    },
+    "BulletList": {
+      "columns": 1
+    },
+    "NumberedList": {
       "columns": 1
     },
     "PartNumber": {

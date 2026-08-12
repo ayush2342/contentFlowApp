@@ -36,6 +36,8 @@
 }
 
 .chapterTitle {
+  margin-top: 1rem;
+  margin-bottom: 1.35rem;
   font-family: var(--typography-chapterTitle-font);
   font-size: var(--typography-chapterTitle-size);
   font-weight: var(--typography-chapterTitle-weight);
@@ -94,6 +96,13 @@
   font-size: var(--typography-greenSubSectionTitle-size);
   font-weight: var(--typography-greenSubSectionTitle-weight);
   color: var(--typography-greenSubSectionTitle-color);
+}
+
+.subSectionHeading {
+  font-family: var(--typography-subSectionHeading-font);
+  font-size: var(--typography-subSectionHeading-size);
+  font-weight: var(--typography-subSectionHeading-weight);
+  color: var(--typography-subSectionHeading-color);
 }
 
 .subTitle {

@@ -647,12 +647,15 @@ function buildCanonicalStyleMap(styleSet) {
     var subTitle = pickTypographyEntry(styleSet, ["subTitle"]);
     var partNumber = pickTypographyEntry(styleSet, ["partNumber"]);
     var paragraphText = pickTypographyEntry(styleSet, ["paragraphText", "paragrapghText", "text"]);
-    var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList", "paragraphText"]);
+    // Theme-only keys: do not invent from other styles when absent (e.g. theme 1).
+    var bulletList = pickTypographyEntry(styleSet, ["bulletList", "bullestList"]);
+    var numberedList = pickTypographyEntry(styleSet, ["numberedList"]);
     var imageFigureNumber = pickTypographyEntry(styleSet, ["imageFigureNumber"]);
     var imageFigureText = pickTypographyEntry(styleSet, ["imageFigureText", "imageCaption", "figureCaption"]);
     var quotation = pickRawTypographyEntry(styleSet, ["quotation", "quote"]);
     var table = pickRawTypographyEntry(styleSet, ["table"]);
     var footer = pickTypographyEntry(styleSet, ["footer"]);
+    var subSectionHeading = pickTypographyEntry(styleSet, ["subSectionHeading", "subsectionHeading"]);
 
     return {
         chapterHeading: chapterHeading,
@@ -665,10 +668,12 @@ function buildCanonicalStyleMap(styleSet) {
         subTitlesList: subTitlesList,
         subSectionTitle: subSectionTitle,
         greenSubSectionTitle: greenSubSectionTitle,
+        subSectionHeading: subSectionHeading,
         subTitle: subTitle,
         partNumber: partNumber,
         paragraphText: paragraphText,
         bulletList: bulletList,
+        numberedList: numberedList,
         imageFigureNumber: imageFigureNumber,
         imageFigureText: imageFigureText,
         chapterNumber: chapterNumber || chapterHeading,
@@ -929,15 +934,33 @@ function buildFrameStylesFromConfig(typographyConfig) {
     }
 
     for (key in FRAME_STYLES_DEFAULTS) {
-        if (FRAME_STYLES_DEFAULTS.hasOwnProperty(key) && !styles[key]) {
-            styles[key] = cloneFallbackStyle(key);
-            appendRenderLog("  style " + key + " -> FALLBACK");
+        if (!FRAME_STYLES_DEFAULTS.hasOwnProperty(key) || styles[key]) {
+            continue;
         }
+        // Do not invent Theme-2-only styles when the active theme omits them.
+        if (
+            key === "numberedList" ||
+            key === "subSectionHeading" ||
+            key === "partNumber" ||
+            key === "quotation" ||
+            key === "table" ||
+            key === "footer" ||
+            key === "greenSubSectionTitle" ||
+            key === "subTitlesList" ||
+            key === "subTitle"
+        ) {
+            continue;
+        }
+        styles[key] = cloneFallbackStyle(key);
+        appendRenderLog("  style " + key + " -> FALLBACK");
     }
     
-    // Ensure bulletList has proper indent
+    // Ensure list styles have proper indent
     if (styles.bulletList) {
         styles.bulletList.leftIndent = 12;
+    }
+    if (styles.numberedList) {
+        styles.numberedList.leftIndent = 12;
     }
 
     styles.__mode = mode;
@@ -966,8 +989,10 @@ var FRAME_STYLES_DEFAULTS = {
     paragraphText: { pointSize: 10, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
     learningObjectives: { pointSize: 15, bold: true, italic: false, leftIndent: 0, color: [202, 80, 39] },
     bulletList: { pointSize: 10, bold: false, italic: false, leftIndent: 12, color: [0, 0, 0] },
+    numberedList: { pointSize: 10, bold: false, italic: false, leftIndent: 12, color: [0, 0, 0] },
     logoText: { pointSize: 10, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
     subSectionTitle: { pointSize: 10, bold: true, italic: false, leftIndent: 0, color: [0, 0, 0] },
+    subSectionHeading: { font: "Arial", pointSize: 12, bold: false, italic: false, leftIndent: 0, color: [202, 80, 39] },
     figureCaption: { pointSize: 7.5, bold: false, italic: true, leftIndent: 0, color: [64, 64, 64] },
     imageFigureNumber: { pointSize: 7.5, bold: true, italic: false, leftIndent: 0, color: [195, 20, 39] },
     imageFigureText: { pointSize: 7.5, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] },
@@ -1055,6 +1080,13 @@ var BLOCK_REGISTRY = {
         prototype: "proto:subSectionTitle",
         spacingAfter: 10
     },
+    SubSectionHeading: {
+        label: "subSectionHeading",
+        style: FRAME_STYLES.subSectionHeading,
+        kind: "text",
+        prototype: "proto:subSectionHeading",
+        spacingAfter: 10
+    },
     FigureCaption: {
         label: "figureCaption",
         style: FRAME_STYLES.figureCaption,
@@ -1083,14 +1115,14 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.chapterNumber,
         kind: "text",
         prototype: "proto:chapterNumber",
-        spacingAfter: 8
+        spacingAfter: 18
     },
     ChapterTitle: {
         label: "chapterTitle",
         style: FRAME_STYLES.chapterTitle,
         kind: "text",
         prototype: "proto:chapterTitle",
-        spacingAfter: 16
+        spacingAfter: 24
     },
     LessonOverview: {
         label: "lessonOverview",
@@ -1098,7 +1130,8 @@ var BLOCK_REGISTRY = {
         kind: "text",
         prototype: "proto:lessonOverview",
         // Match web heading margin (~1rem+) between LO items in 2-col opener grid.
-        spacingAfter: 24
+        spacingAfter: 24,
+        spacingBefore: 14
     },
     ParagraphText: {
         label: "paragraphText",
@@ -1119,6 +1152,13 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.bulletList,
         kind: "text",
         prototype: "proto:bulletList",
+        spacingAfter: 6
+    },
+    NumberedList: {
+        label: "numberedList",
+        style: FRAME_STYLES.numberedList,
+        kind: "text",
+        prototype: "proto:numberedList",
         spacingAfter: 6
     },
     LogoWithText: {
@@ -2939,24 +2979,30 @@ function assignFrameToContentLayer(frame) {
     } catch (layerError) {}
 }
 
-function getBlockText(data) {
+function getBlockText(data, listStyle) {
     var fields;
     var i;
     var value;
     var bulletLines;
     var bulletText;
+    var prefix;
+    var useNumbered;
 
     if (!data) {
         return "";
     }
 
-    // BulletList blocks carry an "items" array instead of a text field.
+    // List blocks carry an "items" array instead of a text field.
     if (data.items && data.items.length !== undefined) {
+        useNumbered = listStyle === "numbered" || listStyle === "NumberedList";
         bulletLines = [];
         for (i = 0; i < data.items.length; i++) {
             bulletText = fixUtf8Mojibake(trimString(data.items[i]));
             if (bulletText) {
-                bulletLines.push("\u2022 " + bulletText);
+                // Strip existing markers so we do not double-prefix.
+                bulletText = bulletText.replace(/^([\u2022•\-\*]|\d+[.)])\s*/, "");
+                prefix = useNumbered ? String(i + 1) + ". " : "\u2022 ";
+                bulletLines.push(prefix + bulletText);
             }
         }
         if (bulletLines.length > 0) {
@@ -2996,12 +3042,15 @@ function normalizeBlockType(itemType) {
         paragraphtext: "ParagraphText",
         learningobjectives: "LearningObjectives",
         bulletlist: "BulletList",
+        numberedlist: "NumberedList",
+        orderedlist: "NumberedList",
         logowithtext: "LogoWithText",
         partnumber: "PartNumber",
         subtitleslist: "SubTitlesList",
         greensubsectiontitle: "GreenSubSectionTitle",
         subtitle: "SubTitle",
         subsectiontitle: "SubSectionTitle",
+        subsectionheading: "SubSectionHeading",
         caption: "FigureCaption",
         figurecaption: "FigureCaption",
         quotation: "Quotation",
@@ -4343,7 +4392,7 @@ function placeChapterNumberBar(layoutState, text, style) {
     padY = 8;
     padX = 12;
     barHeight = pointSize + padY * 2;
-    gapAfter = 8;
+    gapAfter = 18;
 
     layoutBounds = ensureLayoutSpace(layoutState, barHeight);
     frameTop = layoutState.cursorY;
@@ -4417,7 +4466,10 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     var protoFrame;
     var protoHeight;
     var frame;
-    var cleanText = getBlockText(data);
+    var cleanText = getBlockText(
+        data,
+        itemType === "NumberedList" ? "numbered" : null
+    );
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: " + itemType);
@@ -5426,6 +5478,10 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
                     j += 1;
                 }
                 i = j - 1;
+                // Extra air between intro ParagraphText and the LO grid.
+                if (registryEntry.spacingBefore) {
+                    layoutState.cursorY += Number(registryEntry.spacingBefore) || 0;
+                }
                 placeTwoColumnTextGroup(
                     layoutState,
                     document,
@@ -5433,6 +5489,16 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
                     registryEntry
                 );
                 continue;
+            }
+
+            // 1-col LessonOverview: add top gap once when coming from ParagraphText.
+            if (
+                itemType === "LessonOverview" &&
+                registryEntry.spacingBefore &&
+                i > 0 &&
+                normalizeBlockType(split.body[i - 1].type) === "ParagraphText"
+            ) {
+                layoutState.cursorY += Number(registryEntry.spacingBefore) || 0;
             }
 
             populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex);
@@ -5646,10 +5712,12 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.ParagraphText.style = FRAME_STYLES.paragraphText || FRAME_STYLES_DEFAULTS.paragraphText;
     BLOCK_REGISTRY.LearningObjectives.style = FRAME_STYLES.learningObjectives || FRAME_STYLES_DEFAULTS.learningObjectives;
     BLOCK_REGISTRY.BulletList.style = FRAME_STYLES.bulletList || FRAME_STYLES_DEFAULTS.bulletList;
+    BLOCK_REGISTRY.NumberedList.style = FRAME_STYLES.numberedList || FRAME_STYLES_DEFAULTS.numberedList;
     BLOCK_REGISTRY.LogoWithText.style = FRAME_STYLES.logoText || FRAME_STYLES_DEFAULTS.logoText;
     BLOCK_REGISTRY.PartNumber.style = FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber;
     BLOCK_REGISTRY.SubTitlesList.style = FRAME_STYLES.subTitlesList || FRAME_STYLES_DEFAULTS.subTitlesList;
     BLOCK_REGISTRY.GreenSubSectionTitle.style = FRAME_STYLES.greenSubSectionTitle || FRAME_STYLES_DEFAULTS.greenSubSectionTitle;
+    BLOCK_REGISTRY.SubSectionHeading.style = FRAME_STYLES.subSectionHeading || FRAME_STYLES_DEFAULTS.subSectionHeading;
     BLOCK_REGISTRY.SubTitle.style = FRAME_STYLES.subTitle || FRAME_STYLES_DEFAULTS.subTitle;
     BLOCK_REGISTRY.Quotation.style = FRAME_STYLES.quotation || FRAME_STYLES_DEFAULTS.quotation;
     BLOCK_REGISTRY.Table.style = FRAME_STYLES.table || FRAME_STYLES_DEFAULTS.table;

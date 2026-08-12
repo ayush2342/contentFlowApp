@@ -10,6 +10,7 @@ const variantClassMap = {
   sectionTitle: styles.sectionTitle,
   subSectionTitle: styles.subSectionTitle,
   greenSubSectionTitle: styles.greenSubSectionTitle,
+  subSectionHeading: styles.subSectionHeading,
   subTitle: styles.subTitle,
   subTitlesList: styles.subTitlesList,
   chapterOverview: styles.chapterOverview,
