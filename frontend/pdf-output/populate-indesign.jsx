@@ -1115,14 +1115,14 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.chapterNumber,
         kind: "text",
         prototype: "proto:chapterNumber",
-        spacingAfter: 18
+        spacingAfter: 28
     },
     ChapterTitle: {
         label: "chapterTitle",
         style: FRAME_STYLES.chapterTitle,
         kind: "text",
         prototype: "proto:chapterTitle",
-        spacingAfter: 24
+        spacingAfter: 36
     },
     LessonOverview: {
         label: "lessonOverview",
@@ -3023,6 +3023,162 @@ function getBlockText(data, listStyle) {
     return "";
 }
 
+/**
+ * Parse cendoc-style inline HTML from output JSON into plain text + style runs.
+ * Supports: i/em, b/strong, span (glossary → plain), sup (endnote → superscript), br, a (text only).
+ */
+function parseInlineMarkup(raw) {
+    var text;
+    var plain = "";
+    var runs = [];
+    var stack = [];
+    var last = 0;
+    var m;
+    var re;
+    var tag;
+    var isClose;
+    var isSelfClose;
+    var i;
+    var open;
+    var runItalic;
+    var runBold;
+    var runSuper;
+
+    text = fixUtf8Mojibake(String(raw || ""));
+    text = text
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, "\"")
+        .replace(/&#39;/gi, "'");
+
+    if (text.indexOf("<") < 0) {
+        return { plain: text, runs: runs };
+    }
+
+    re = /<\/?([a-zA-Z0-9]+)(\s[^>]*)?\s*\/?>/g;
+    while ((m = re.exec(text)) !== null) {
+        if (m.index > last) {
+            plain += text.substring(last, m.index);
+        }
+
+        tag = String(m[1] || "").toLowerCase();
+        isClose = m[0].charAt(1) === "/";
+        isSelfClose = /\/\s*>$/.test(m[0]) || tag === "br";
+
+        if (!isClose && isSelfClose && tag === "br") {
+            plain += "\r";
+        } else if (!isClose && !isSelfClose) {
+            if (
+                tag === "i" ||
+                tag === "em" ||
+                tag === "b" ||
+                tag === "strong" ||
+                tag === "span" ||
+                tag === "sup" ||
+                tag === "a"
+            ) {
+                stack.push({
+                    tag: tag,
+                    start: plain.length,
+                    italic: tag === "i" || tag === "em",
+                    bold: tag === "b" || tag === "strong",
+                    superscript: tag === "sup"
+                });
+            }
+            // Unknown open tags are dropped; inner text is kept.
+        } else if (isClose) {
+            for (i = stack.length - 1; i >= 0; i--) {
+                if (stack[i].tag === tag) {
+                    open = stack[i];
+                    stack.splice(i, 1);
+                    runItalic = open.italic;
+                    runBold = open.bold;
+                    runSuper = open.superscript;
+                    // Inherit open emphasis from parents still on the stack.
+                    var p;
+                    for (p = 0; p < stack.length; p++) {
+                        if (stack[p].italic) runItalic = true;
+                        if (stack[p].bold) runBold = true;
+                        if (stack[p].superscript) runSuper = true;
+                    }
+                    if (plain.length > open.start && (runItalic || runBold || runSuper)) {
+                        runs.push({
+                            start: open.start,
+                            end: plain.length,
+                            italic: runItalic,
+                            bold: runBold,
+                            superscript: runSuper
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+
+        last = m.index + m[0].length;
+    }
+
+    if (last < text.length) {
+        plain += text.substring(last);
+    }
+
+    return { plain: plain, runs: runs };
+}
+
+function applyInlineMarkupRuns(frame, runs, baseStyle) {
+    var story;
+    var i;
+    var run;
+    var fromIdx;
+    var toIdx;
+    var range;
+    var runStyle;
+    var base;
+
+    if (!frame || !runs || !runs.length) {
+        return;
+    }
+
+    try {
+        story = frame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+    if (!story) {
+        return;
+    }
+
+    base = baseStyle && !isCompositeStyle(baseStyle) ? baseStyle : {};
+
+    for (i = 0; i < runs.length; i++) {
+        run = runs[i];
+        if (!run || run.end <= run.start) {
+            continue;
+        }
+        fromIdx = run.start;
+        toIdx = run.end - 1;
+        try {
+            range = story.characters.itemByRange(fromIdx, toIdx);
+            runStyle = {
+                font: base.fontFamily || base.font || "",
+                fontFamily: base.fontFamily || base.font || "",
+                pointSize: base.pointSize,
+                bold: run.bold ? true : isTruthyFlag(base.bold),
+                italic: run.italic ? true : isTruthyFlag(base.italic),
+                color: base.color
+            };
+            applyThemeFontAndEmphasis(range, runStyle);
+            if (run.superscript) {
+                try {
+                    range.position = Position.SUPERSCRIPT;
+                } catch (supError) {}
+            }
+        } catch (rangeError) {}
+    }
+}
+
 function normalizeBlockType(itemType) {
     var compact;
     var aliases;
@@ -3692,7 +3848,8 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
 
     frameTop = layoutState.cursorY;
     frame = createTextFrameOnPage(layoutState.page, layoutBounds, frameTop, frameHeight);
-    frame.contents = cleanText;
+    var inlineParsed = parseInlineMarkup(cleanText);
+    frame.contents = inlineParsed.plain;
     if (isCompositeStyle(style)) {
         applyCompositeStyle(frame, style);
     } else {
@@ -3715,6 +3872,8 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     } else {
         applyCompositeStyle(frame, style);
     }
+    // Apply after theme style so i/b/sup runs are not wiped by whole-story formatting.
+    applyInlineMarkupRuns(frame, inlineParsed.runs, style);
 
     firstFrame = frame;
     lastFrame = frame;
@@ -3871,6 +4030,7 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     if (!isCompositeStyle(style)) {
         ensureFrameThemeStyle(firstFrame, style);
     }
+    applyInlineMarkupRuns(firstFrame, inlineParsed.runs, style);
 
     return chainEnd;
 }
@@ -4392,7 +4552,7 @@ function placeChapterNumberBar(layoutState, text, style) {
     padY = 8;
     padX = 12;
     barHeight = pointSize + padY * 2;
-    gapAfter = 18;
+    gapAfter = 28;
 
     layoutBounds = ensureLayoutSpace(layoutState, barHeight);
     frameTop = layoutState.cursorY;

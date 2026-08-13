@@ -6,12 +6,32 @@
   font-weight: var(--typography-paragraphText-weight, 400);
   margin: 0 0 0.85rem;
   text-align: left;
-}
 
-.link {
-  color: var(--primary-color);
-  text-decoration: underline;
-  word-break: break-all;
+  :global(.cendoc-glossary-term) {
+    border-bottom: 1px dotted currentColor;
+    cursor: help;
+  }
+
+  :global(sup.cendoc-endnote),
+  :global(.cendoc-endnote) {
+    font-size: 0.65em;
+    line-height: 0;
+    vertical-align: super;
+  }
+
+  em {
+    font-style: italic;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+
+  a {
+    color: var(--primary-color);
+    text-decoration: underline;
+    word-break: break-all;
+  }
 }
 
 .leadLabel {
@@ -32,6 +52,19 @@
     margin: 0 0 0.35rem;
     padding-left: 0.15rem;
   }
+
+  :global(.cendoc-glossary-term) {
+    border-bottom: 1px dotted currentColor;
+    cursor: help;
+  }
+
+  em {
+    font-style: italic;
+  }
+
+  strong {
+    font-weight: 700;
+  }
 }
 
 .numberedList {
@@ -47,5 +80,18 @@
   li {
     margin: 0 0 0.35rem;
     padding-left: 0.15rem;
+  }
+
+  :global(.cendoc-glossary-term) {
+    border-bottom: 1px dotted currentColor;
+    cursor: help;
+  }
+
+  em {
+    font-style: italic;
+  }
+
+  strong {
+    font-weight: 700;
   }
 }

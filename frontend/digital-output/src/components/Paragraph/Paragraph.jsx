@@ -1,30 +1,6 @@
 import { getTypographyBorderStyle } from '../../../../../shared/typography-styles.js';
+import { renderInlineHtml } from '../../utils/inlineHtml';
 import styles from './Paragraph.module.scss';
-
-const URL_REGEX = /(https?:\/\/[^\s]+)/g;
-
-const renderWithLinks = (text) => {
-  const value = String(text ?? '');
-  const parts = value.split(URL_REGEX);
-
-  return parts.map((part, index) => {
-    if (!part) return null;
-    if (part.startsWith('http://') || part.startsWith('https://')) {
-      return (
-        <a
-          key={`link-${index}`}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.link}
-        >
-          {part}
-        </a>
-      );
-    }
-    return <span key={`text-${index}`}>{part}</span>;
-  });
-};
 
 const splitIntroductionPrefix = (text) => {
   const value = String(text ?? '');
@@ -45,7 +21,7 @@ const Paragraph = ({ text, items, listType = 'bullet' }) => {
     return (
       <ListTag className={listClass} style={getTypographyBorderStyle(styleKey)}>
         {items.map((item, index) => (
-          <li key={`list-${index}`}>{renderWithLinks(item)}</li>
+          <li key={`list-${index}`}>{renderInlineHtml(item)}</li>
         ))}
       </ListTag>
     );
@@ -58,14 +34,14 @@ const Paragraph = ({ text, items, listType = 'bullet' }) => {
     return (
       <p className={styles.paragraph} style={borderStyle}>
         <strong className={styles.leadLabel}>{intro.label}</strong>{' '}
-        {renderWithLinks(intro.rest)}
+        {renderInlineHtml(intro.rest)}
       </p>
     );
   }
 
   return (
     <p className={styles.paragraph} style={borderStyle}>
-      {renderWithLinks(text)}
+      {renderInlineHtml(text)}
     </p>
   );
 };
