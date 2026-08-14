@@ -14,9 +14,15 @@ const captionParts = (caption) => {
 const ImageBlock = ({ src, alt, caption, partNumberOverlay }) => {
   const parsedCaption = captionParts(caption);
   const overlayText = String(partNumberOverlay ?? '').trim();
+  const figureClass = [
+    styles.imageBlock,
+    overlayText ? styles.imageBlockFlush : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <figure className={styles.imageBlock}>
+    <figure className={figureClass}>
       <div className={styles.imageFrame}>
         <img src={src} alt={alt} className={styles.image} />
         {overlayText ? (

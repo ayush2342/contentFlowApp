@@ -254,8 +254,8 @@ export const toCssVariables = (key, style) => {
   const padValue = !hasBadgeBackground
     ? '0'
     : isFullWidthBar
-      ? '0.45rem 0.85rem'
-      : '0.2rem 0.6rem';
+      ? '0.7rem 0.85rem'
+      : '0.08rem 0.55rem';
   return {
     [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,
     [`${prefix}-size`]: `${style.size}pt`,

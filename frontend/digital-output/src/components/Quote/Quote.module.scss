@@ -1,6 +1,11 @@
 .quote {
-  margin: 1rem 0;
-  padding: 1rem 1.25rem;
+  margin: 0.35rem 0;
+  /* Explicit top/bottom so padding is never collapsed by shorthand overrides */
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  padding-left: 1.15rem;
+  padding-right: 1.15rem;
+  box-sizing: border-box;
   /* Neutral fallback — theme2 green must not appear when theme has no quotation bg */
   background: var(--typography-quotation-bg, transparent);
   border-radius: 2px;
@@ -18,7 +23,7 @@
 
 .author {
   display: block;
-  margin-top: 0.75rem;
+  margin-top: 0.65rem;
   font-family: var(--typography-quotationAuthor-font, Arial, sans-serif);
   font-size: var(--typography-quotationAuthor-size, 10pt);
   font-weight: var(--typography-quotationAuthor-weight, 400);

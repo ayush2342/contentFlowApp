@@ -15,6 +15,7 @@
   font-weight: var(--typography-partNumber-weight);
   color: var(--typography-partNumber-color);
   background-color: var(--typography-partNumber-bg, transparent);
+  line-height: 1.05;
 }
 
 .chapterNumber {
@@ -22,6 +23,7 @@
   width: 100%;
   box-sizing: border-box;
   text-align: left;
+  margin-top: 0;
   margin-bottom: 0;
   /* theme1 (no bg) → pad 0; theme2 (full-width bar) → vertical pad via CSS var */
   padding: var(

@@ -1108,7 +1108,8 @@ var BLOCK_REGISTRY = {
         captionPrototype: "proto:imageCaption",
         style: FRAME_STYLES.imageCaption,
         kind: "image",
-        spacingAfter: 14
+        // Flush to following ChapterNumber on opener (tiny hairline gap in placeChapterNumberBar).
+        spacingAfter: 0
     },
     ChapterNumber: {
         label: "chapterNumber",
@@ -1202,7 +1203,7 @@ var BLOCK_REGISTRY = {
         label: "quotation",
         style: FRAME_STYLES.quotation,
         kind: "quotation",
-        spacingAfter: 14
+        spacingAfter: 6
     },
     Table: {
         label: "table",
@@ -3443,13 +3444,13 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
 
     appliedStyle = style || FRAME_STYLES.partNumber || FRAME_STYLES_DEFAULTS.partNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 24;
-    padX = 14;
-    padY = 8;
-    // Approximate web badge: padding + text width (Arial ~0.55em average).
-    width = Math.max(90, text.length * pointSize * 0.55 + padX * 2);
-    height = Math.max(pointSize + padY * 2, 34);
+    padX = 10;
+    padY = 3;
+    // Compact badge — match web tight padding (not a tall bar).
+    width = Math.max(72, text.length * pointSize * 0.55 + padX * 2);
+    height = Math.max(pointSize + padY * 2, 28);
     // Inset slightly from the image top-left (match web gap).
-    top = imageBounds[0] + 10;
+    top = imageBounds[0] + 8;
     left = imageBounds[1];
 
     if (left + width > imageBounds[3]) {
@@ -4549,7 +4550,7 @@ function placeChapterNumberBar(layoutState, text, style) {
 
     appliedStyle = style || FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 36;
-    padY = 8;
+    padY = 14;
     padX = 12;
     barHeight = pointSize + padY * 2;
     gapAfter = 28;
@@ -4660,6 +4661,15 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     // ChapterNumber: dedicated full-width bar — never go through flowDynamicText /
     // advanceLayoutCursor tighten (FRAME_TO_CONTENT was wiping the text).
     if (itemType === "ChapterNumber" || itemType === "ChapterHeading") {
+        // Opener: sit almost flush under the hero image (slight hairline gap).
+        if (layoutState.lastImageFrame) {
+            try {
+                var imgBottom = layoutState.lastImageFrame.geometricBounds[2];
+                if (layoutState.cursorY - imgBottom <= 24) {
+                    layoutState.cursorY = imgBottom + 3;
+                }
+            } catch (flushError) {}
+        }
         try {
             frame = placeChapterNumberBar(
                 layoutState,
@@ -5184,7 +5194,9 @@ function applyQuotationPresentation(frame, quotationStyle, hasAuthor) {
     for (i = 0; i < frames.length; i++) {
         applyFrameFillColor(frames[i], fillStyle);
         try {
-            frames[i].textFramePreferences.insetSpacing = [10, 12, 10, 12];
+            frames[i].textFramePreferences.insetSpacing = [18, 12, 18, 12];
+            frames[i].textFramePreferences.verticalJustification =
+                VerticalJustification.TOP_ALIGN;
         } catch (insetError) {}
     }
 
@@ -5201,17 +5213,32 @@ function applyQuotationPresentation(frame, quotationStyle, hasAuthor) {
     } catch (authorStyleError) {}
 }
 
+/**
+ * Place quotation (+ author) in one sized frame so text is not truncated by
+ * overflow threading / FRAME_TO_CONTENT (matches full web quote block).
+ */
 function populateDynamicQuotationBlock(layoutState, document, registryEntry, data, blockIndex) {
-    var quoteText = trimString(
+    var quoteText = fixUtf8Mojibake(trimString(
         (data && (data.text || data.quote || data.quotation)) || ""
-    );
-    var author = trimString(
+    ));
+    var author = fixUtf8Mojibake(trimString(
         (data && (data.author || data.attribution || data.source)) || ""
-    );
+    ));
     var cleanText = quoteText;
     var style = registryEntry.style || FRAME_STYLES.quotation || FRAME_STYLES_DEFAULTS.quotation;
     var textStyle;
+    var layoutBounds;
+    var colWidth;
+    var pointSize;
+    var estimatedLines;
+    var frameHeight;
+    var frameTop;
     var frame;
+    var story;
+    var textRange;
+    var growPass;
+    var gapAfter;
+    var contentBottom;
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Quotation");
@@ -5227,19 +5254,152 @@ function populateDynamicQuotationBlock(layoutState, document, registryEntry, dat
     }
 
     textStyle = (style && style.text) ? style.text : style;
+    pointSize = Number(
+        (textStyle && (textStyle.pointSize || textStyle.size)) || 13
+    );
+    layoutBounds = getPageLayoutBounds(layoutState.page);
+    colWidth = Math.max(40, layoutBounds.right - layoutBounds.left);
+    // ~0.5em average char width; leave room for insets.
+    estimatedLines = Math.max(
+        2,
+        Math.ceil((cleanText.length * pointSize * 0.5) / Math.max(colWidth - 24, 40))
+    );
+    if (author) {
+        estimatedLines += 1;
+    }
+    frameHeight = Math.max(
+        estimatedLines * pointSize * 1.45 + 40,
+        pointSize * 3 + 40,
+        80
+    );
+
+    // Tighten gap above quotation (previous block spacingAfter is usually generous).
+    try {
+        layoutBounds = getPageLayoutBounds(layoutState.page);
+        if (layoutState.cursorY > layoutBounds.top + 8) {
+            layoutState.cursorY = Math.max(layoutBounds.top, layoutState.cursorY - 8);
+        }
+    } catch (tightenTopError) {}
+
+    layoutBounds = ensureLayoutSpace(layoutState, frameHeight);
+    frameTop = layoutState.cursorY;
+    // If remaining column height is short, take what's left and grow via overflow check.
+    try {
+        frameHeight = Math.min(
+            frameHeight,
+            Math.max(
+                getAvailableColumnHeight(layoutState),
+                DYNAMIC_LAYOUT.minTextFrameHeight
+            )
+        );
+    } catch (availError) {}
 
     try {
-        frame = flowDynamicText(
-            layoutState,
-            cleanText,
-            textStyle,
-            DYNAMIC_LAYOUT.minTextFrameHeight,
-            72
+        frame = createTextFrameOnPage(
+            layoutState.page,
+            layoutBounds,
+            frameTop,
+            frameHeight
         );
+        frame.contents = cleanText;
+
+        try {
+            story = frame.parentStory;
+            textRange = story && story.texts.length ? story.texts[0] : null;
+            if (textRange) {
+                if (textStyle.pointSize || textStyle.size) {
+                    textRange.pointSize = textStyle.pointSize || textStyle.size;
+                }
+                applyThemeFontAndEmphasis(textRange, {
+                    font: textStyle.font || textStyle.fontFamily,
+                    fontFamily: textStyle.fontFamily || textStyle.font,
+                    bold: textStyle.bold,
+                    italic: textStyle.italic,
+                    pointSize: textStyle.pointSize || textStyle.size,
+                    color: textStyle.color
+                });
+                applyTextColor(textRange, textStyle);
+            }
+            if (story && story.paragraphs.length) {
+                story.paragraphs[0].justification = Justification.LEFT_ALIGN;
+                story.paragraphs[0].spaceBefore = 0;
+                story.paragraphs[0].spaceAfter = 4;
+                story.paragraphs[0].leftIndent = 0;
+                story.paragraphs[0].firstLineIndent = 0;
+            }
+        } catch (styleError) {}
+
         applyQuotationPresentation(frame, style, !!author);
-        advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
+
+        // Grow frame until the full quote + author fit (no threaded overflow).
+        for (growPass = 0; growPass < 12; growPass++) {
+            try {
+                if (frame.parentStory) {
+                    frame.parentStory.recompose();
+                }
+            } catch (recomposeGrowError) {}
+            if (!textFrameOverflows(frame)) {
+                break;
+            }
+            try {
+                layoutBounds = ensureLayoutSpace(layoutState, frameHeight + 28);
+                frameHeight += 28;
+                if (frameHeight > getAvailableColumnHeight(layoutState) + 2) {
+                    // Move to next column/page and recreate if still overflowing hard.
+                    addLayoutPage(layoutState);
+                    layoutBounds = getPageLayoutBounds(layoutState.page);
+                    frameTop = layoutBounds.top;
+                    layoutState.cursorY = frameTop;
+                    frame.geometricBounds = [
+                        frameTop,
+                        layoutBounds.left,
+                        frameTop + Math.min(frameHeight, layoutBounds.bottom - frameTop),
+                        layoutBounds.right
+                    ];
+                    continue;
+                }
+                frame.geometricBounds = [
+                    frameTop,
+                    layoutBounds.left,
+                    frameTop + frameHeight,
+                    layoutBounds.right
+                ];
+            } catch (growError) {
+                break;
+            }
+        }
+
+        // Soft shrink to content bottom — never FRAME_TO_CONTENT (clips quote).
+        try {
+            if (frame.parentStory) {
+                frame.parentStory.recompose();
+            }
+            contentBottom = getTextFrameBottomY(frame);
+            if (contentBottom && contentBottom > frameTop + 20) {
+                frame.geometricBounds = [
+                    frameTop,
+                    layoutBounds.left,
+                    Math.min(contentBottom + 20, layoutBounds.bottom),
+                    layoutBounds.right
+                ];
+            }
+        } catch (shrinkError) {}
+
+        applyQuotationPresentation(frame, style, !!author);
+
+        gapAfter = resolveBlockSpacing(registryEntry);
+        syncLayoutPageFromFrame(layoutState, frame);
+        try {
+            layoutState.cursorY = frame.geometricBounds[2] + gapAfter;
+        } catch (cursorError) {
+            layoutState.cursorY = frameTop + frameHeight + gapAfter;
+        }
+
         populatedCount += 1;
-        appendRenderLog("Status: populated (quotation)");
+        appendRenderLog(
+            "Status: populated (quotation len=" + cleanText.length +
+            (author ? ", hasAuthor" : "") + ")"
+        );
     } catch (quoteError) {
         appendRenderLog("Status: not populated - " + quoteError.message);
         warnings.push('Could not create quotation #' + blockIndex + ": " + quoteError.message);

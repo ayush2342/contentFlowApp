@@ -3,6 +3,12 @@
   text-align: left;
 }
 
+/* Opener hero with PartNumber overlay — tiny gap before ChapterNumber bar. */
+.imageBlockFlush {
+  margin-top: 0;
+  margin-bottom: 0.12rem;
+}
+
 .imageFrame {
   position: relative;
   width: 100%;
@@ -23,14 +29,14 @@
   z-index: 1;
   display: inline-block;
   margin: 0;
-  padding: var(--typography-partNumber-pad, 0.2rem 0.75rem);
+  padding: var(--typography-partNumber-pad, 0.08rem 0.55rem);
   border-radius: 0;
   font-family: var(--typography-partNumber-font, Arial, sans-serif);
   font-size: var(--typography-partNumber-size, 24pt);
   font-weight: var(--typography-partNumber-weight, 400);
   color: var(--typography-partNumber-color, #ffffff);
   background-color: var(--typography-partNumber-bg, #ca5027);
-  line-height: 1.2;
+  line-height: 1.05;
   pointer-events: none;
 }
 
