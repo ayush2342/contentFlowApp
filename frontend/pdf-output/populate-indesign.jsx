@@ -4583,6 +4583,17 @@ function prepareTemplateForDynamicLayout(document) {
     appendRenderLog("Content layer: " + contentLayer.name);
 }
 
+/** Theme 2 chapter number is a filled full-width bar; theme 1 is plain text. */
+function chapterNumberHasBarFill(style) {
+    return !!(style && style.backgroundColor);
+}
+
+function resolveChapterNumberGapAfter(style) {
+    // Theme 2 keeps the existing gap under the orange bar.
+    // Theme 1 has no bar padding, so a large shared gap looks like empty space.
+    return chapterNumberHasBarFill(style) ? 28 : 6;
+}
+
 /** Full-width ChapterNumber bar with visible left-aligned text (no FRAME_TO_CONTENT). */
 function placeChapterNumberBar(layoutState, text, style) {
     var layoutBounds;
@@ -4596,13 +4607,15 @@ function placeChapterNumberBar(layoutState, text, style) {
     var textRange;
     var appliedStyle;
     var gapAfter;
+    var isBar;
 
     appliedStyle = style || FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 36;
-    padY = 14;
-    padX = 12;
-    barHeight = pointSize + padY * 2;
-    gapAfter = 28;
+    isBar = chapterNumberHasBarFill(appliedStyle);
+    padY = isBar ? 14 : 0;
+    padX = isBar ? 12 : 0;
+    barHeight = isBar ? (pointSize + padY * 2) : (pointSize + 4);
+    gapAfter = resolveChapterNumberGapAfter(appliedStyle);
 
     layoutBounds = ensureLayoutSpace(layoutState, barHeight);
     frameTop = layoutState.cursorY;
@@ -6093,6 +6106,9 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.Text.style = FRAME_STYLES.text || FRAME_STYLES_DEFAULTS.text;
     BLOCK_REGISTRY.Image.style = FRAME_STYLES.imageCaption || FRAME_STYLES_DEFAULTS.imageCaption;
     BLOCK_REGISTRY.ChapterNumber.style = FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
+    BLOCK_REGISTRY.ChapterNumber.spacingAfter = resolveChapterNumberGapAfter(
+        BLOCK_REGISTRY.ChapterNumber.style
+    );
     BLOCK_REGISTRY.ChapterTitle.style = FRAME_STYLES.chapterTitle || FRAME_STYLES_DEFAULTS.chapterTitle;
     BLOCK_REGISTRY.LessonOverview.style = FRAME_STYLES.lessonOverview || FRAME_STYLES_DEFAULTS.lessonOverview;
     BLOCK_REGISTRY.ParagraphText.style = FRAME_STYLES.paragraphText || FRAME_STYLES_DEFAULTS.paragraphText;

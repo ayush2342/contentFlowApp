@@ -39,7 +39,7 @@
 }
 
 .chapterTitle {
-  margin-top: 1.5rem;
+  margin-top: var(--typography-chapterTitle-space-before, 1.5rem);
   margin-bottom: 1.85rem;
   font-family: var(--typography-chapterTitle-font);
   font-size: var(--typography-chapterTitle-size);

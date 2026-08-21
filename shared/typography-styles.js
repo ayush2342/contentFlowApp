@@ -297,6 +297,14 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
     if (!style) return;
     Object.assign(variables, toCssVariables(key, style));
   });
+  const chapterNumberHasBar = Boolean(
+    styles?.chapterNumber?.backgroundColor || styles?.chapterHeading?.backgroundColor
+  );
+  // Theme 2 keeps the existing 1.5rem gap under the chapter bar.
+  // Theme 1 is plain text, so that same gap looks like empty space.
+  variables['--typography-chapterTitle-space-before'] = chapterNumberHasBar
+    ? '1.5rem'
+    : '0.35rem';
   return variables;
 };
 
