@@ -1796,12 +1796,26 @@ function readJsonScalePercent(data) {
 
 /**
  * Format sheet columns=2 → always 100% (ignore JSON).
- * Any other column count (format 1, opener of format 2) → JSON scale_percent.
+ * Otherwise use data.scale_percent as a percentage of column width (e.g. 73.9 → 73.9%).
+ * If the format sheet is missing, do not assume 2-col — still use JSON.
  */
 function resolveImageScalePercent(data, layoutState) {
     var pageType = (layoutState && layoutState.pageType) || CURRENT_PAGE_TYPE || "opener";
-    var formatColumns = resolvePageColumnCount(pageType, LAYOUT_FORMAT);
+    var key = String(pageType || "opener").toLowerCase();
+    var section;
+    var formatColumns = 1;
     var raw;
+
+    if (key === "non_opener" || key === "non-opener" || key === "nonopener") {
+        key = "non-opener";
+    } else {
+        key = "opener";
+    }
+
+    section = LAYOUT_FORMAT && LAYOUT_FORMAT[key];
+    if (section && section.columns != null) {
+        formatColumns = Number(section.columns) === 2 ? 2 : 1;
+    }
 
     if (formatColumns === 2) {
         return {
@@ -1815,7 +1829,8 @@ function resolveImageScalePercent(data, layoutState) {
     return {
         scalePercent: normalizeScalePercent(raw),
         fromJson: raw !== undefined,
-        formatColumns: formatColumns
+        formatColumns: formatColumns,
+        jsonValue: raw
     };
 }
 
@@ -1827,12 +1842,13 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
     var imageHeight;
     var ratio;
 
-    var frameBounds;
+    var columnBounds;
     var columnWidth;
     var scale;
     var targetWidth;
     var targetHeight;
     var targetLeft;
+    var targetTop;
 
     try {
 
@@ -1852,43 +1868,52 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
             imageHeight /
             imageWidth;
 
-        frameBounds =
-            frame.geometricBounds;
+        // Use the pre-place column frame, not the bounds after place()
+        // (place can expand the frame to the image's native size).
+        columnBounds =
+            savedBounds && savedBounds.length === 4
+                ? savedBounds
+                : frame.geometricBounds;
 
         columnWidth =
-            frameBounds[3] -
-            frameBounds[1];
+            columnBounds[3] -
+            columnBounds[1];
 
-        // scale_percent from JSON sizes the image against the column width,
-        // and the scaled frame is centered horizontally in that column.
+        targetTop = columnBounds[0];
+
+        // scale_percent is a % of column width (73.9 → 73.9% of the column).
         scale = normalizeScalePercent(scalePercent);
         targetWidth = columnWidth * (scale / 100);
-        targetLeft = frameBounds[1] + (columnWidth - targetWidth) / 2;
+        targetLeft = columnBounds[1] + (columnWidth - targetWidth) / 2;
 
         targetHeight =
             targetWidth * ratio;
 
         frame.geometricBounds = [
-            frameBounds[0],
+            targetTop,
             targetLeft,
-            frameBounds[0] + targetHeight,
+            targetTop + targetHeight,
             targetLeft + targetWidth
         ];
 
         try {
             frame.fit(
-                FitOptions.FILL_PROPORTIONALLY
+                FitOptions.PROPORTIONALLY
             );
         } catch(e) {
-            frame.fit(
-                FitOptions.FILL_PROPORTIONALLY
-            );
+            try {
+                frame.fit(
+                    FitOptions.FILL_PROPORTIONALLY
+                );
+            } catch (fillError) {}
         }
 
         appendRenderLog(
             "Dynamic image resize => scale=" +
             scale +
-            "% width=" +
+            "% columnWidth=" +
+            columnWidth +
+            " width=" +
             targetWidth +
             " height=" +
             targetHeight
@@ -1917,6 +1942,9 @@ function placeImageContentInFrame(frame, imageFile, scalePercent) {
     var fittingResult;
 
     savedBounds = frame.geometricBounds;
+    try {
+        frame.frameFittingOptions.autoFit = false;
+    } catch (autoFitError) {}
     clearGraphicsFromFrame(frame);
     frame.place(imageFile);
 
@@ -4979,12 +5007,13 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     } else if (scaleResult.fromJson) {
         appendRenderLog(
             "Image scale_percent: " + scalePercent +
-            "% (from JSON; format columns=" + scaleResult.formatColumns + ")"
+            "% (JSON scale_percent=" + scaleResult.jsonValue +
+            "; format columns=" + scaleResult.formatColumns + ")"
         );
     } else {
         appendRenderLog(
             "Image scale_percent: " + scalePercent +
-            "% (JSON scale missing; format columns=" + scaleResult.formatColumns + ")"
+            "% (JSON scale_percent missing; format columns=" + scaleResult.formatColumns + ")"
         );
     }
 
