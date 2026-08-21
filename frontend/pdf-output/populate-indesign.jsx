@@ -1834,103 +1834,132 @@ function resolveImageScalePercent(data, layoutState) {
     };
 }
 
+function getGraphicNativeSize(graphic) {
+    var bounds;
+    var width;
+    var height;
+    var horizontalScale;
+    var verticalScale;
+
+    bounds = graphic.geometricBounds;
+    width = bounds[3] - bounds[1];
+    height = bounds[2] - bounds[0];
+    try {
+        horizontalScale = Number(graphic.horizontalScale);
+    } catch (hsError) {
+        horizontalScale = 100;
+    }
+    try {
+        verticalScale = Number(graphic.verticalScale);
+    } catch (vsError) {
+        verticalScale = 100;
+    }
+    if (!horizontalScale) {
+        horizontalScale = 100;
+    }
+    if (!verticalScale) {
+        verticalScale = 100;
+    }
+
+    return {
+        width: width / (horizontalScale / 100),
+        height: height / (verticalScale / 100)
+    };
+}
+
+function fitFrameToGraphicNoCrop(frame) {
+    try {
+        frame.fit(FitOptions.FRAME_TO_CONTENT);
+        return;
+    } catch (fitErrorA) {}
+    try {
+        frame.fit(FitOptions.frameToContent);
+    } catch (fitErrorB) {}
+}
+
 function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
-
     var graphic;
-    var imageBounds;
-    var imageWidth;
-    var imageHeight;
-    var ratio;
-
+    var nativeSize;
     var columnBounds;
     var columnWidth;
+    var columnLeft;
     var scale;
     var targetWidth;
-    var targetHeight;
+    var graphicScale;
+    var frameBounds;
+    var frameWidth;
+    var frameHeight;
     var targetLeft;
     var targetTop;
 
     try {
-
         graphic = frame.graphics[0];
+        try {
+            graphic.horizontalScale = 100;
+            graphic.verticalScale = 100;
+        } catch (resetScaleError) {}
+        nativeSize = getGraphicNativeSize(graphic);
+        if (!(nativeSize.width > 0) || !(nativeSize.height > 0)) {
+            throw new Error("graphic native size unavailable");
+        }
 
-        imageBounds = graphic.geometricBounds;
-
-        imageWidth =
-            imageBounds[3] -
-            imageBounds[1];
-
-        imageHeight =
-            imageBounds[2] -
-            imageBounds[0];
-
-        ratio =
-            imageHeight /
-            imageWidth;
-
-        // Use the pre-place column frame, not the bounds after place()
-        // (place can expand the frame to the image's native size).
         columnBounds =
             savedBounds && savedBounds.length === 4
                 ? savedBounds
                 : frame.geometricBounds;
-
-        columnWidth =
-            columnBounds[3] -
-            columnBounds[1];
-
+        columnLeft = columnBounds[1];
+        columnWidth = columnBounds[3] - columnBounds[1];
         targetTop = columnBounds[0];
 
-        // scale_percent is a % of column width (73.9 → 73.9% of the column).
         scale = normalizeScalePercent(scalePercent);
         targetWidth = columnWidth * (scale / 100);
-        targetLeft = columnBounds[1] + (columnWidth - targetWidth) / 2;
+        graphicScale = (targetWidth / nativeSize.width) * 100;
 
-        targetHeight =
-            targetWidth * ratio;
+        graphic.horizontalScale = graphicScale;
+        graphic.verticalScale = graphicScale;
 
+        try {
+            frame.frameFittingOptions.topCrop = 0;
+            frame.frameFittingOptions.leftCrop = 0;
+            frame.frameFittingOptions.bottomCrop = 0;
+            frame.frameFittingOptions.rightCrop = 0;
+        } catch (cropError) {}
+
+        fitFrameToGraphicNoCrop(frame);
+
+        frameBounds = frame.geometricBounds;
+        frameWidth = frameBounds[3] - frameBounds[1];
+        frameHeight = frameBounds[2] - frameBounds[0];
+        targetLeft = columnLeft + (columnWidth - frameWidth) / 2;
         frame.geometricBounds = [
             targetTop,
             targetLeft,
-            targetTop + targetHeight,
-            targetLeft + targetWidth
+            targetTop + frameHeight,
+            targetLeft + frameWidth
         ];
-
-        try {
-            frame.fit(
-                FitOptions.PROPORTIONALLY
-            );
-        } catch(e) {
-            try {
-                frame.fit(
-                    FitOptions.FILL_PROPORTIONALLY
-                );
-            } catch (fillError) {}
-        }
 
         appendRenderLog(
             "Dynamic image resize => scale=" +
             scale +
             "% columnWidth=" +
             columnWidth +
+            " native=" +
+            nativeSize.width +
+            "x" +
+            nativeSize.height +
+            " graphicScale=" +
+            graphicScale +
             " width=" +
-            targetWidth +
+            frameWidth +
             " height=" +
-            targetHeight
+            frameHeight
         );
-
-    } catch(error) {
-
-        appendRenderLog(
-            "Dynamic image sizing failed : " +
-            error
-        );
-
+    } catch (error) {
+        appendRenderLog("Dynamic image sizing failed : " + error);
         try {
-            frame.fit(
-                FitOptions.PROPORTIONALLY
-            );
-        } catch(e){}
+            frame.fit(FitOptions.PROPORTIONALLY);
+            fitFrameToGraphicNoCrop(frame);
+        } catch (fallbackError) {}
     }
 
     return "dynamic-image-sizing";
@@ -3637,12 +3666,22 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
 
 function createGraphicFrameOnPage(page, layoutBounds, top, height) {
     var frame;
+    var frameHeight = height && height > 0 ? height : DYNAMIC_LAYOUT.defaultImageFrameHeight;
+    var bottom;
+
+    bottom = top + frameHeight;
+    if (layoutBounds && layoutBounds.bottom && bottom > layoutBounds.bottom) {
+        bottom = layoutBounds.bottom;
+    }
+    if (bottom <= top + 24) {
+        bottom = top + Math.max(frameHeight, 120);
+    }
 
     frame = page.rectangles.add({
         geometricBounds: [
             top,
             layoutBounds.left,
-            top + 100,
+            bottom,
             layoutBounds.right
         ]
     });
@@ -5053,7 +5092,12 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
 
     appendRenderLog("Image block cursor trace [before createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
     try {
-        imageFrame = createGraphicFrameOnPage(layoutState.page, layoutBounds, layoutState.cursorY, protoHeight);
+        imageFrame = createGraphicFrameOnPage(
+            layoutState.page,
+            layoutBounds,
+            layoutState.cursorY,
+            Math.max(protoHeight, getAvailableColumnHeight(layoutState))
+        );
         appendRenderLog("Image block cursor trace [after createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
         if (!placeImageContentInFrame(imageFrame, imageFile, scalePercent)) {
             appendRenderLog("Status: not populated — graphic not visible after place/fit");
