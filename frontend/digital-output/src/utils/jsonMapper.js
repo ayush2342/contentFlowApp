@@ -33,6 +33,18 @@ const normalizePublicAssetPath = (value) =>
     .replace(/^\.?\//, '')
     .trim();
 
+/**
+ * Accepts 50, "50", "50%" or 0.5 and returns a 5-100 percentage.
+ * Returns null when unspecified so the image keeps its default full width.
+ */
+const normalizeScalePercent = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number.parseFloat(String(value).replace(/%/g, '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  const percent = parsed <= 1 ? parsed * 100 : parsed;
+  return Math.min(100, Math.max(5, percent));
+};
+
 const resolveMediaSrc = (fileName, sourcePath, mediaBaseUrl, tenantId) => {
   const normalizedSourcePath = normalizePublicAssetPath(sourcePath);
 
@@ -140,6 +152,7 @@ const mapContentItem = (item, media, index, options = {}) => {
         ),
         alt: mediaItem.caption || mediaItem.fileName || 'Course image',
         caption: mediaItem.caption,
+        scalePercent: mediaItem.scalePercent ?? null,
       },
     };
   }
@@ -555,11 +568,15 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     const urlPath = normalizePublicAssetPath(block.data.url);
     // Match PDF: caption may live on data.caption or data.text
     const caption = normalizeText(block?.data?.caption || block?.data?.text);
+    const scalePercent = normalizeScalePercent(
+      block?.data?.scale_percent ?? block?.data?.scalePercent
+    );
     const mediaId = `tree-media-${ctx.mediaIndex++}`;
     ctx.media[mediaId] = {
       fileName: basenameFromPath(urlPath),
       sourcePath: urlPath,
       caption,
+      scalePercent,
     };
     ctx.pendingImageMediaId = mediaId;
     return {
@@ -575,6 +592,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
         ),
         alt: caption || ctx.media[mediaId].fileName || 'Course image',
         caption,
+        scalePercent,
       },
     };
   }
@@ -946,6 +964,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         fileName: basenameFromPath(urlPath),
         sourcePath: urlPath,
         caption,
+        scalePercent: normalizeScalePercent(node?.data?.scale_percent ?? node?.data?.scalePercent),
       };
 
       content.push({ type: 'image', mediaId });

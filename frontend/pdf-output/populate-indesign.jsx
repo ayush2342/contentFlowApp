@@ -1716,7 +1716,37 @@ function ensureGraphicFrameVisible(frame) {
     } catch (zOrderError) {}
 }
 
-function fitPlacedImageInFrame(frame, savedBounds) {
+/**
+ * Normalize JSON scale_percent (50, "50", "50%", 0.5) to a 1-100 percentage.
+ * Returns 100 when absent/invalid so existing content keeps full column width.
+ */
+function normalizeScalePercent(value) {
+    var raw;
+    var num;
+
+    if (value === undefined || value === null || value === "") {
+        return 100;
+    }
+
+    raw = trimString(String(value)).replace(/%/g, "");
+    num = parseFloat(raw);
+
+    if (isNaN(num) || num <= 0) {
+        return 100;
+    }
+
+    // Fractional form (0.5 => 50%).
+    if (num > 0 && num <= 1) {
+        num = num * 100;
+    }
+
+    if (num < 5) num = 5;
+    if (num > 100) num = 100;
+
+    return num;
+}
+
+function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
 
     var graphic;
     var imageBounds;
@@ -1725,8 +1755,11 @@ function fitPlacedImageInFrame(frame, savedBounds) {
     var ratio;
 
     var frameBounds;
+    var columnWidth;
+    var scale;
     var targetWidth;
     var targetHeight;
+    var targetLeft;
 
     try {
 
@@ -1749,18 +1782,24 @@ function fitPlacedImageInFrame(frame, savedBounds) {
         frameBounds =
             frame.geometricBounds;
 
-        targetWidth =
+        columnWidth =
             frameBounds[3] -
             frameBounds[1];
+
+        // scale_percent from JSON sizes the image against the column width,
+        // and the scaled frame is centered horizontally in that column.
+        scale = normalizeScalePercent(scalePercent);
+        targetWidth = columnWidth * (scale / 100);
+        targetLeft = frameBounds[1] + (columnWidth - targetWidth) / 2;
 
         targetHeight =
             targetWidth * ratio;
 
         frame.geometricBounds = [
             frameBounds[0],
-            frameBounds[1],
+            targetLeft,
             frameBounds[0] + targetHeight,
-            frameBounds[3]
+            targetLeft + targetWidth
         ];
 
         try {
@@ -1774,7 +1813,9 @@ function fitPlacedImageInFrame(frame, savedBounds) {
         }
 
         appendRenderLog(
-            "Dynamic image resize => width=" +
+            "Dynamic image resize => scale=" +
+            scale +
+            "% width=" +
             targetWidth +
             " height=" +
             targetHeight
@@ -1797,7 +1838,7 @@ function fitPlacedImageInFrame(frame, savedBounds) {
     return "dynamic-image-sizing";
 }
 
-function placeImageContentInFrame(frame, imageFile) {
+function placeImageContentInFrame(frame, imageFile, scalePercent) {
     var savedBounds;
     var graphicsCount = 0;
     var fittingResult;
@@ -1821,7 +1862,7 @@ function placeImageContentInFrame(frame, imageFile) {
 
     logImagePlacementDiagnostics(frame, "after place (before fit)");
 
-    fittingResult = fitPlacedImageInFrame(frame, savedBounds);
+    fittingResult = fitPlacedImageInFrame(frame, savedBounds, scalePercent);
     appendRenderLog("Image fitting result: " + fittingResult);
 
     ensureGraphicFrameVisible(frame);
@@ -4812,12 +4853,16 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     var protoHeight;
     var cleanCaption;
     var urlOrPath = data.url;
+    var scalePercent = normalizeScalePercent(
+        data.scale_percent !== undefined ? data.scale_percent : data.scalePercent
+    );
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Image");
     appendRenderLog("Dynamic prototype: " + frameProtoLabel);
     appendRenderLog("Occurrence: " + blockIndex);
     appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
+    appendRenderLog("Image scale_percent: " + scalePercent + "%");
 
     if (!urlOrPath) {
         appendRenderLog("Status: not populated — empty image url in JSON");
@@ -4857,7 +4902,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     try {
         imageFrame = createGraphicFrameOnPage(layoutState.page, layoutBounds, layoutState.cursorY, protoHeight);
         appendRenderLog("Image block cursor trace [after createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
-        if (!placeImageContentInFrame(imageFrame, imageFile)) {
+        if (!placeImageContentInFrame(imageFrame, imageFile, scalePercent)) {
             appendRenderLog("Status: not populated — graphic not visible after place/fit");
             warnings.push('Image #' + blockIndex + ' place/fit did not produce a visible graphic.');
             try {

@@ -11,9 +11,18 @@ const captionParts = (caption) => {
   };
 };
 
-const ImageBlock = ({ src, alt, caption, partNumberOverlay }) => {
+const resolveScalePercent = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number.parseFloat(String(value).replace(/%/g, '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  const percent = parsed <= 1 ? parsed * 100 : parsed;
+  return Math.min(100, Math.max(5, percent));
+};
+
+const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
   const parsedCaption = captionParts(caption);
   const overlayText = String(partNumberOverlay ?? '').trim();
+  const scale = resolveScalePercent(scalePercent);
   const figureClass = [
     styles.imageBlock,
     overlayText ? styles.imageBlockFlush : '',
@@ -23,7 +32,10 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay }) => {
 
   return (
     <figure className={figureClass}>
-      <div className={styles.imageFrame}>
+      <div
+        className={styles.imageFrame}
+        style={scale ? { width: `${scale}%`, marginInline: 'auto' } : undefined}
+      >
         <img src={src} alt={alt} className={styles.image} />
         {overlayText ? (
           <div className={styles.partNumberOverlay} aria-label={overlayText}>
