@@ -19,6 +19,7 @@ var DYNAMIC_LAYOUT = {
     // regardless of the template's saved measurement units.
     blockGap: 6,            // ~8px / 0.5rem uniform gap between every block
     imageCaptionGap: 6,
+    afterImageGap: 12,      // space below image/caption before the next block
     prototypeOffPageTop: -2000,
     minTextFrameHeight: 24,
     defaultImageFrameHeight: 180
@@ -1108,8 +1109,7 @@ var BLOCK_REGISTRY = {
         captionPrototype: "proto:imageCaption",
         style: FRAME_STYLES.imageCaption,
         kind: "image",
-        // Flush to following ChapterNumber on opener (tiny hairline gap in placeChapterNumberBar).
-        spacingAfter: 0
+        spacingAfter: 12
     },
     ChapterNumber: {
         label: "chapterNumber",
@@ -3650,9 +3650,9 @@ function getImageContentBottomY(imageFrame) {
         }
     } catch (graphicBoundsError) {}
 
-    // Use the visible graphic bottom when it sits inside the frame so the
-    // caption hugs the rendered image instead of the (possibly taller) frame.
-    if (graphicBottom > 0 && graphicBottom <= frameBottom) {
+    // Prefer the visible graphic bottom: a taller crop/overflow must push
+    // following text down, while a shorter graphic lets the caption hug the image.
+    if (graphicBottom > 0) {
         return graphicBottom;
     }
 
@@ -4319,7 +4319,8 @@ function createLayoutState(document, page) {
         gutter: 18,
         pageType: "opener",
         footerReserve: 0,
-        lastImageFrame: null
+        lastImageFrame: null,
+        lastImageHadCaption: false
     };
 }
 
@@ -4432,6 +4433,7 @@ function advanceLayoutCursor(layoutState, frame, gapAfter) {
 function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame, gapAfter) {
     var imageBottom;
     var captionBottom;
+    var captionEnd;
     var blockBottom;
     var gap = gapAfter;
 
@@ -4439,21 +4441,27 @@ function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFram
         return;
     }
 
-    if (gap === undefined || gap === null) {
-        gap = layoutState.blockGap;
-    }
-    if (gap === undefined || gap === null) {
-        gap = DYNAMIC_LAYOUT.blockGap;
+    if (gap === undefined || gap === null || gap < DYNAMIC_LAYOUT.afterImageGap) {
+        gap = DYNAMIC_LAYOUT.afterImageGap;
     }
 
     syncLayoutPageFromFrame(layoutState, captionFrame || imageFrame);
 
     imageBottom = getImageContentBottomY(imageFrame);
-    // imageBottom = imageFrame.geometricBounds[2];
     blockBottom = imageBottom;
 
     if (captionFrame) {
-        captionBottom = getFrameBottomY(getLastFrameInChain(captionFrame));
+        captionEnd = getLastFrameInChain(captionFrame);
+        try {
+            if (captionEnd.parentStory) {
+                captionEnd.parentStory.recompose();
+            }
+        } catch (recomposeCaptionError) {}
+        shrinkTextFrameToContentBottom(captionEnd);
+        captionBottom = getTextFrameBottomY(captionEnd);
+        if (!(captionBottom > 0)) {
+            captionBottom = getFrameBottomY(captionEnd);
+        }
         if (captionBottom > blockBottom) {
             blockBottom = captionBottom;
         }
@@ -4702,10 +4710,11 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     // ChapterNumber: dedicated full-width bar — never go through flowDynamicText /
     // advanceLayoutCursor tighten (FRAME_TO_CONTENT was wiping the text).
     if (itemType === "ChapterNumber" || itemType === "ChapterHeading") {
-        // Opener: sit almost flush under the hero image (slight hairline gap).
-        if (layoutState.lastImageFrame) {
+        // Opener hero: sit almost flush under the image only when there is no
+        // caption below it. Pulling back over a caption overlaps FIGURE text.
+        if (layoutState.lastImageFrame && !layoutState.lastImageHadCaption) {
             try {
-                var imgBottom = layoutState.lastImageFrame.geometricBounds[2];
+                var imgBottom = getImageContentBottomY(layoutState.lastImageFrame);
                 if (layoutState.cursorY - imgBottom <= 24) {
                     layoutState.cursorY = imgBottom + 3;
                 }
@@ -4853,16 +4862,26 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     var protoHeight;
     var cleanCaption;
     var urlOrPath = data.url;
-    var scalePercent = normalizeScalePercent(
-        data.scale_percent !== undefined ? data.scale_percent : data.scalePercent
-    );
+    var scalePercent = 100;
+    var useJsonScale = (layoutState.columnCount || 1) !== 2;
+
+    // 2-column format: fill the column; do not apply JSON scale_percent.
+    if (useJsonScale) {
+        scalePercent = normalizeScalePercent(
+            data.scale_percent !== undefined ? data.scale_percent : data.scalePercent
+        );
+    }
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Image");
     appendRenderLog("Dynamic prototype: " + frameProtoLabel);
     appendRenderLog("Occurrence: " + blockIndex);
     appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
-    appendRenderLog("Image scale_percent: " + scalePercent + "%");
+    if (useJsonScale) {
+        appendRenderLog("Image scale_percent: " + scalePercent + "%");
+    } else {
+        appendRenderLog("Image scale_percent: 100% (2-column format; JSON scale ignored)");
+    }
 
     if (!urlOrPath) {
         appendRenderLog("Status: not populated — empty image url in JSON");
@@ -4912,6 +4931,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         }
         populatedCount += 1;
         layoutState.lastImageFrame = imageFrame;
+        layoutState.lastImageHadCaption = false;
         appendRenderLog("Resolved image file: " + imageFile.fsName);
         appendRenderLog("Image status: populated (dynamic frame created on Content layer)");
 
@@ -4969,6 +4989,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         );
         applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
         populatedCount += 1;
+        layoutState.lastImageHadCaption = true;
         appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
         advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFrame, resolveBlockSpacing(registryEntry));
     } catch (captionError) {

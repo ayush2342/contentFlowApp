@@ -568,9 +568,12 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     const urlPath = normalizePublicAssetPath(block.data.url);
     // Match PDF: caption may live on data.caption or data.text
     const caption = normalizeText(block?.data?.caption || block?.data?.text);
-    const scalePercent = normalizeScalePercent(
-      block?.data?.scale_percent ?? block?.data?.scalePercent
-    );
+    const scalePercent =
+      ctx.pageColumns === 2
+        ? 100
+        : normalizeScalePercent(
+            block?.data?.scale_percent ?? block?.data?.scalePercent
+          );
     const mediaId = `tree-media-${ctx.mediaIndex++}`;
     ctx.media[mediaId] = {
       fileName: basenameFromPath(urlPath),
@@ -737,6 +740,8 @@ const mapPagedTemplateJson = (pages, options = {}) => {
   const lessons = normalizedPages.map((page, index) => {
     const blocks = Array.isArray(page?.content) ? page.content : [];
     const components = [];
+    const pageType = normalizeText(page?.page_type).toLowerCase() || 'opener';
+    const pageColumns = getPageColumns(options.layout, pageType);
     const ctx = {
       media,
       options,
@@ -744,6 +749,7 @@ const mapPagedTemplateJson = (pages, options = {}) => {
       pendingImageMediaId: null,
       pendingLearningObjective: null,
       components,
+      pageColumns,
     };
 
     blocks.forEach((block, blockIndex) => {
@@ -753,12 +759,10 @@ const mapPagedTemplateJson = (pages, options = {}) => {
 
     mediaIndex = ctx.mediaIndex;
     const pageNo = page?.page_no ?? index + 1;
-    const pageType = normalizeText(page?.page_type).toLowerCase() || 'opener';
     const isOpener = pageType === 'opener' || pageHasChapterNumber(page);
     const mappedComponents = isOpener
       ? attachOpenerPartNumberOverlay(components)
       : components;
-    const pageColumns = getPageColumns(options.layout, pageType);
     const layout = pageColumns === 2 ? 'two-column' : 'single-column';
     const lessonKey = `page-${pageNo}`;
 
