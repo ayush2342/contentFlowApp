@@ -835,8 +835,12 @@ function placeTwoColumnTextGroup(layoutState, document, items, registryEntry) {
     startY = layoutState.cursorY;
     savedColumnCount = layoutState.columnCount;
     savedColumn = layoutState.currentColumn;
-    // Extra air between LO rows (web: ~1rem heading margin + 0.5rem row-gap).
-    spacing = Math.max(resolveBlockSpacing(registryEntry), 24);
+    spacing = resolveBlockSpacing(registryEntry);
+    // Theme 2: keep the existing roomy gap between LO rows.
+    // Theme 1: do not force 24pt — that looks like a blank line between 9pt items.
+    if (usesRoomyOverviewSpacing()) {
+        spacing = Math.max(spacing, 24);
+    }
 
     protoResult = resolveTextPrototype(document, registryEntry.prototype);
     protoHeight = protoResult
@@ -4594,6 +4598,24 @@ function resolveChapterNumberGapAfter(style) {
     return chapterNumberHasBarFill(style) ? 28 : 6;
 }
 
+/** Theme 2 outline/LO items keep roomy gaps; theme 1 is compact 9pt stacked text. */
+function usesRoomyOverviewSpacing() {
+    return isCompositeStyle(FRAME_STYLES.lessonOverview) ||
+        chapterNumberHasBarFill(FRAME_STYLES.chapterNumber);
+}
+
+function resolveChapterOverviewSpacingAfter() {
+    return usesRoomyOverviewSpacing() ? 8 : 4;
+}
+
+function resolveLessonOverviewSpacingAfter() {
+    return usesRoomyOverviewSpacing() ? 24 : 4;
+}
+
+function resolveLessonOverviewSpacingBefore() {
+    return usesRoomyOverviewSpacing() ? 14 : 2;
+}
+
 /** Full-width ChapterNumber bar with visible left-aligned text (no FRAME_TO_CONTENT). */
 function placeChapterNumberBar(layoutState, text, style) {
     var layoutBounds;
@@ -6099,6 +6121,7 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.LessonNumber.style = FRAME_STYLES.lessonNumber || FRAME_STYLES_DEFAULTS.lessonNumber;
     BLOCK_REGISTRY.LessonTitle.style = FRAME_STYLES.lessonTitle || FRAME_STYLES_DEFAULTS.lessonTitle;
     BLOCK_REGISTRY.ChapterOverview.style = FRAME_STYLES.chapterOverview || FRAME_STYLES_DEFAULTS.chapterOverview;
+    BLOCK_REGISTRY.ChapterOverview.spacingAfter = resolveChapterOverviewSpacingAfter();
     BLOCK_REGISTRY.Topic.style = FRAME_STYLES.topic || FRAME_STYLES_DEFAULTS.topic;
     BLOCK_REGISTRY.SectionTitle.style = FRAME_STYLES.sectionTitle || FRAME_STYLES_DEFAULTS.sectionTitle;
     BLOCK_REGISTRY.SubSectionTitle.style = FRAME_STYLES.subSectionTitle || FRAME_STYLES_DEFAULTS.subSectionTitle;
@@ -6111,6 +6134,8 @@ function rebuildBlockRegistry() {
     );
     BLOCK_REGISTRY.ChapterTitle.style = FRAME_STYLES.chapterTitle || FRAME_STYLES_DEFAULTS.chapterTitle;
     BLOCK_REGISTRY.LessonOverview.style = FRAME_STYLES.lessonOverview || FRAME_STYLES_DEFAULTS.lessonOverview;
+    BLOCK_REGISTRY.LessonOverview.spacingAfter = resolveLessonOverviewSpacingAfter();
+    BLOCK_REGISTRY.LessonOverview.spacingBefore = resolveLessonOverviewSpacingBefore();
     BLOCK_REGISTRY.ParagraphText.style = FRAME_STYLES.paragraphText || FRAME_STYLES_DEFAULTS.paragraphText;
     BLOCK_REGISTRY.LearningObjectives.style = FRAME_STYLES.learningObjectives || FRAME_STYLES_DEFAULTS.learningObjectives;
     BLOCK_REGISTRY.BulletList.style = FRAME_STYLES.bulletList || FRAME_STYLES_DEFAULTS.bulletList;

@@ -137,6 +137,7 @@
 }
 
 .chapterOverview {
+  margin-bottom: var(--typography-chapterOverview-space-after, 0.5rem);
   font-family: var(--typography-chapterOverview-font);
   font-size: var(--typography-chapterOverview-size);
   font-weight: var(--typography-chapterOverview-weight);
@@ -145,6 +146,7 @@
 }
 
 .lessonOverview {
+  margin-bottom: var(--typography-lessonOverview-space-after, 1rem);
   font-family: var(--typography-lessonOverview-font);
   font-size: var(--typography-lessonOverview-size);
   font-weight: var(--typography-lessonOverview-weight);

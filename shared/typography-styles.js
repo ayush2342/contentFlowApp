@@ -305,6 +305,15 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
   variables['--typography-chapterTitle-space-before'] = chapterNumberHasBar
     ? '1.5rem'
     : '0.35rem';
+  const roomyOverview = Boolean(
+    styles?.lessonOverview?.text && styles?.lessonOverview?.number
+  ) || chapterNumberHasBar;
+  variables['--typography-chapterOverview-space-after'] = roomyOverview
+    ? '0.5rem'
+    : '0.2rem';
+  variables['--typography-lessonOverview-space-after'] = roomyOverview
+    ? '1rem'
+    : '0.2rem';
   return variables;
 };
 
