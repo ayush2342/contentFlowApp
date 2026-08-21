@@ -33,7 +33,8 @@ var POPULATE_SCRIPT_VERSION = "dynamic-v24";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
-var LAYOUT_FORMAT = null; // from layout-format.json (format id 2 default locally)
+var LAYOUT_FORMAT = null; // from layout-format.json / shared/formats/{id}.json
+var LAYOUT_FORMAT_ID = "";
 
 // -----------------------------------------------------------------------------
 // Run headless (no popups/dialogs on server)
@@ -730,16 +731,32 @@ function loadTypographyConfig(scriptFolderPath) {
     }
 }
 
-function loadLayoutFormat(scriptFolderPath) {
+function normalizeFormatIdToken(value) {
+    var raw = trimString(String(value || "")).toLowerCase().replace(/[\s_]+/g, "");
+    var match;
+
+    if (!raw) {
+        return "";
+    }
+    match = raw.match(/^(?:theme|format)?(\d+)$/);
+    if (match) {
+        return match[1];
+    }
+    return "";
+}
+
+function loadLayoutFormat(scriptFolderPath, preferredFormatId) {
+    var formatId = normalizeFormatIdToken(preferredFormatId) || "2";
     var configPaths = [
         scriptFolderPath + "/layout-format.json",
-        scriptFolderPath + "/../../shared/formats/2.json",
-        scriptFolderPath + "/../../../shared/formats/2.json"
+        scriptFolderPath + "/../../shared/formats/" + formatId + ".json",
+        scriptFolderPath + "/../../../shared/formats/" + formatId + ".json"
     ];
     var configFile;
     var i;
     var rawJson;
     var config;
+    var layout;
 
     for (i = 0; i < configPaths.length; i++) {
         configFile = File(configPaths[i]);
@@ -760,11 +777,22 @@ function loadLayoutFormat(scriptFolderPath) {
 
     try {
         config = parseJSON(rawJson);
-        // Job file shape: { formatId, layout: { opener, non-opener } }
-        if (config && config.layout) {
-            return config.layout;
+        if (config && config.formatId) {
+            LAYOUT_FORMAT_ID = normalizeFormatIdToken(config.formatId) || formatId;
+        } else {
+            LAYOUT_FORMAT_ID = formatId;
         }
-        return config;
+        // Job file shape: { formatId, layout: { opener, non-opener } }
+        if (config && config.layout && (config.layout.opener || config.layout["non-opener"])) {
+            layout = config.layout;
+        } else {
+            layout = config;
+        }
+        appendRenderLog(
+            "Layout format loaded from " + configFile.fsName +
+            " (formatId=" + LAYOUT_FORMAT_ID + ")"
+        );
+        return layout;
     } catch (parseError) {
         return null;
     }
@@ -1748,6 +1776,47 @@ function normalizeScalePercent(value) {
     if (num > 100) num = 100;
 
     return num;
+}
+
+function readJsonScalePercent(data) {
+    if (!data) {
+        return undefined;
+    }
+    if (data.scale_percent !== undefined && data.scale_percent !== null && data.scale_percent !== "") {
+        return data.scale_percent;
+    }
+    if (data.scalePercent !== undefined && data.scalePercent !== null && data.scalePercent !== "") {
+        return data.scalePercent;
+    }
+    if (data.scale !== undefined && data.scale !== null && data.scale !== "") {
+        return data.scale;
+    }
+    return undefined;
+}
+
+/**
+ * Format sheet columns=2 → always 100% (ignore JSON).
+ * Any other column count (format 1, opener of format 2) → JSON scale_percent.
+ */
+function resolveImageScalePercent(data, layoutState) {
+    var pageType = (layoutState && layoutState.pageType) || CURRENT_PAGE_TYPE || "opener";
+    var formatColumns = resolvePageColumnCount(pageType, LAYOUT_FORMAT);
+    var raw;
+
+    if (formatColumns === 2) {
+        return {
+            scalePercent: 100,
+            fromJson: false,
+            formatColumns: formatColumns
+        };
+    }
+
+    raw = readJsonScalePercent(data);
+    return {
+        scalePercent: normalizeScalePercent(raw),
+        fromJson: raw !== undefined,
+        formatColumns: formatColumns
+    };
 }
 
 function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
@@ -4897,25 +4966,26 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     var protoHeight;
     var cleanCaption;
     var urlOrPath = data.url;
-    var scalePercent = 100;
-    var useJsonScale = (layoutState.columnCount || 1) !== 2;
-
-    // 2-column format: fill the column; do not apply JSON scale_percent.
-    if (useJsonScale) {
-        scalePercent = normalizeScalePercent(
-            data.scale_percent !== undefined ? data.scale_percent : data.scalePercent
-        );
-    }
+    var scaleResult = resolveImageScalePercent(data, layoutState);
+    var scalePercent = scaleResult.scalePercent;
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Image");
     appendRenderLog("Dynamic prototype: " + frameProtoLabel);
     appendRenderLog("Occurrence: " + blockIndex);
     appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
-    if (useJsonScale) {
-        appendRenderLog("Image scale_percent: " + scalePercent + "%");
+    if (scaleResult.formatColumns === 2) {
+        appendRenderLog("Image scale_percent: 100% (format columns=2; JSON scale ignored)");
+    } else if (scaleResult.fromJson) {
+        appendRenderLog(
+            "Image scale_percent: " + scalePercent +
+            "% (from JSON; format columns=" + scaleResult.formatColumns + ")"
+        );
     } else {
-        appendRenderLog("Image scale_percent: 100% (2-column format; JSON scale ignored)");
+        appendRenderLog(
+            "Image scale_percent: " + scalePercent +
+            "% (JSON scale missing; format columns=" + scaleResult.formatColumns + ")"
+        );
     }
 
     if (!urlOrPath) {
@@ -6043,12 +6113,25 @@ function initializeStylesFromConfig(scriptFolderPath) {
     var typographyConfig = loadTypographyConfig(scriptFolderPath);
     var configStyles;
     var layoutFormat;
+    var formatId = "";
 
-    layoutFormat = loadLayoutFormat(scriptFolderPath);
+    if (typographyConfig) {
+        formatId = normalizeFormatIdToken(
+            typographyConfig.formatId || typographyConfig.themeId || typographyConfig.templateId
+        );
+        if (typographyConfig.layout && (typographyConfig.layout.opener || typographyConfig.layout["non-opener"])) {
+            LAYOUT_FORMAT = typographyConfig.layout;
+            LAYOUT_FORMAT_ID = formatId;
+        }
+    }
+
+    layoutFormat = loadLayoutFormat(scriptFolderPath, formatId);
     if (layoutFormat) {
         LAYOUT_FORMAT = layoutFormat;
         appendRenderLog(
-            "Layout format loaded (opener.columns=" +
+            "Layout format loaded (formatId=" +
+            (LAYOUT_FORMAT_ID || formatId || "?") +
+            ", opener.columns=" +
             ((LAYOUT_FORMAT.opener && LAYOUT_FORMAT.opener.columns) || "?") +
             ", non-opener.columns=" +
             ((LAYOUT_FORMAT["non-opener"] && LAYOUT_FORMAT["non-opener"].columns) || "?") +

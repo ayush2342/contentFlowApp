@@ -568,12 +568,12 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     const urlPath = normalizePublicAssetPath(block.data.url);
     // Match PDF: caption may live on data.caption or data.text
     const caption = normalizeText(block?.data?.caption || block?.data?.text);
+    const jsonScale =
+      block?.data?.scale_percent ??
+      block?.data?.scalePercent ??
+      block?.data?.scale;
     const scalePercent =
-      ctx.pageColumns === 2
-        ? 100
-        : normalizeScalePercent(
-            block?.data?.scale_percent ?? block?.data?.scalePercent
-          );
+      ctx.pageColumns === 2 ? 100 : normalizeScalePercent(jsonScale);
     const mediaId = `tree-media-${ctx.mediaIndex++}`;
     ctx.media[mediaId] = {
       fileName: basenameFromPath(urlPath),

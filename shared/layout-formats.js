@@ -112,11 +112,20 @@ export const toFormatContentKey = (contentType) => {
   return found ? CONTENT_TYPE_TO_FORMAT_KEY[found] : raw;
 };
 
+const unwrapLayoutDoc = (formatDoc) => {
+  if (!formatDoc || typeof formatDoc !== 'object') return formatDoc;
+  if (formatDoc.opener || formatDoc['non-opener']) return formatDoc;
+  const nested = formatDoc.layout || formatDoc.FORMAT || formatDoc.format;
+  if (nested && typeof nested === 'object') return nested;
+  return formatDoc;
+};
+
 export const getPageFormat = (formatDoc, pageType) => {
+  const layout = unwrapLayoutDoc(formatDoc);
   const key = normalizePageTypeKey(pageType);
-  const section = formatDoc?.[key];
+  const section = layout?.[key];
   if (section && typeof section === 'object') return section;
-  return formatDoc?.opener || { columns: 1 };
+  return layout?.opener || { columns: 1 };
 };
 
 export const getPageColumns = (formatDoc, pageType) => {
