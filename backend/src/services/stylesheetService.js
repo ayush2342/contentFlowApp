@@ -113,6 +113,7 @@ const LEGACY_THEME_KEY_MAP = {
   BulletList: 'bulletList',
   NumberedList: 'numberedList',
   Quotation: 'quotation',
+  LogoWithText: 'logoWithText',
   Table: 'table',
   Footer: 'footer',
 };

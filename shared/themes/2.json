@@ -43,7 +43,7 @@
       }
     },
     "lessonTitle": {
-      "font": "Futura PT",
+      "font": "Futura Std",
       "size": 18,
       "color": "#214880",
       "bold": true
@@ -118,6 +118,13 @@
       "size": 11,
       "color": "#000000",
       "bold": false
+    },
+    "logoWithText": {
+      "font": "Mulish Black",
+      "size": 10.8,
+      "color": "#000000",
+      "bold": false,
+      "textTransform": "uppercase"
     },
     "imageFigureNumber": {
       "font": "Arial",

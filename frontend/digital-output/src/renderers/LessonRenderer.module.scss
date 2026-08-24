@@ -76,8 +76,10 @@
   row-gap: 0.5rem;
   align-items: start;
   width: 100%;
-  /* Space after ChapterOverview intro ParagraphText before LO items */
+  /* Space after ChapterOverview intro ParagraphText before LO items, and
+     again below the list so body copy does not butt against it. */
   margin-top: 0.85rem;
+  margin-bottom: 1.15rem;
 }
 
 .unsupported {

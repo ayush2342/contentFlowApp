@@ -53,8 +53,8 @@
       "size": 10,
       "color": "#000000",
       "bold": false,
-      "borderTop": "2px solid #CA5021",
-      "borderBottom": "2px solid #CA5021"
+      "borderTop": "1px solid #CA5021",
+      "borderBottom": "1px solid #CA5021"
     },
     "subSectionTitle": {
       "font": "Neue Kabel",
@@ -118,6 +118,13 @@
       "size": 11,
       "color": "#000000",
       "bold": false
+    },
+    "logoWithText": {
+      "font": "Mulish Black",
+      "size": 10.8,
+      "color": "#000000",
+      "bold": false,
+      "textTransform": "uppercase"
     },
     "imageFigureNumber": {
       "font": "Arial",

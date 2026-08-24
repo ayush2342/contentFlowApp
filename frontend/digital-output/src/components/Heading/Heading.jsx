@@ -1,4 +1,5 @@
 import { getTypographyBorderStyle } from '../../../../../shared/typography-styles.js';
+import { renderInlineHtml, stripInlineHtml } from '../../utils/inlineHtml.jsx';
 import styles from './Heading.module.scss';
 
 const variantClassMap = {
@@ -28,6 +29,9 @@ const splitNumberAndText = (value) => {
 
 const COMPOSITE_VARIANTS = new Set(['subTitlesList', 'sectionTitle', 'lessonOverview']);
 
+/** Badge-style headings sit on a themed fill, so source colors must not win. */
+const THEME_COLOR_VARIANTS = new Set(['chapterNumber', 'chapterHeading', 'partNumber']);
+
 const Heading = ({ text, level = 1, variant }) => {
   const Tag = `h${level}`;
   const variantClass = variant ? variantClassMap[variant] : '';
@@ -36,7 +40,7 @@ const Heading = ({ text, level = 1, variant }) => {
   const borderStyle = getTypographyBorderStyle(variant);
 
   if (COMPOSITE_VARIANTS.has(variant)) {
-    const parts = splitNumberAndText(text);
+    const parts = splitNumberAndText(stripInlineHtml(text));
     if (parts.number) {
       return (
         <Tag className={className} style={borderStyle}>
@@ -49,7 +53,7 @@ const Heading = ({ text, level = 1, variant }) => {
 
   return (
     <Tag className={className} style={borderStyle}>
-      {text}
+      {renderInlineHtml(text, { ignoreColors: THEME_COLOR_VARIANTS.has(variant) })}
     </Tag>
   );
 };

@@ -131,6 +131,7 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
   const tableRaw = pickRawStyle(styleSet, ['table']);
   const footer = pickFlatStyle(styleSet, ['footer']);
   const subSectionHeading = pickFlatStyle(styleSet, ['subSectionHeading', 'subsectionHeading']);
+  const logoWithText = pickFlatStyle(styleSet, ['logoWithText', 'logoText']);
 
   return {
     chapterHeading,
@@ -156,7 +157,7 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
     text: paragraphText,
     imageCaption: imageFigureText,
     figureCaption: imageFigureText,
-    logoText: subSectionTitle,
+    logoText: logoWithText || subSectionTitle,
     partNumber,
     quotation: quotationRaw,
     table: tableRaw,
@@ -199,6 +200,67 @@ export const hexToRgb = (hex) => {
   return result
     ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
     : [0, 0, 0];
+};
+
+const FONT_STYLE_SUFFIX_WEIGHTS = {
+  thin: 100,
+  extralight: 200,
+  ultralight: 200,
+  light: 300,
+  book: 400,
+  regular: 400,
+  roman: 400,
+  medium: 500,
+  semi: 600,
+  semibold: 600,
+  demibold: 600,
+  bold: 700,
+  black: 900,
+  heavy: 900,
+};
+
+/**
+ * Theme fonts are named the way designers get them ("Mulish SemiBold").
+ * The browser needs the base family plus a numeric weight, so split the
+ * style suffix off and keep the full name first for locally installed fonts.
+ */
+export const toWebFont = (font) => {
+  const families = String(font || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!families.length) {
+    return { stack: 'Arial, sans-serif', weight: null };
+  }
+
+  const [primary, ...rest] = families;
+  const match = /^(.*?)[\s-]+(thin|extra\s?light|ultra\s?light|light|book|regular|roman|medium|semi\s?bold|demi\s?bold|semi|bold|black|heavy)$/i.exec(
+    primary
+  );
+
+  const names = [primary];
+  let weight = null;
+
+  if (match) {
+    const base = match[1].trim();
+    const suffix = match[2].toLowerCase().replace(/\s+/g, '');
+    weight = FONT_STYLE_SUFFIX_WEIGHTS[suffix] ?? null;
+    if (base && base.toLowerCase() !== primary.toLowerCase()) {
+      names.push(base);
+    }
+  }
+
+  // Adobe Fonts installs several of these under their variable family name.
+  names.push(`${names[names.length - 1]} Variable`);
+
+  const stack = names
+    .concat(rest)
+    .map((name) => (/\s/.test(name) ? `"${name}"` : name))
+    .concat('sans-serif')
+    .join(', ');
+
+  return { stack, weight };
 };
 
 export const toInDesignStyle = (style) => ({
@@ -256,8 +318,9 @@ export const toCssVariables = (key, style) => {
     : isFullWidthBar
       ? '0.7rem 0.85rem'
       : '0.08rem 0.55rem';
+  const webFont = toWebFont(style.font);
   return {
-    [`${prefix}-font`]: `${style.font || 'Arial'}, sans-serif`,
+    [`${prefix}-font`]: webFont.stack,
     [`${prefix}-size`]: `${style.size}pt`,
     [`${prefix}-color`]: style.color,
     // Always set bg so a previous theme's badge color cannot stick (e.g. theme2 → theme1).
@@ -265,7 +328,7 @@ export const toCssVariables = (key, style) => {
     [`${prefix}-alt-bg`]:
       style.altBackgroundColor || style.altbackgroundColor || 'transparent',
     [`${prefix}-pad`]: padValue,
-    [`${prefix}-weight`]: style.bold ? '700' : '400',
+    [`${prefix}-weight`]: style.bold ? '700' : String(webFont.weight || 400),
     [`${prefix}-style`]: style.italic ? 'italic' : 'normal',
     // Always reset transform so theme1 uppercase cannot stick on theme2.
     [`${prefix}-transform`]: style.textTransform || 'none',
@@ -314,6 +377,10 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
   variables['--typography-lessonOverview-space-after'] = roomyOverview
     ? '1rem'
     : '0.2rem';
+  // Gap below the final overview item, before body copy resumes.
+  variables['--typography-lessonOverview-space-after-last'] = roomyOverview
+    ? '1.4rem'
+    : '0.9rem';
   return variables;
 };
 

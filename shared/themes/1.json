@@ -3,63 +3,63 @@
   "label": "Theme 1",
   "STYLES": {
     "chapterNumber": {
-      "font": "Arial",
+      "font": "Mulish Regular",
       "size": 15,
       "color": "#0074BC",
       "bold": false
     },
     "chapterHeading": {
-      "font": "Arial",
+      "font": "Mulish Regular",
       "size": 15,
       "color": "#0074BC",
       "bold": false
     },
     "chapterTitle": {
-      "font": "Arial",
+      "font": "Arimo",
       "size": 22,
       "color": "#000000",
       "bold": false
     },
     "chapterOverview": {
-      "font": "Arial",
+      "font": "Mulish",
       "size": 9,
       "color": "#0074BC",
       "bold": true,
       "textTransform": "uppercase"
     },
     "lessonOverview": {
-      "font": "Arial",
+      "font": "IBM Plex Sans",
       "size": 9,
       "color": "#000000",
       "bold": true
     },
     "lessonTitle": {
-      "font": "Arial",
-      "size": 12,
+      "font": "Mulish SemiBold",
+      "size": 13,
       "color": "#0074BC",
       "bold": false
     },
     "sectionTitle": {
-      "font": "Arial",
+      "font": "Mulish SemiBold",
       "size": 11,
       "color": "#0074BC",
       "bold": false
     },
     "subSectionTitle": {
-      "font": "Arial",
+      "font": "Mulish SemiBold",
       "size": 9,
       "color": "#0074BC",
       "bold": false
     },
     "learningObjectives": {
-      "font": "Arial",
+      "font": "Mulish",
       "size": 9,
       "color": "#0074BC",
       "bold": true,
       "textTransform": "uppercase"
     },
     "paragraphText": {
-      "font": "IBM Plex Sans",
+      "font": "IBM Plex Sans Regular",
       "size": 9,
       "color": "#000000",
       "bold": false
@@ -71,13 +71,13 @@
       "bold": false
     },
     "imageFigureNumber": {
-      "font": "Arial",
+      "font": "Mulish",
       "size": 7.5,
       "color": "#C31427",
       "bold": true
     },
     "imageFigureText": {
-      "font": "Arial",
+      "font": "IBM Plex Sans Regular",
       "size": 7.5,
       "color": "#000000",
       "bold": false

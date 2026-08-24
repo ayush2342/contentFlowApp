@@ -1,3 +1,4 @@
+import { stripInlineHtml } from '../../utils/inlineHtml.jsx';
 import styles from './ImageBlock.module.scss';
 
 const captionParts = (caption) => {
@@ -20,7 +21,9 @@ const resolveScalePercent = (value) => {
 };
 
 const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
-  const parsedCaption = captionParts(caption);
+  // The figure prefix is styled from the theme, so match against tag-free text.
+  const captionText = stripInlineHtml(caption).trim();
+  const parsedCaption = captionParts(captionText);
   const overlayText = String(partNumberOverlay ?? '').trim();
   const scale = resolveScalePercent(scalePercent);
   const figureClass = [
@@ -36,14 +39,14 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
         className={styles.imageFrame}
         style={scale ? { width: `${scale}%`, marginInline: 'auto' } : undefined}
       >
-        <img src={src} alt={alt} className={styles.image} />
+        <img src={src} alt={stripInlineHtml(alt)} className={styles.image} />
         {overlayText ? (
           <div className={styles.partNumberOverlay} aria-label={overlayText}>
             {overlayText}
           </div>
         ) : null}
       </div>
-      {caption ? (
+      {captionText ? (
         <figcaption className={styles.caption}>
           {parsedCaption ? (
             <>
@@ -51,7 +54,7 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
               {parsedCaption.rest}
             </>
           ) : (
-            caption
+            captionText
           )}
         </figcaption>
       ) : null}

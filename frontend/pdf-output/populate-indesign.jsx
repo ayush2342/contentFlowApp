@@ -3265,7 +3265,8 @@ function parseFigureCaptionParts(caption) {
 }
 
 function applyFigureCaptionPrefixStyle(textFrame, captionText) {
-    var parts = parseFigureCaptionParts(captionText);
+    // The caption in the frame is the tag-stripped text, so match against that.
+    var parts = parseFigureCaptionParts(parseInlineMarkup(captionText).plain);
     var story;
     var numberStyle;
     var prefixRange;
@@ -3321,8 +3322,9 @@ function populateFrame(document, labelName, textContent, style, blockType) {
 
     appendRenderLog("Frame found: yes");
 
-    frame.contents = cleanText;
+    var frameRuns = setFrameContentsWithMarkup(frame, cleanText);
     applyFrameStyle(frame, style);
+    applyInlineMarkupRuns(frame, frameRuns, style);
     if (itemType === "ImageCaption") {
         applyFigureCaptionPrefixStyle(frame, cleanText);
     }
@@ -3406,6 +3408,26 @@ function getBlockText(data, listStyle) {
  * Parse cendoc-style inline HTML from output JSON into plain text + style runs.
  * Supports: i/em, b/strong, span (glossary → plain), sup (endnote → superscript), br, a (text only).
  */
+/** Extract a hex color from an inline style attribute, e.g. style="color: #c31427;". */
+function parseInlineStyleColor(attrs) {
+    var match = /(?:^|;|\s)color\s*:\s*(#[0-9a-fA-F]{3,6})/.exec(String(attrs || ""));
+    var hex;
+
+    if (!match) {
+        return "";
+    }
+
+    hex = match[1].replace(/^#/, "");
+    if (hex.length === 3) {
+        hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
+    }
+    if (hex.length !== 6) {
+        return "";
+    }
+
+    return "#" + hex;
+}
+
 function parseInlineMarkup(raw) {
     var text;
     var plain = "";
@@ -3415,6 +3437,7 @@ function parseInlineMarkup(raw) {
     var m;
     var re;
     var tag;
+    var attrs;
     var isClose;
     var isSelfClose;
     var i;
@@ -3422,6 +3445,7 @@ function parseInlineMarkup(raw) {
     var runItalic;
     var runBold;
     var runSuper;
+    var runColor;
 
     text = fixUtf8Mojibake(String(raw || ""));
     text = text
@@ -3443,6 +3467,7 @@ function parseInlineMarkup(raw) {
         }
 
         tag = String(m[1] || "").toLowerCase();
+        attrs = m[2] || "";
         isClose = m[0].charAt(1) === "/";
         isSelfClose = /\/\s*>$/.test(m[0]) || tag === "br";
 
@@ -3463,7 +3488,8 @@ function parseInlineMarkup(raw) {
                     start: plain.length,
                     italic: tag === "i" || tag === "em",
                     bold: tag === "b" || tag === "strong",
-                    superscript: tag === "sup"
+                    superscript: tag === "sup",
+                    color: parseInlineStyleColor(attrs)
                 });
             }
             // Unknown open tags are dropped; inner text is kept.
@@ -3475,20 +3501,23 @@ function parseInlineMarkup(raw) {
                     runItalic = open.italic;
                     runBold = open.bold;
                     runSuper = open.superscript;
-                    // Inherit open emphasis from parents still on the stack.
+                    runColor = open.color;
+                    // Inherit open emphasis/color from parents still on the stack.
                     var p;
                     for (p = 0; p < stack.length; p++) {
                         if (stack[p].italic) runItalic = true;
                         if (stack[p].bold) runBold = true;
                         if (stack[p].superscript) runSuper = true;
+                        if (!runColor && stack[p].color) runColor = stack[p].color;
                     }
-                    if (plain.length > open.start && (runItalic || runBold || runSuper)) {
+                    if (plain.length > open.start && (runItalic || runBold || runSuper || runColor)) {
                         runs.push({
                             start: open.start,
                             end: plain.length,
                             italic: runItalic,
                             bold: runBold,
-                            superscript: runSuper
+                            superscript: runSuper,
+                            color: runColor
                         });
                     }
                     break;
@@ -3546,9 +3575,12 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
                 pointSize: base.pointSize,
                 bold: run.bold ? true : isTruthyFlag(base.bold),
                 italic: run.italic ? true : isTruthyFlag(base.italic),
-                color: base.color
+                color: run.color ? hexToRgb(run.color) : base.color
             };
             applyThemeFontAndEmphasis(range, runStyle);
+            if (run.color) {
+                applyTextColor(range, runStyle);
+            }
             if (run.superscript) {
                 try {
                     range.position = Position.SUPERSCRIPT;
@@ -3556,6 +3588,45 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
             }
         } catch (rangeError) {}
     }
+}
+
+/**
+ * Set frame text from JSON that may carry inline HTML (<b>, <i>, <span style="color">).
+ * Returns the parsed runs so the caller can re-apply them after its own styling pass.
+ */
+function setFrameContentsWithMarkup(frame, rawText) {
+    var parsed = parseInlineMarkup(rawText);
+
+    try {
+        frame.contents = parsed.plain;
+    } catch (contentsError) {
+        frame.contents = String(rawText || "");
+        return [];
+    }
+
+    return parsed.runs;
+}
+
+/**
+ * Drop per-run colors so the theme color wins. Used for badge/bar blocks where a
+ * color from the source HTML could render the text invisible on its fill.
+ */
+function dropRunColors(runs) {
+    var out = [];
+    var i;
+
+    for (i = 0; runs && i < runs.length; i++) {
+        out.push({
+            start: runs[i].start,
+            end: runs[i].end,
+            italic: runs[i].italic,
+            bold: runs[i].bold,
+            superscript: runs[i].superscript,
+            color: ""
+        });
+    }
+
+    return out;
 }
 
 function normalizeBlockType(itemType) {
@@ -3803,6 +3874,7 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
     var frame;
     var story;
     var appliedStyle;
+    var overlayRuns;
 
     if (!imageFrame || !text) {
         return;
@@ -3849,8 +3921,9 @@ function placeOpenerPartNumberOverlay(layoutState, imageFrame, text, style) {
             frame.textFramePreferences.verticalJustification =
                 VerticalJustification.CENTER_ALIGN;
         } catch (insetError) {}
-        frame.contents = text;
+        overlayRuns = setFrameContentsWithMarkup(frame, text);
         applyFrameStyle(frame, appliedStyle);
+        applyInlineMarkupRuns(frame, dropRunColors(overlayRuns), appliedStyle);
         try {
             story = frame.parentStory;
             if (story && story.paragraphs.length) {
@@ -4950,6 +5023,11 @@ function resolveLessonOverviewSpacingBefore() {
     return usesRoomyOverviewSpacing() ? 14 : 2;
 }
 
+/** Extra air after the last LessonOverview item before body copy resumes. */
+function resolveLessonOverviewTailGap() {
+    return usesRoomyOverviewSpacing() ? 20 : 14;
+}
+
 /** Full-width ChapterNumber bar with visible left-aligned text (no FRAME_TO_CONTENT). */
 function placeChapterNumberBar(layoutState, text, style) {
     var layoutBounds;
@@ -4964,6 +5042,7 @@ function placeChapterNumberBar(layoutState, text, style) {
     var appliedStyle;
     var gapAfter;
     var isBar;
+    var barRuns;
 
     appliedStyle = style || FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 36;
@@ -4982,7 +5061,7 @@ function placeChapterNumberBar(layoutState, text, style) {
         frameTop,
         barHeight
     );
-    frame.contents = String(text || "");
+    barRuns = setFrameContentsWithMarkup(frame, text);
 
     try {
         frame.textFramePreferences.verticalJustification =
@@ -5011,6 +5090,8 @@ function placeChapterNumberBar(layoutState, text, style) {
     } catch (styleError) {
         warnings.push("ChapterNumber text style failed: " + styleError.message);
     }
+
+    applyInlineMarkupRuns(frame, dropRunColors(barRuns), appliedStyle);
 
     applyFrameFillColor(frame, appliedStyle);
 
@@ -5440,6 +5521,7 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
     var blockBottom;
     var logoFrame;
     var textFrame;
+    var logoTextRuns;
     var imageFile;
     var cleanText = trimString(data.text || data.caption || "");
     var urlOrPath = data.url;
@@ -5526,8 +5608,9 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
                 }
             } catch (verticalJustifyError) {}
 
-            textFrame.contents = cleanText;
+            logoTextRuns = setFrameContentsWithMarkup(textFrame, cleanText);
             applyFrameStyle(textFrame, registryEntry.style);
+            applyInlineMarkupRuns(textFrame, logoTextRuns, registryEntry.style);
             populatedCount += 1;
             appendRenderLog("Logo text status: populated");
             if (getFrameBottomY(textFrame) > blockBottom) {
@@ -5692,6 +5775,7 @@ function populateDynamicQuotationBlock(layoutState, document, registryEntry, dat
     var growPass;
     var gapAfter;
     var contentBottom;
+    var quoteRuns;
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Quotation");
@@ -5754,7 +5838,7 @@ function populateDynamicQuotationBlock(layoutState, document, registryEntry, dat
             frameTop,
             frameHeight
         );
-        frame.contents = cleanText;
+        quoteRuns = setFrameContentsWithMarkup(frame, cleanText);
 
         try {
             story = frame.parentStory;
@@ -5839,6 +5923,7 @@ function populateDynamicQuotationBlock(layoutState, document, registryEntry, dat
         } catch (shrinkError) {}
 
         applyQuotationPresentation(frame, style, !!author);
+        applyInlineMarkupRuns(frame, quoteRuns, textStyle);
 
         gapAfter = resolveBlockSpacing(registryEntry);
         syncLayoutPageFromFrame(layoutState, frame);
@@ -6126,6 +6211,7 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
     var pageIndex;
     var page;
     var fullBounds;
+    var footerRuns;
     var footerHeight = 28;
     var frame;
 
@@ -6165,8 +6251,9 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
             });
             assignFrameToContentLayer(frame);
             clearRuntimeLabel(frame);
-            frame.contents = footerText;
+            footerRuns = setFrameContentsWithMarkup(frame, footerText);
             applyFrameStyle(frame, style);
+            applyInlineMarkupRuns(frame, footerRuns, style);
             populatedCount += 1;
         } catch (footerError) {
             warnings.push("Could not place footer on page index " + pageIndex + ": " + footerError.message);
@@ -6261,6 +6348,7 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
                     overviewGroup,
                     registryEntry
                 );
+                layoutState.cursorY += resolveLessonOverviewTailGap();
                 continue;
             }
 
@@ -6275,6 +6363,15 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
             }
 
             populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex);
+
+            // Last LessonOverview of a run: separate the list from the body copy.
+            if (
+                itemType === "LessonOverview" &&
+                (i + 1 >= split.body.length ||
+                    normalizeBlockType(split.body[i + 1].type) !== "LessonOverview")
+            ) {
+                layoutState.cursorY += resolveLessonOverviewTailGap();
+            }
             continue;
         }
 

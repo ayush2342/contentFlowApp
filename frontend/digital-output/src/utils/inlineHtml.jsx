@@ -10,11 +10,17 @@ const getAttr = (el, name) => {
   }
 };
 
+/** Pull a color out of an inline style attribute, e.g. style="color: #c31427;". */
+const getInlineColor = (el) => {
+  const match = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(getAttr(el, 'style'));
+  return match ? match[1].trim() : '';
+};
+
 /**
  * Walk a DOM node tree into safe React children for paragraph/list text.
  * Supports cendoc inline markup from output JSON: i/em, b/strong, glossary spans, endnote sup.
  */
-const walkNodes = (nodes, keyPrefix = 'n') => {
+const walkNodes = (nodes, keyPrefix = 'n', options = {}) => {
   const out = [];
 
   Array.from(nodes || []).forEach((node, index) => {
@@ -29,7 +35,7 @@ const walkNodes = (nodes, keyPrefix = 'n') => {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
 
     const tag = String(node.tagName || '').toUpperCase();
-    const children = walkNodes(node.childNodes, key);
+    const children = walkNodes(node.childNodes, key, options);
 
     if (!ALLOWED_TAGS.has(tag)) {
       out.push(...children);
@@ -81,6 +87,15 @@ const walkNodes = (nodes, keyPrefix = 'n') => {
         );
         return;
       }
+      const color = options.ignoreColors ? '' : getInlineColor(node);
+      if (color) {
+        out.push(
+          <span key={key} style={{ color }}>
+            {children}
+          </span>
+        );
+        return;
+      }
       out.push(<React.Fragment key={key}>{children}</React.Fragment>);
       return;
     }
@@ -106,10 +121,28 @@ const walkNodes = (nodes, keyPrefix = 'n') => {
 export const looksLikeInlineHtml = (value) =>
   /<\/?[a-z][\s\S]*>/i.test(String(value ?? ''));
 
+/** Plain text version of inline HTML, for regex matching and alt text. */
+export const stripInlineHtml = (html) => {
+  const value = String(html ?? '');
+  if (!value || !looksLikeInlineHtml(value)) return value;
+
+  if (typeof DOMParser === 'undefined') {
+    return value.replace(/<[^>]+>/g, '');
+  }
+
+  try {
+    const doc = new DOMParser().parseFromString(`<div>${value}</div>`, 'text/html');
+    return doc.body?.textContent ?? value.replace(/<[^>]+>/g, '');
+  } catch {
+    return value.replace(/<[^>]+>/g, '');
+  }
+};
+
 /**
  * Render output-JSON inline HTML as React nodes (escaped text when no tags).
+ * Pass { ignoreColors: true } for blocks whose theme color must win, e.g. badges.
  */
-export const renderInlineHtml = (html) => {
+export const renderInlineHtml = (html, options = {}) => {
   const value = String(html ?? '');
   if (!value) return null;
   if (!looksLikeInlineHtml(value)) return value;
@@ -121,7 +154,7 @@ export const renderInlineHtml = (html) => {
   try {
     const doc = new DOMParser().parseFromString(`<div>${value}</div>`, 'text/html');
     const root = doc.body?.firstElementChild || doc.body;
-    return walkNodes(root?.childNodes || []);
+    return walkNodes(root?.childNodes || [], 'n', options);
   } catch {
     return value.replace(/<[^>]+>/g, '');
   }

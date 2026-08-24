@@ -146,7 +146,13 @@
 }
 
 .lessonOverview {
-  margin-bottom: var(--typography-lessonOverview-space-after, 1rem);
+  /* Last item of a run gets extra air before the following paragraph. */
+  margin-bottom: var(--typography-lessonOverview-space-after-last, 1.4rem);
+
+  &:has(+ .lessonOverview) {
+    margin-bottom: var(--typography-lessonOverview-space-after, 1rem);
+  }
+
   font-family: var(--typography-lessonOverview-font);
   font-size: var(--typography-lessonOverview-size);
   font-weight: var(--typography-lessonOverview-weight);
