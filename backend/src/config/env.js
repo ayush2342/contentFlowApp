@@ -34,7 +34,7 @@ export const env = {
   inDesignExePath: process.env.INDESIGN_EXE_PATH || '',
   inDesignScriptPath: process.env.INDESIGN_SCRIPT_PATH || '',
   inDesignTemplatePath: process.env.INDESIGN_TEMPLATE_PATH || '',
-  inDesignTimeoutMs: Number(process.env.INDESIGN_TIMEOUT_MS || 300000),
+  inDesignTimeoutMs: Number(process.env.INDESIGN_TIMEOUT_MS || 900000),
   /** Default local theme when S3 theme is missing/fails (numeric: 1, 2, …). */
   defaultThemeId: normalizeAppearanceId(process.env.DEFAULT_THEME_ID || '2', '2'),
   /** Default local format when S3 format is missing/fails (numeric: 1, 2, …). */

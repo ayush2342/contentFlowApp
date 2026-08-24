@@ -29,7 +29,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v24";
+var POPULATE_SCRIPT_VERSION = "dynamic-v27-scale-percent-always-honor-json";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
@@ -1799,83 +1799,317 @@ function readJsonScalePercent(data) {
  * Otherwise use data.scale_percent as a percentage of column width (e.g. 73.9 → 73.9%).
  * If the format sheet is missing, do not assume 2-col — still use JSON.
  */
+function normalizeColumnFormatToken(value) {
+    var raw = trimString(String(value == null ? "" : value)).toLowerCase();
+    raw = raw.replace(/[\s_-]+/g, "");
+    if (!raw) return 0;
+    if (raw === "column2" || raw === "columns2" || raw === "2column" || raw === "twocolumn" || raw === "2cols" || raw === "columns2") {
+        return 2;
+    }
+    if (raw === "column1" || raw === "columns1" || raw === "1column" || raw === "onecolumn" || raw === "1col" || raw === "columns1") {
+        return 1;
+    }
+    if (Number(raw) === 2) return 2;
+    if (Number(raw) === 1) return 1;
+    return 0;
+}
+
+/**
+ * Resolve an EXPLICIT image/component format only.
+ *
+ * IMPORTANT:
+ * A page being two-column does NOT mean the image is a column2 image.
+ * Page columns and image format are separate concepts.
+ *
+ * Returns 2/1 when an explicit image/component format is known, otherwise 0.
+ */
+/**
+ * Image scale:
+ *   - 2-column format pages: always 100% of the current column (ignore JSON).
+ *   - 1-column pages: JSON scale_percent (unchanged; this path is working).
+ */
 function resolveImageScalePercent(data, layoutState) {
+    var raw = readJsonScalePercent(data);
     var pageType = (layoutState && layoutState.pageType) || CURRENT_PAGE_TYPE || "opener";
-    var key = String(pageType || "opener").toLowerCase();
-    var section;
-    var formatColumns = 1;
-    var raw;
+    var pageColumns = 1;
 
-    if (key === "non_opener" || key === "non-opener" || key === "nonopener") {
-        key = "non-opener";
+    if (layoutState && Number(layoutState.columnCount) === 2) {
+        pageColumns = 2;
     } else {
-        key = "opener";
+        pageColumns = resolvePageColumnCount(pageType, LAYOUT_FORMAT);
     }
 
-    section = LAYOUT_FORMAT && LAYOUT_FORMAT[key];
-    if (section && section.columns != null) {
-        formatColumns = Number(section.columns) === 2 ? 2 : 1;
-    }
-
-    if (formatColumns === 2) {
+    if (pageColumns === 2) {
         return {
             scalePercent: 100,
             fromJson: false,
-            formatColumns: formatColumns
+            formatColumns: 2,
+            jsonValue: raw,
+            scaleReason: "format columns=2; JSON ignored, 100% of current column"
         };
     }
 
-    raw = readJsonScalePercent(data);
     return {
         scalePercent: normalizeScalePercent(raw),
         fromJson: raw !== undefined,
-        formatColumns: formatColumns,
-        jsonValue: raw
+        formatColumns: 1,
+        jsonValue: raw,
+        scaleReason: raw !== undefined
+            ? "tree_output.json scale_percent (authoritative)"
+            : "JSON scale_percent missing/invalid; default 100% of current column"
     };
 }
 
-function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
+
+function readBinaryUInt16BE(binary, offset) {
+    return (binary.charCodeAt(offset) << 8) | binary.charCodeAt(offset + 1);
+}
+
+function readBinaryUInt32BE(binary, offset) {
+    return (
+        binary.charCodeAt(offset) * 16777216 +
+        binary.charCodeAt(offset + 1) * 65536 +
+        binary.charCodeAt(offset + 2) * 256 +
+        binary.charCodeAt(offset + 3)
+    );
+}
+
+/*
+ * Read the source image dimensions directly from the linked file.
+ * This avoids using a cropped/fit graphic's geometricBounds to infer the
+ * source aspect ratio.
+ */
+function getSourceImageAspectRatio(imageFile) {
+    var name;
+    var ext;
+    var file;
+    var binary;
+    var length;
+    var i;
+    var marker;
+    var markerCode;
+    var segmentLength;
+    var width;
+    var height;
+
+    if (!imageFile || !imageFile.exists) {
+        return 0;
+    }
+
+    name = String(imageFile.name || "").toLowerCase();
+    ext = "";
+    if (name.lastIndexOf(".") >= 0) {
+        ext = name.substring(name.lastIndexOf(".") + 1);
+    }
+
+    try {
+        file = new File(imageFile.fsName);
+        file.encoding = "BINARY";
+        if (!file.open("r")) {
+            return 0;
+        }
+
+        binary = file.read();
+        file.close();
+
+        length = binary.length;
+
+        // PNG signature + IHDR dimensions.
+        if (ext === "png" &&
+            length >= 24 &&
+            binary.charCodeAt(0) === 0x89 &&
+            binary.charCodeAt(1) === 0x50 &&
+            binary.charCodeAt(2) === 0x4E &&
+            binary.charCodeAt(3) === 0x47) {
+            width = readBinaryUInt32BE(binary, 16);
+            height = readBinaryUInt32BE(binary, 20);
+            if (width > 0 && height > 0) {
+                return height / width;
+            }
+        }
+
+        // JPEG SOF marker scan.
+        if (ext === "jpg" || ext === "jpeg" || ext === "jpe") {
+            i = 2;
+            while (i + 9 < length) {
+                if (binary.charCodeAt(i) !== 0xFF) {
+                    i++;
+                    continue;
+                }
+
+                markerCode = binary.charCodeAt(i + 1);
+
+                // Skip fill bytes.
+                if (markerCode === 0xFF) {
+                    i++;
+                    continue;
+                }
+
+                // Standalone JPEG markers.
+                if (markerCode === 0xD8 || markerCode === 0xD9 ||
+                    (markerCode >= 0xD0 && markerCode <= 0xD7) ||
+                    markerCode === 0x01) {
+                    i += 2;
+                    continue;
+                }
+
+                if (i + 3 >= length) {
+                    break;
+                }
+
+                segmentLength = readBinaryUInt16BE(binary, i + 2);
+                if (segmentLength < 2 || i + 2 + segmentLength > length) {
+                    break;
+                }
+
+                // SOF0..SOF3, SOF5..SOF7, SOF9..SOFB, SOFD..SOFF.
+                if ((markerCode >= 0xC0 && markerCode <= 0xC3) ||
+                    (markerCode >= 0xC5 && markerCode <= 0xC7) ||
+                    (markerCode >= 0xC9 && markerCode <= 0xCB) ||
+                    (markerCode >= 0xCD && markerCode <= 0xCF)) {
+                    height = readBinaryUInt16BE(binary, i + 5);
+                    width = readBinaryUInt16BE(binary, i + 7);
+                    if (width > 0 && height > 0) {
+                        return height / width;
+                    }
+                }
+
+                i += 2 + segmentLength;
+            }
+        }
+    } catch (dimensionError) {
+        try {
+            if (file && file.isOpen) {
+                file.close();
+            }
+        } catch (closeError) {}
+    }
+
+    return 0;
+}
+
+function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
     var graphic;
     var imageBounds;
     var imageWidth;
     var imageHeight;
     var ratio;
-    var columnBounds;
-    var columnWidth;
+    var pageBounds;
+    var contentWidth;
+    var availableHeight;
+    var baseWidth;
+    var baseHeight;
     var scale;
     var targetWidth;
     var targetHeight;
     var targetLeft;
     var targetTop;
+    var maxBottom;
+    var fitRatio;
+    var fittedBounds;
+    var fittedWidth;
+    var resizeFactor;
 
     try {
         graphic = frame.graphics[0];
+        if (!graphic) {
+            throw new Error("graphic unavailable");
+        }
 
-        // Show the full image first so ratio is not taken from a cropped slice.
+        /*
+         * IMPORTANT:
+         * scale_percent is a UNIFORM image scale. We first establish the
+         * image's 100% size inside the available page content area, preserving
+         * its real aspect ratio. Then the JSON percentage is applied to BOTH
+         * width and height.
+         *
+         * This prevents tall portrait images (such as Figure 1.7) from being
+         * made 73.8% of the entire page width and becoming unnecessarily tall.
+         */
         try {
             frame.fit(FitOptions.PROPORTIONALLY);
-        } catch (uncropError) {}
+        } catch (fitError) {}
 
         imageBounds = graphic.geometricBounds;
         imageWidth = imageBounds[3] - imageBounds[1];
         imageHeight = imageBounds[2] - imageBounds[0];
+
         if (!(imageWidth > 0) || !(imageHeight > 0)) {
             throw new Error("graphic bounds unavailable");
         }
-        ratio = imageHeight / imageWidth;
 
-        columnBounds =
-            savedBounds && savedBounds.length === 4
-                ? savedBounds
-                : frame.geometricBounds;
-        columnWidth = columnBounds[3] - columnBounds[1];
-        targetTop = columnBounds[0];
+        ratio = getSourceImageAspectRatio(imageFile);
+        if (!(ratio > 0)) {
+            ratio = imageHeight / imageWidth;
+        }
 
-        // Format col 2 → 100; otherwise JSON scale_percent as % of column width.
         scale = normalizeScalePercent(scalePercent);
-        targetWidth = columnWidth * (scale / 100);
-        targetLeft = columnBounds[1] + (columnWidth - targetWidth) / 2;
-        targetHeight = targetWidth * ratio;
+
+        // 2-column: fill the column frame (savedBounds). Do not use JSON % or page width.
+        if (scale >= 99.5 && savedBounds && savedBounds.length === 4) {
+            targetLeft = savedBounds[1];
+            targetTop = savedBounds[0];
+            targetWidth = savedBounds[3] - savedBounds[1];
+            targetHeight = targetWidth * ratio;
+            frame.geometricBounds = [
+                targetTop,
+                targetLeft,
+                targetTop + targetHeight,
+                targetLeft + targetWidth
+            ];
+            try {
+                frame.fit(FitOptions.PROPORTIONALLY);
+            } catch (columnFitError) {}
+            try {
+                frame.fit(FitOptions.CENTER_CONTENT);
+            } catch (columnCenterError) {}
+            appendRenderLog(
+                "Dynamic image resize => scale=100% of column width=" +
+                targetWidth +
+                " height=" +
+                targetHeight
+            );
+            return "dynamic-image-sizing";
+        }
+
+        pageBounds = getFullPageMarginBounds(frame.parentPage);
+        contentWidth = pageBounds.right - pageBounds.left;
+        availableHeight = pageBounds.bottom - frame.geometricBounds[0];
+
+        if (!(contentWidth > 0)) {
+            throw new Error("page content width unavailable");
+        }
+
+        if (!(availableHeight > 0)) {
+            availableHeight = pageBounds.bottom - pageBounds.top;
+        }
+
+        /*
+         * Establish a 100% reference size that fits the complete image inside
+         * the available content rectangle. This gives us a reliable width AND
+         * height base for the percentage.
+         */
+        baseWidth = contentWidth;
+        baseHeight = baseWidth * ratio;
+
+        if (baseHeight > availableHeight) {
+            fitRatio = availableHeight / baseHeight;
+            baseWidth = baseWidth * fitRatio;
+            baseHeight = availableHeight;
+        }
+
+        scale = normalizeScalePercent(scalePercent);
+
+        targetWidth = baseWidth * (scale / 100);
+        targetHeight = baseHeight * (scale / 100);
+
+        targetLeft = pageBounds.left + (contentWidth - targetWidth) / 2;
+        targetTop = frame.geometricBounds[0];
+
+        maxBottom = pageBounds.bottom;
+        if (targetTop + targetHeight > maxBottom) {
+            targetTop = Math.max(pageBounds.top, maxBottom - targetHeight);
+        }
 
         frame.geometricBounds = [
             targetTop,
@@ -1884,22 +2118,49 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent) {
             targetLeft + targetWidth
         ];
 
+        /*
+         * Fit the placed graphic to the final proportional frame. The frame
+         * dimensions are already the final width AND height, so InDesign
+         * cannot stretch the image in one direction.
+         */
         try {
-            frame.fit(FitOptions.PROPORTIONALLY);
-        } catch (fitError) {}
+            frame.fit(FitOptions.FILL_PROPORTIONALLY);
+        } catch (fillError) {
+            try {
+                frame.fit(FitOptions.PROPORTIONALLY);
+            } catch (proportionalError) {}
+        }
+
+        /*
+         * Center content without changing the frame dimensions.
+         */
         try {
             frame.fit(FitOptions.CENTER_CONTENT);
         } catch (centerError) {}
 
+        fittedBounds = graphic.geometricBounds;
+        fittedWidth = fittedBounds[3] - fittedBounds[1];
+
         appendRenderLog(
             "Dynamic image resize => scale=" +
             scale +
-            "% columnWidth=" +
-            columnWidth +
-            " width=" +
-            targetWidth +
-            " height=" +
-            targetHeight
+            "% uniform-image-scale" +
+            " baseWidth=" + baseWidth +
+            " baseHeight=" + baseHeight +
+            " targetWidth=" + targetWidth +
+            " targetHeight=" + targetHeight
+        );
+        appendRenderLog(
+            "Dynamic image scale source => " +
+            (scale === 100
+                ? "100%/fit-to-available-content"
+                : "JSON scale_percent applied uniformly to width+height")
+        );
+        appendRenderLog(
+            "Dynamic image final frame => [" +
+            targetTop + "," + targetLeft + "," +
+            (targetTop + targetHeight) + "," +
+            (targetLeft + targetWidth) + "]"
         );
     } catch (error) {
         appendRenderLog("Dynamic image sizing failed : " + error);
@@ -1938,7 +2199,7 @@ function placeImageContentInFrame(frame, imageFile, scalePercent) {
 
     logImagePlacementDiagnostics(frame, "after place (before fit)");
 
-    fittingResult = fitPlacedImageInFrame(frame, savedBounds, scalePercent);
+    fittingResult = fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile);
     appendRenderLog("Image fitting result: " + fittingResult);
 
     ensureGraphicFrameVisible(frame);
@@ -4979,17 +5240,17 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     appendRenderLog("Occurrence: " + blockIndex);
     appendRenderLog("Image path: " + (urlOrPath ? urlOrPath : "(empty)"));
     if (scaleResult.formatColumns === 2) {
-        appendRenderLog("Image scale_percent: 100% (format columns=2; JSON scale ignored)");
+        appendRenderLog("Image scale_percent: 100% (2-column format; JSON scale ignored)");
     } else if (scaleResult.fromJson) {
         appendRenderLog(
             "Image scale_percent: " + scalePercent +
             "% (JSON scale_percent=" + scaleResult.jsonValue +
-            "; format columns=" + scaleResult.formatColumns + ")"
+            "; JSON is authoritative)"
         );
     } else {
         appendRenderLog(
             "Image scale_percent: " + scalePercent +
-            "% (JSON scale_percent missing; format columns=" + scaleResult.formatColumns + ")"
+            "% (JSON scale_percent missing/invalid; default 100% of current column)"
         );
     }
 
@@ -5024,7 +5285,23 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     appendRenderLog("Image block cursor trace [after compactCursorYBeforeImage]: cursorY=" + layoutState.cursorY);
 
     appendRenderLog("Image block cursor trace [before ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
-    layoutBounds = ensureLayoutSpace(layoutState, protoHeight);
+
+    if (layoutState.columnCount === 2) {
+        layoutBounds = ensureLayoutSpace(layoutState, protoHeight);
+        appendRenderLog(
+            "Image 2-column bounds => left=" + layoutBounds.left +
+            ", right=" + layoutBounds.right
+        );
+    } else {
+        layoutBounds = getFullPageMarginBounds(layoutState.page);
+        if (layoutState.cursorY < layoutBounds.top) {
+            layoutState.cursorY = layoutBounds.top;
+        }
+        appendRenderLog(
+            "Image full-page bounds => left=" + layoutBounds.left +
+            ", right=" + layoutBounds.right
+        );
+    }
     appendRenderLog("Image block cursor trace [after ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
 
     appendRenderLog("Image block cursor trace [before createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
