@@ -368,6 +368,10 @@ export const generateAllCssVariables = (styles = typographyStyles) => {
   variables['--typography-chapterTitle-space-before'] = chapterNumberHasBar
     ? '1.5rem'
     : '0.35rem';
+  // Theme 1 sets the title directly above the hero image; theme 2 needs air.
+  variables['--typography-chapterTitle-space-after'] = chapterNumberHasBar
+    ? '1.85rem'
+    : '0.5rem';
   const roomyOverview = Boolean(
     styles?.lessonOverview?.text && styles?.lessonOverview?.number
   ) || chapterNumberHasBar;

@@ -4258,6 +4258,69 @@ function tightenTextFrameToRenderedContent(textFrame, options) {
     shrinkTextFrameToContentBottom(textFrame);
 }
 
+/**
+ * Re-grow a frame that was tightened to its rendered content and then restyled.
+ * Character styling applied afterwards (inline runs, figure caption prefix) can
+ * change line metrics, and with zero slack the tail text goes overset.
+ */
+function growTextFrameToFitContent(frame) {
+    var pass;
+    var bounds;
+    var pageBottom;
+    var story;
+
+    if (!frame) {
+        return;
+    }
+
+    try {
+        story = frame.parentStory;
+        if (story) {
+            story.recompose();
+        }
+    } catch (recomposeError) {}
+
+    try {
+        if (frame.nextTextFrame) {
+            return;
+        }
+    } catch (chainError) {}
+
+    try {
+        pageBottom = getPageLayoutBounds(frame.parentPage).bottom;
+    } catch (pageBoundsError) {
+        return;
+    }
+
+    for (pass = 0; pass < 24; pass++) {
+        if (!textFrameOverflows(frame)) {
+            return;
+        }
+
+        try {
+            bounds = frame.geometricBounds;
+            if (bounds[2] >= pageBottom) {
+                return;
+            }
+            frame.geometricBounds = [
+                bounds[0],
+                bounds[1],
+                Math.min(pageBottom, bounds[2] + 12),
+                bounds[3]
+            ];
+        } catch (growError) {
+            return;
+        }
+
+        try {
+            story = frame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeGrowError) {}
+    }
+}
+
 function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     var layoutBounds;
     var available;
@@ -4484,6 +4547,7 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
         ensureFrameThemeStyle(firstFrame, style);
     }
     applyInlineMarkupRuns(firstFrame, inlineParsed.runs, style);
+    growTextFrameToFitContent(chainEnd);
 
     return chainEnd;
 }
@@ -5023,6 +5087,14 @@ function resolveLessonOverviewSpacingBefore() {
     return usesRoomyOverviewSpacing() ? 14 : 2;
 }
 
+/**
+ * Theme 2's oversized chapter title needs a generous gap before the hero image.
+ * Theme 1 sets the title straight above the image, so keep it tight.
+ */
+function resolveChapterTitleSpacingAfter() {
+    return chapterNumberHasBarFill(FRAME_STYLES.chapterNumber) ? 36 : 10;
+}
+
 /** Extra air after the last LessonOverview item before body copy resumes. */
 function resolveLessonOverviewTailGap() {
     return usesRoomyOverviewSpacing() ? 20 : 14;
@@ -5456,6 +5528,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             )
         );
         applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
+        growTextFrameToFitContent(captionFrame);
         populatedCount += 1;
         layoutState.lastImageHadCaption = true;
         appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
@@ -6595,6 +6668,7 @@ function rebuildBlockRegistry() {
         BLOCK_REGISTRY.ChapterNumber.style
     );
     BLOCK_REGISTRY.ChapterTitle.style = FRAME_STYLES.chapterTitle || FRAME_STYLES_DEFAULTS.chapterTitle;
+    BLOCK_REGISTRY.ChapterTitle.spacingAfter = resolveChapterTitleSpacingAfter();
     BLOCK_REGISTRY.LessonOverview.style = FRAME_STYLES.lessonOverview || FRAME_STYLES_DEFAULTS.lessonOverview;
     BLOCK_REGISTRY.LessonOverview.spacingAfter = resolveLessonOverviewSpacingAfter();
     BLOCK_REGISTRY.LessonOverview.spacingBefore = resolveLessonOverviewSpacingBefore();
