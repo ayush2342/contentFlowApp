@@ -4859,6 +4859,9 @@ function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
     var padRight = 24;
     var pass;
     var story;
+    var nextFrame;
+    var contentBottom;
+    var roomyBottom;
 
     if (!frame || !fillHex) {
         return;
@@ -4883,26 +4886,45 @@ function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
         return;
     }
 
-    // Re-fit the height for the new width: auto-sizing is authoritative here,
-    // since the manual loop below can miss overflow on a freshly resized frame.
+    // Any text that spilled into a threaded frame belongs in the band.
+    try {
+        nextFrame = frame.nextTextFrame;
+        if (nextFrame) {
+            frame.nextTextFrame = null;
+            try {
+                nextFrame.remove();
+            } catch (removeNextError) {}
+        }
+    } catch (unthreadError) {}
+
+    // Re-fit the height for the new width by growing generously first and then
+    // shrinking to the last rendered baseline: the overflow flag is unreliable
+    // immediately after a frame resize, so it cannot drive the fit alone.
     try {
         bounds = frame.geometricBounds;
-        frame.geometricBounds = [bounds[0], bounds[1], bounds[0] + padY * 2 + 6, bounds[3]];
-    } catch (collapseError) {}
+        roomyBottom = Math.min(bounds[0] + 240, pageBounds[2] - 12);
+        if (roomyBottom > bounds[2]) {
+            frame.geometricBounds = [bounds[0], bounds[1], roomyBottom, bounds[3]];
+        }
+    } catch (expandError) {}
 
     try {
-        frame.textFramePreferences.autoSizingReferencePoint =
-            AutoSizingReferenceEnum.TOP_LEFT_POINT;
-        frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.HEIGHT_ONLY;
         story = frame.parentStory;
         if (story) {
             story.recompose();
         }
         app.activeDocument.recompose();
-        frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF;
-    } catch (autoSizeError) {}
+    } catch (recomposeBandError) {}
 
-    // Safety net in case auto-sizing was unavailable or came up short.
+    try {
+        bounds = frame.geometricBounds;
+        contentBottom = getTextFrameBottomY(frame) + padY;
+        if (contentBottom > bounds[0] + padY * 2 && contentBottom < bounds[2]) {
+            frame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
+        }
+    } catch (shrinkBandError) {}
+
+    // Safety net in case the baseline-driven fit came up short.
     for (pass = 0; pass < 120; pass++) {
         try {
             story = frame.parentStory;
@@ -4925,7 +4947,14 @@ function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
     }
 
     applyFrameFillColor(frame, { backgroundColor: fillHex });
-    appendRenderLog("Opener caption band applied (" + fillHex + ", full width)");
+
+    try {
+        bounds = frame.geometricBounds;
+        appendRenderLog(
+            "Opener caption band applied (" + fillHex + ", full width, height=" +
+            (bounds[2] - bounds[0]) + ", overset=" + textFrameOverflows(frame) + ")"
+        );
+    } catch (logError) {}
 }
 
 function getFrameHeight(frame, fallbackHeight) {
