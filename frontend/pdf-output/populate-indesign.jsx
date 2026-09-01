@@ -4848,73 +4848,95 @@ function constrainImageFrameHeight(frame, maxBottom, boundsLeft, boundsRight) {
 }
 
 /**
- * Widens the opener figure caption to the page edges and paints the theme's
- * caption band behind it. The text keeps its body-copy left alignment through
- * the frame inset, and the band height is fitted to the wrapped lines.
+ * Opener figure caption for themes that define a caption band: the frame is
+ * built at its final full-page width so the text composes once at that width,
+ * then the height is trimmed to the last rendered baseline. Resizing a caption
+ * that was already composed at column width left it overset instead.
  */
-function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
-    var bounds;
+function placeOpenerCaptionBand(layoutState, cleanCaption, style, fillHex, textInset) {
+    var page = layoutState.page;
     var pageBounds;
     var padY = 6;
     var padRight = 24;
-    var pass;
+    var top = layoutState.cursorY;
+    var maxBottom;
+    var seedBottom;
+    var frame;
+    var runs;
     var story;
-    var nextFrame;
+    var bounds;
     var contentBottom;
-    var roomyBottom;
-
-    if (!frame || !fillHex) {
-        return;
-    }
+    var pass;
 
     try {
-        bounds = frame.geometricBounds;
         pageBounds = page.bounds;
-    } catch (boundsError) {
-        return;
+    } catch (pageBoundsError) {
+        return null;
     }
 
+    maxBottom = pageBounds[2] - 12;
+    seedBottom = Math.min(top + 200, maxBottom);
+    if (seedBottom - top < 24) {
+        return null;
+    }
+
+    frame = page.textFrames.add({
+        geometricBounds: [top, pageBounds[1], seedBottom, pageBounds[3]]
+    });
+    assignFrameToContentLayer(frame);
+    clearRuntimeLabel(frame);
+
+    // Insets before composing: they define the text column inside the band.
     try {
-        frame.geometricBounds = [bounds[0], pageBounds[1], bounds[2], pageBounds[3]];
         frame.textFramePreferences.insetSpacing = [
             padY,
             Math.max(textInset, padRight),
             padY,
             padRight
         ];
-    } catch (widenError) {
-        return;
+    } catch (insetError) {}
+
+    runs = setFrameContentsWithMarkup(frame, cleanCaption);
+    if (isCompositeStyle(style)) {
+        applyCompositeStyle(frame, style);
+    } else {
+        applyFrameStyle(frame, style);
+        ensureFrameThemeStyle(frame, style);
     }
-
-    // Any text that spilled into a threaded frame belongs in the band.
-    try {
-        nextFrame = frame.nextTextFrame;
-        if (nextFrame) {
-            frame.nextTextFrame = null;
-            try {
-                nextFrame.remove();
-            } catch (removeNextError) {}
-        }
-    } catch (unthreadError) {}
-
-    // Re-fit the height for the new width by growing generously first and then
-    // shrinking to the last rendered baseline: the overflow flag is unreliable
-    // immediately after a frame resize, so it cannot drive the fit alone.
-    try {
-        bounds = frame.geometricBounds;
-        roomyBottom = Math.min(bounds[0] + 240, pageBounds[2] - 12);
-        if (roomyBottom > bounds[2]) {
-            frame.geometricBounds = [bounds[0], bounds[1], roomyBottom, bounds[3]];
-        }
-    } catch (expandError) {}
+    applyInlineMarkupRuns(frame, runs, style);
+    applyFigureCaptionPrefixStyle(frame, cleanCaption);
 
     try {
         story = frame.parentStory;
         if (story) {
             story.recompose();
         }
-        app.activeDocument.recompose();
-    } catch (recomposeBandError) {}
+        layoutState.document.recompose();
+    } catch (recomposeError) {}
+
+    for (pass = 0; pass < 60; pass++) {
+        if (!textFrameOverflows(frame)) {
+            break;
+        }
+        try {
+            bounds = frame.geometricBounds;
+            if (bounds[2] >= maxBottom) {
+                break;
+            }
+            frame.geometricBounds = [
+                bounds[0],
+                bounds[1],
+                Math.min(maxBottom, bounds[2] + 12),
+                bounds[3]
+            ];
+            story = frame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (growError) {
+            break;
+        }
+    }
 
     try {
         bounds = frame.geometricBounds;
@@ -4922,39 +4944,20 @@ function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
         if (contentBottom > bounds[0] + padY * 2 && contentBottom < bounds[2]) {
             frame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
         }
-    } catch (shrinkBandError) {}
-
-    // Safety net in case the baseline-driven fit came up short.
-    for (pass = 0; pass < 120; pass++) {
-        try {
-            story = frame.parentStory;
-            if (story) {
-                story.recompose();
-            }
-            app.activeDocument.recompose();
-        } catch (recomposeError) {}
-
-        if (!textFrameOverflows(frame)) {
-            break;
-        }
-
-        try {
-            bounds = frame.geometricBounds;
-            frame.geometricBounds = [bounds[0], bounds[1], bounds[2] + 2, bounds[3]];
-        } catch (growError) {
-            break;
-        }
-    }
+    } catch (shrinkError) {}
 
     applyFrameFillColor(frame, { backgroundColor: fillHex });
+    syncLayoutPageFromFrame(layoutState, frame);
 
     try {
         bounds = frame.geometricBounds;
         appendRenderLog(
-            "Opener caption band applied (" + fillHex + ", full width, height=" +
+            "Opener caption band placed (" + fillHex + ", height=" +
             (bounds[2] - bounds[0]) + ", overset=" + textFrameOverflows(frame) + ")"
         );
     } catch (logError) {}
+
+    return frame;
 }
 
 function getFrameHeight(frame, fallbackHeight) {
@@ -5824,26 +5827,33 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
 
     try {
         layoutState.cursorY = imageFrame.geometricBounds[2] + captionGap;
-        captionFrame = flowDynamicText(
-            layoutState,
-            cleanCaption,
-            registryEntry.style,
-            DYNAMIC_LAYOUT.minTextFrameHeight,
-            getDynamicTextSeedHeight(
-                captionProtoResult.usedFallback ? captionProtoResult.label : captionProtoLabel,
-                captionProtoResult.usedFallback ? captionProtoLabel : null
-            )
-        );
-        applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
+        captionFrame = null;
+
         if (fullBleed && getOpenerCaptionBackground()) {
-            applyOpenerCaptionBand(
-                captionFrame,
-                layoutState.page,
+            captionFrame = placeOpenerCaptionBand(
+                layoutState,
+                cleanCaption,
+                registryEntry.style,
                 getOpenerCaptionBackground(),
                 getFullPageMarginBounds(layoutState.page).left - layoutState.page.bounds[1]
             );
         }
-        growTextFrameToFitContent(captionFrame);
+
+        if (!captionFrame) {
+            captionFrame = flowDynamicText(
+                layoutState,
+                cleanCaption,
+                registryEntry.style,
+                DYNAMIC_LAYOUT.minTextFrameHeight,
+                getDynamicTextSeedHeight(
+                    captionProtoResult.usedFallback ? captionProtoResult.label : captionProtoLabel,
+                    captionProtoResult.usedFallback ? captionProtoLabel : null
+                )
+            );
+            applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
+            growTextFrameToFitContent(captionFrame);
+        }
+
         populatedCount += 1;
         layoutState.lastImageHadCaption = true;
         appendRenderLog("Caption status: populated (dynamic frame created on Content layer)");
