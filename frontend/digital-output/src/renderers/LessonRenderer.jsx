@@ -3,6 +3,8 @@ import componentRegistry from '../constants/componentRegistry';
 import styles from './LessonRenderer.module.scss';
 import {
   generateAllCssVariables,
+  generateThemeOptionVariables,
+  resolveThemeOptions,
   resolveTypographyStylesFromPayload,
   DEFAULT_THEME_ID,
 } from '../../../../shared/typography-styles.js';
@@ -221,8 +223,10 @@ const LessonRenderer = ({
     scopedTypography.sectionTitle?.text?.color ||
     undefined;
   const paragraphColor = scopedTypography.paragraphText?.color;
+  const themeOptions = resolveThemeOptions(typographyProp, templateId);
   const pageStyleVars = {
     ...generateAllCssVariables(scopedTypography),
+    ...generateThemeOptionVariables(themeOptions),
     ...(sectionColor
       ? { '--heading-color': sectionColor, '--primary-color': sectionColor }
       : {}),

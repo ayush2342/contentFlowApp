@@ -2,6 +2,8 @@
   max-width: 900px;
   margin: 0 auto;
   padding: 1rem 0;
+  /* Theme-driven wider left margin (theme 1); 0 elsewhere. */
+  padding-left: var(--page-left-inset, 0px);
 }
 
 .twoColumnLesson {

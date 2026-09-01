@@ -1072,6 +1072,34 @@ var FRAME_STYLES_DEFAULTS = {
 
 var FRAME_STYLES = FRAME_STYLES_DEFAULTS;
 
+// Theme-level layout switches (theme JSON "OPTIONS"), e.g. Theme 1's wider
+// left margin. Themes without an OPTIONS block keep the template defaults.
+var THEME_OPTIONS = {};
+
+// Extra left inset (points) added to the template's left margin for body
+// content. Full-bleed opener images ignore it and stay at the page edge.
+function getContentLeftInset() {
+    var raw = THEME_OPTIONS ? THEME_OPTIONS.contentLeftInset : 0;
+    var value = parseFloat(raw);
+
+    if (isNaN(value) || value <= 0) {
+        return 0;
+    }
+    return value;
+}
+
+// Background band behind the opener figure caption (theme 1). Empty = no band.
+function getOpenerCaptionBackground() {
+    var raw = THEME_OPTIONS ? THEME_OPTIONS.openerCaptionBackground : "";
+    return trimString(String(raw || ""));
+}
+
+// Color block filling the left inset strip beside the opener image (theme 1).
+function getOpenerImageInsetBackground() {
+    var raw = THEME_OPTIONS ? THEME_OPTIONS.openerImageInsetBackground : "";
+    return trimString(String(raw || ""));
+}
+
 var BLOCK_REGISTRY = {
     LessonNumber: {
         label: "lessonNumber",
@@ -4642,7 +4670,7 @@ function getPageLayoutBounds(page) {
         gutter = layoutState.gutter || 18;
     }
 
-    var usableLeft = bounds[1] + leftMargin;
+    var usableLeft = bounds[1] + leftMargin + getContentLeftInset();
     var usableRight = bounds[3] - rightMargin;
     var usableWidth = usableRight - usableLeft;
     var usableBottom = bounds[2] - bottomMargin;
@@ -4709,7 +4737,7 @@ function getFullPageMarginBounds(page) {
 
     return {
         top: bounds[0] + topMargin,
-        left: bounds[1] + leftMargin,
+        left: bounds[1] + leftMargin + getContentLeftInset(),
         bottom: bounds[2] - bottomMargin,
         right: bounds[3] - rightMargin
     };
@@ -4729,11 +4757,48 @@ function getFullBleedBounds(page, layoutBounds) {
     }
 
     return {
+        // The theme's left inset stays clear of the image and is filled with a
+        // color block instead (see placeOpenerImageInsetBand).
         top: layoutBounds.top,
-        left: bounds[1],
+        left: bounds[1] + getContentLeftInset(),
         bottom: layoutBounds.bottom,
         right: bounds[3]
     };
+}
+
+/** Paints the theme color block in the strip left of a full-bleed opener image. */
+function placeOpenerImageInsetBand(page, imageFrame, fillHex) {
+    var imageBounds;
+    var pageLeft;
+    var band;
+
+    if (!page || !imageFrame || !fillHex) {
+        return;
+    }
+
+    try {
+        imageBounds = imageFrame.geometricBounds;
+        pageLeft = page.bounds[1];
+    } catch (boundsError) {
+        return;
+    }
+
+    if (imageBounds[1] - pageLeft < 1) {
+        return;
+    }
+
+    try {
+        band = page.rectangles.add({
+            geometricBounds: [imageBounds[0], pageLeft, imageBounds[2], imageBounds[1]]
+        });
+        band.strokeWeight = 0;
+        assignFrameToContentLayer(band);
+        clearRuntimeLabel(band);
+        applyFrameFillColor(band, { backgroundColor: fillHex });
+        appendRenderLog("Opener image inset band placed (" + fillHex + ")");
+    } catch (bandError) {
+        warnings.push("Could not place opener image inset band: " + bandError.message);
+    }
 }
 
 /**
@@ -4780,6 +4845,72 @@ function constrainImageFrameHeight(frame, maxBottom, boundsLeft, boundsRight) {
             " height=" + available
         );
     } catch (constrainError) {}
+}
+
+/**
+ * Widens the opener figure caption to the page edges and paints the theme's
+ * caption band behind it. The text keeps its body-copy left alignment through
+ * the frame inset, and the band height is fitted to the wrapped lines.
+ */
+function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
+    var bounds;
+    var pageBounds;
+    var padY = 6;
+    var padRight = 24;
+    var pass;
+    var story;
+
+    if (!frame || !fillHex) {
+        return;
+    }
+
+    try {
+        bounds = frame.geometricBounds;
+        pageBounds = page.bounds;
+    } catch (boundsError) {
+        return;
+    }
+
+    try {
+        frame.geometricBounds = [bounds[0], pageBounds[1], bounds[2], pageBounds[3]];
+        frame.textFramePreferences.insetSpacing = [
+            padY,
+            Math.max(textInset, padRight),
+            padY,
+            padRight
+        ];
+    } catch (widenError) {
+        return;
+    }
+
+    // Re-fit the height: the wider band needs fewer lines than the column did.
+    try {
+        bounds = frame.geometricBounds;
+        frame.geometricBounds = [bounds[0], bounds[1], bounds[0] + padY * 2 + 6, bounds[3]];
+    } catch (collapseError) {}
+
+    for (pass = 0; pass < 80; pass++) {
+        try {
+            story = frame.parentStory;
+            if (story) {
+                story.recompose();
+            }
+        } catch (recomposeError) {}
+
+        if (!textFrameOverflows(frame)) {
+            break;
+        }
+
+        try {
+            bounds = frame.geometricBounds;
+            frame.geometricBounds = [bounds[0], bounds[1], bounds[2] + 2, bounds[3]];
+        } catch (growError) {
+            break;
+        }
+    }
+
+    applyFrameFillColor(frame, { backgroundColor: fillHex });
+    appendRenderLog("Opener caption band applied (" + fillHex + ", full width)");
 }
 
 function getFrameHeight(frame, fallbackHeight) {
@@ -5594,6 +5725,13 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
                 layoutBounds.right
             );
         }
+        if (fullBleed) {
+            placeOpenerImageInsetBand(
+                layoutState.page,
+                imageFrame,
+                getOpenerImageInsetBackground()
+            );
+        }
         populatedCount += 1;
         layoutState.lastImageFrame = imageFrame;
         layoutState.lastImageHadCaption = false;
@@ -5652,6 +5790,14 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             )
         );
         applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
+        if (fullBleed && getOpenerCaptionBackground()) {
+            applyOpenerCaptionBand(
+                captionFrame,
+                layoutState.page,
+                getOpenerCaptionBackground(),
+                getFullPageMarginBounds(layoutState.page).left - layoutState.page.bounds[1]
+            );
+        }
         growTextFrameToFitContent(captionFrame);
         populatedCount += 1;
         layoutState.lastImageHadCaption = true;
@@ -6717,6 +6863,12 @@ function initializeStylesFromConfig(scriptFolderPath) {
     var formatId = "";
 
     if (typographyConfig) {
+        if (typographyConfig.OPTIONS && typeof typographyConfig.OPTIONS === "object") {
+            THEME_OPTIONS = typographyConfig.OPTIONS;
+            appendRenderLog(
+                "Theme options loaded => contentLeftInset=" + getContentLeftInset()
+            );
+        }
         formatId = normalizeFormatIdToken(
             typographyConfig.formatId || typographyConfig.themeId || typographyConfig.templateId
         );

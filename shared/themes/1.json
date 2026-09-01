@@ -1,6 +1,11 @@
 {
   "themeId": "1",
   "label": "Theme 1",
+  "OPTIONS": {
+    "contentLeftInset": 50,
+    "openerCaptionBackground": "#EEEAE0",
+    "openerImageInsetBackground": "#EEEAE0"
+  },
   "STYLES": {
     "chapterNumber": {
       "font": "Mulish Regular",

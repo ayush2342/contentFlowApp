@@ -313,6 +313,7 @@ export const toPdfTypographyConfig = (stylesheetResult) => {
     templateId: stylesheetResult?.templateId,
     themeId,
     STYLES: styles,
+    OPTIONS: doc.OPTIONS && typeof doc.OPTIONS === 'object' ? doc.OPTIONS : {},
     formatId: stylesheetResult?.formatId || templateIdToFormatId(stylesheetResult?.templateId),
     layout: stylesheetResult?.layout || null,
   };

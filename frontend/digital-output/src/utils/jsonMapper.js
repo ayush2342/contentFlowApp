@@ -604,6 +604,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
         alt: caption || ctx.media[mediaId].fileName || 'Course image',
         caption,
         scalePercent,
+        fullBleed: ctx.pageType === 'opener' && ctx.pageColumns !== 2,
       },
     };
   }
@@ -758,6 +759,7 @@ const mapPagedTemplateJson = (pages, options = {}) => {
       pendingLearningObjective: null,
       components,
       pageColumns,
+      pageType,
     };
 
     blocks.forEach((block, blockIndex) => {

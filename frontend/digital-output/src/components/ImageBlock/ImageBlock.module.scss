@@ -9,9 +9,26 @@
   margin-bottom: 0.12rem;
 }
 
+/* Opener hero: cancel the theme's page left inset so image and caption band
+   run to the sheet edge. Themes without an inset are unaffected. */
+.imageBlockBleed {
+  margin-left: calc(-1 * var(--page-left-inset, 0px));
+}
+
 .imageFrame {
   position: relative;
   width: 100%;
+}
+
+/* The bled-out left strip is not empty space: it carries the theme color. */
+.imageFrameInset {
+  box-sizing: border-box;
+  padding-left: var(--page-left-inset, 0px);
+  background-color: var(--opener-inset-bg, transparent);
+
+  .partNumberOverlay {
+    left: var(--page-left-inset, 0px);
+  }
 }
 
 .image {
@@ -49,6 +66,12 @@
   font-style: normal;
   text-align: left;
   line-height: 1.35;
+}
+
+.captionBand {
+  margin-top: 0;
+  padding: 0.35rem 1rem 0.4rem var(--page-left-inset, 0px);
+  background-color: var(--opener-caption-bg, transparent);
 }
 
 .figurePrefix {

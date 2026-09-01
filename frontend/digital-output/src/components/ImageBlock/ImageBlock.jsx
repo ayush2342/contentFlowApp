@@ -20,7 +20,7 @@ const resolveScalePercent = (value) => {
   return Math.min(100, Math.max(5, percent));
 };
 
-const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
+const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent, fullBleed }) => {
   // The figure prefix is styled from the theme, so match against tag-free text.
   const captionText = stripInlineHtml(caption).trim();
   const parsedCaption = captionParts(captionText);
@@ -29,6 +29,7 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
   const figureClass = [
     styles.imageBlock,
     overlayText ? styles.imageBlockFlush : '',
+    fullBleed ? styles.imageBlockBleed : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -36,7 +37,7 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
   return (
     <figure className={figureClass}>
       <div
-        className={styles.imageFrame}
+        className={`${styles.imageFrame}${fullBleed ? ` ${styles.imageFrameInset}` : ''}`}
         style={scale ? { width: `${scale}%`, marginInline: 'auto' } : undefined}
       >
         <img src={src} alt={stripInlineHtml(alt)} className={styles.image} />
@@ -47,7 +48,9 @@ const ImageBlock = ({ src, alt, caption, partNumberOverlay, scalePercent }) => {
         ) : null}
       </div>
       {captionText ? (
-        <figcaption className={styles.caption}>
+        <figcaption
+          className={`${styles.caption}${fullBleed ? ` ${styles.captionBand}` : ''}`}
+        >
           {parsedCaption ? (
             <>
               <span className={styles.figurePrefix}>{parsedCaption.prefix}</span>

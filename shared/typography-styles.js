@@ -195,6 +195,31 @@ export const resolveTypographyStylesFromPayload = (
 
 export const typographyStyles = resolveTypographyStyles(DEFAULT_THEME_ID);
 
+const extractOptions = (themeDoc) =>
+  themeDoc && typeof themeDoc.OPTIONS === 'object' && themeDoc.OPTIONS ? themeDoc.OPTIONS : null;
+
+/** Theme-level layout switches ("OPTIONS"), from the API payload or local theme file. */
+export const resolveThemeOptions = (typographyPayload, templateId = DEFAULT_THEME_ID) =>
+  extractOptions(typographyPayload) ||
+  extractOptions(getLocalThemeDocument(templateId)) ||
+  {};
+
+/**
+ * Option-driven page variables. contentLeftInset is authored in points (shared
+ * with the PDF renderer) and converted to CSS pixels here.
+ */
+export const generateThemeOptionVariables = (options = {}) => {
+  const inset = Number.parseFloat(options?.contentLeftInset);
+  const captionBg = String(options?.openerCaptionBackground || '').trim();
+  const insetBg = String(options?.openerImageInsetBackground || '').trim();
+  return {
+    '--page-left-inset':
+      Number.isFinite(inset) && inset > 0 ? `${(inset * 96) / 72}px` : '0px',
+    '--opener-caption-bg': captionBg || 'transparent',
+    '--opener-inset-bg': insetBg || 'transparent',
+  };
+};
+
 export const hexToRgb = (hex) => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
