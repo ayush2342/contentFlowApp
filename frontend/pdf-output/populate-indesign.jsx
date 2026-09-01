@@ -4,7 +4,7 @@
 // Exports output.pdf in the SAME folder as this script.
 // =============================================================================
 
-/* global app, File, Folder, ExportFormat, FitOptions, UserInteractionLevels, ColorModel, ColorSpace, SaveOptions, PagesPerDocumentOptions, MeasurementUnits */
+/* global app, File, Folder, ExportFormat, FitOptions, UserInteractionLevels, ColorModel, ColorSpace, SaveOptions, PagesPerDocumentOptions, MeasurementUnits, AutoSizingTypeEnum, AutoSizingReferenceEnum */
 
 // -----------------------------------------------------------------------------
 // Layout mode: true = create frames from proto:* prototypes (Option B)
@@ -19,7 +19,7 @@ var DYNAMIC_LAYOUT = {
     // regardless of the template's saved measurement units.
     blockGap: 6,            // ~8px / 0.5rem uniform gap between every block
     imageCaptionGap: 6,
-    imageCaptionReserve: 40, // height kept free below a full-bleed image for its caption
+    imageCaptionReserve: 72, // height kept free below a full-bleed image for its caption
     afterImageGap: 12,      // space below image/caption before the next block
     listTailGap: 8,         // space after the last bullet/numbered item
     prototypeOffPageTop: -2000,
@@ -4163,12 +4163,27 @@ function getPrototypeParagraphSpaceBefore(protoFrame) {
     }
 }
 
+function getTextFrameInsetBottom(textFrame) {
+    var inset;
+
+    try {
+        inset = textFrame.textFramePreferences.insetSpacing;
+        if (inset && typeof inset.length === "number" && inset.length >= 3) {
+            return Number(inset[2]) || 0;
+        }
+        return Number(inset) || 0;
+    } catch (insetError) {
+        return 0;
+    }
+}
+
 function getTextFrameBottomY(textFrame) {
     var bounds;
     var endBaseline;
     var spaceAfter = 0;
     var paragraphs;
     var tailPadding = 1;
+    var insetBottom;
 
     try {
         bounds = textFrame.geometricBounds;
@@ -4177,8 +4192,9 @@ function getTextFrameBottomY(textFrame) {
         if (paragraphs.length > 0) {
             spaceAfter = paragraphs[paragraphs.length - 1].spaceAfter;
         }
+        insetBottom = getTextFrameInsetBottom(textFrame);
         if (endBaseline > bounds[0]) {
-            return endBaseline + spaceAfter + tailPadding;
+            return endBaseline + spaceAfter + insetBottom + tailPadding;
         }
     } catch (bottomError) {}
 
@@ -4194,10 +4210,16 @@ function shrinkTextFrameToContentBottom(textFrame) {
     var contentBottom;
 
     try {
+        if (textFrameOverflows(textFrame)) {
+            return;
+        }
         bounds = textFrame.geometricBounds;
         contentBottom = getTextFrameBottomY(textFrame);
         if (contentBottom > bounds[0] && contentBottom < bounds[2]) {
             textFrame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
+        }
+        if (textFrameOverflows(textFrame)) {
+            growTextFrameToFitContent(textFrame);
         }
     } catch (shrinkError) {}
 }
@@ -4347,6 +4369,11 @@ function growTextFrameToFitContent(frame) {
 
     try {
         pageBottom = getPageLayoutBounds(frame.parentPage).bottom;
+        try {
+            if (trimString(frame.extractLabel("runtimeOpenerCaption")) === "1") {
+                pageBottom = frame.parentPage.bounds[2] - 8;
+            }
+        } catch (openerGrowError) {}
     } catch (pageBoundsError) {
         return;
     }
@@ -4801,6 +4828,92 @@ function placeOpenerImageInsetBand(page, imageFrame, fillHex) {
     }
 }
 
+function estimateImageCaptionReserve(captionText, style) {
+    var text = trimString(captionText || "");
+    var pointSize = 8;
+    var lineHeight;
+    var lines;
+
+    if (!text) {
+        return 0;
+    }
+    if (style && style.pointSize) {
+        pointSize = Number(style.pointSize) || 8;
+    }
+    lineHeight = Math.max(12, pointSize * 1.4);
+    lines = Math.ceil(text.length / 80);
+    if (lines < 2) {
+        lines = 2;
+    }
+    if (lines > 8) {
+        lines = 8;
+    }
+    return Math.ceil(16 + lines * lineHeight);
+}
+
+function ensureOpenerCaptionFullyVisible(layoutState, imageFrame, captionFrame, captionGap) {
+    var pageBottom;
+    var minImageHeight = 96;
+    var pass;
+    var imageBounds;
+    var capBounds;
+    var newImageBottom;
+    var fillHex;
+
+    if (!imageFrame || !captionFrame) {
+        return;
+    }
+
+    try {
+        pageBottom = layoutState.page.bounds[2] - 12;
+    } catch (pageError) {
+        return;
+    }
+
+    growTextFrameToFitContent(captionFrame);
+
+    for (pass = 0; pass < 16 && textFrameOverflows(captionFrame); pass++) {
+        try {
+            imageBounds = imageFrame.geometricBounds;
+            if (imageBounds[2] - imageBounds[0] <= minImageHeight) {
+                break;
+            }
+            newImageBottom = imageBounds[2] - 18;
+            if (newImageBottom - imageBounds[0] < minImageHeight) {
+                newImageBottom = imageBounds[0] + minImageHeight;
+            }
+            imageFrame.geometricBounds = [
+                imageBounds[0],
+                imageBounds[1],
+                newImageBottom,
+                imageBounds[3]
+            ];
+            try {
+                imageFrame.fit(FitOptions.FILL_PROPORTIONALLY);
+            } catch (fitImageError) {}
+
+            capBounds = captionFrame.geometricBounds;
+            captionFrame.geometricBounds = [
+                newImageBottom + captionGap,
+                capBounds[1],
+                pageBottom,
+                capBounds[3]
+            ];
+            try {
+                captionFrame.parentStory.recompose();
+            } catch (recomposeError) {}
+            growTextFrameToFitContent(captionFrame);
+        } catch (nudgeError) {
+            break;
+        }
+    }
+
+    fillHex = getOpenerImageInsetBackground();
+    if (fillHex && pass > 0) {
+        placeOpenerImageInsetBand(layoutState.page, imageFrame, fillHex);
+    }
+}
+
 /**
  * Keep a placed image inside the remaining column height, shrinking it
  * proportionally (and re-centering) rather than letting it run off the page.
@@ -4896,6 +5009,12 @@ function placeOpenerCaptionBand(layoutState, cleanCaption, style, fillHex, textI
         ];
     } catch (insetError) {}
 
+    try {
+        frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.HEIGHT_ONLY;
+        frame.textFramePreferences.autoSizingReferencePoint =
+            AutoSizingReferenceEnum.TOP_LEFT_POINT;
+    } catch (autoSizeError) {}
+
     runs = setFrameContentsWithMarkup(frame, cleanCaption);
     if (isCompositeStyle(style)) {
         applyCompositeStyle(frame, style);
@@ -4939,14 +5058,20 @@ function placeOpenerCaptionBand(layoutState, cleanCaption, style, fillHex, textI
     }
 
     try {
-        bounds = frame.geometricBounds;
-        contentBottom = getTextFrameBottomY(frame) + padY;
-        if (contentBottom > bounds[0] + padY * 2 && contentBottom < bounds[2]) {
-            frame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
+        if (!textFrameOverflows(frame)) {
+            bounds = frame.geometricBounds;
+            contentBottom = getTextFrameBottomY(frame) + padY;
+            if (contentBottom > bounds[0] + padY * 2 && contentBottom < bounds[2]) {
+                frame.geometricBounds = [bounds[0], bounds[1], contentBottom, bounds[3]];
+            }
         }
     } catch (shrinkError) {}
 
     applyFrameFillColor(frame, { backgroundColor: fillHex });
+    try {
+        frame.insertLabel("runtimeOpenerCaption", "1");
+    } catch (tagError) {}
+    growTextFrameToFitContent(frame);
     syncLayoutPageFromFrame(layoutState, frame);
 
     try {
@@ -5771,7 +5896,12 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             constrainImageFrameHeight(
                 imageFrame,
                 getFullPageMarginBounds(layoutState.page).bottom -
-                    (cleanCaption ? DYNAMIC_LAYOUT.imageCaptionReserve : 0),
+                    (cleanCaption
+                        ? Math.max(
+                            DYNAMIC_LAYOUT.imageCaptionReserve,
+                            estimateImageCaptionReserve(cleanCaption, registryEntry.style)
+                        )
+                        : 0),
                 layoutBounds.left,
                 layoutBounds.right
             );
@@ -5852,6 +5982,13 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             );
             applyFigureCaptionPrefixStyle(captionFrame, cleanCaption);
             growTextFrameToFitContent(captionFrame);
+        } else {
+            ensureOpenerCaptionFullyVisible(
+                layoutState,
+                imageFrame,
+                captionFrame,
+                captionGap
+            );
         }
 
         populatedCount += 1;
