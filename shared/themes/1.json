@@ -2,9 +2,9 @@
   "themeId": "1",
   "label": "Theme 1",
   "OPTIONS": {
-    "contentLeftInset": 50,
+    "contentLeftInset": 45,
     "openerCaptionBackground": "#EEEAE0",
-    "openerImageInsetBackground": "#EEEAE0"
+    "openerImageInsetBackground": "#0074BB"
   },
   "STYLES": {
     "chapterNumber": {

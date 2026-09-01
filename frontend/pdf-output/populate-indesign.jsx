@@ -4757,10 +4757,10 @@ function getFullBleedBounds(page, layoutBounds) {
     }
 
     return {
-        // The theme's left inset stays clear of the image and is filled with a
-        // color block instead (see placeOpenerImageInsetBand).
+        // The image starts where body copy starts (margin + theme inset); that
+        // strip is filled with a color block instead (placeOpenerImageInsetBand).
         top: layoutBounds.top,
-        left: bounds[1] + getContentLeftInset(),
+        left: getContentLeftInset() > 0 ? layoutBounds.left : bounds[1],
         bottom: layoutBounds.bottom,
         right: bounds[3]
     };
@@ -4883,18 +4883,33 @@ function applyOpenerCaptionBand(frame, page, fillHex, textInset) {
         return;
     }
 
-    // Re-fit the height: the wider band needs fewer lines than the column did.
+    // Re-fit the height for the new width: auto-sizing is authoritative here,
+    // since the manual loop below can miss overflow on a freshly resized frame.
     try {
         bounds = frame.geometricBounds;
         frame.geometricBounds = [bounds[0], bounds[1], bounds[0] + padY * 2 + 6, bounds[3]];
     } catch (collapseError) {}
 
-    for (pass = 0; pass < 80; pass++) {
+    try {
+        frame.textFramePreferences.autoSizingReferencePoint =
+            AutoSizingReferenceEnum.TOP_LEFT_POINT;
+        frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.HEIGHT_ONLY;
+        story = frame.parentStory;
+        if (story) {
+            story.recompose();
+        }
+        app.activeDocument.recompose();
+        frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF;
+    } catch (autoSizeError) {}
+
+    // Safety net in case auto-sizing was unavailable or came up short.
+    for (pass = 0; pass < 120; pass++) {
         try {
             story = frame.parentStory;
             if (story) {
                 story.recompose();
             }
+            app.activeDocument.recompose();
         } catch (recomposeError) {}
 
         if (!textFrameOverflows(frame)) {
@@ -5624,6 +5639,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     var protoHeight;
     var cleanCaption;
     var fullBleed = false;
+    var captionGap = DYNAMIC_LAYOUT.imageCaptionGap;
     var urlOrPath = data.url;
     var scaleResult = resolveImageScalePercent(data, layoutState);
     var scalePercent = scaleResult.scalePercent;
@@ -5695,6 +5711,9 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         if (isOpenerLayoutPage(layoutState)) {
             layoutBounds = getFullBleedBounds(layoutState.page, layoutBounds);
             fullBleed = true;
+            if (getOpenerCaptionBackground()) {
+                captionGap = 0;
+            }
         }
         appendRenderLog(
             "Image " + (fullBleed ? "full-bleed" : "full-page") + " bounds => left=" +
@@ -5724,8 +5743,6 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
                 layoutBounds.left,
                 layoutBounds.right
             );
-        }
-        if (fullBleed) {
             placeOpenerImageInsetBand(
                 layoutState.page,
                 imageFrame,
@@ -5754,7 +5771,8 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         syncLayoutPageFromFrame(layoutState, imageFrame);
         // Leave a small gap between the image and its caption so the caption
         // does not sit flush against the image (spacing is config-driven).
-        layoutState.cursorY = getImageContentBottomY(imageFrame) + DYNAMIC_LAYOUT.imageCaptionGap;
+        // A banded opener caption is the exception: its band butts the image.
+        layoutState.cursorY = getImageContentBottomY(imageFrame) + captionGap;
     } catch (imageError) {
         appendRenderLog("Status: not populated — " + imageError.message);
         warnings.push('Could not create dynamic image frame #' + blockIndex + ": " + imageError.message);
@@ -5776,9 +5794,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     layoutBounds = ensureLayoutSpace(layoutState, DYNAMIC_LAYOUT.minTextFrameHeight);
 
     try {
-        layoutState.cursorY =
-            imageFrame.geometricBounds[2] +
-            DYNAMIC_LAYOUT.imageCaptionGap;
+        layoutState.cursorY = imageFrame.geometricBounds[2] + captionGap;
         captionFrame = flowDynamicText(
             layoutState,
             cleanCaption,
