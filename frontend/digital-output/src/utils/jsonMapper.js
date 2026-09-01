@@ -537,9 +537,10 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
   }
 
   if (type === 'BulletList' || type === 'NumberedList') {
+    // A list block may hold an items array or a single item in data.text.
     const items = Array.isArray(block?.data?.items)
       ? block.data.items.map((item) => normalizeBulletItem(item)).filter(Boolean)
-      : [];
+      : [normalizeBulletItem(block?.data?.text)].filter(Boolean);
     if (!items.length) return null;
 
     if (type === 'BulletList' && ctx.pendingLearningObjective) {
@@ -547,6 +548,13 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
         ...(ctx.pendingLearningObjective.props.objectives || []),
         ...items,
       ];
+      return null;
+    }
+
+    // Single-item blocks arrive consecutively; keep them in one list.
+    const previous = ctx.components[ctx.components.length - 1];
+    if (previous?.type === 'Paragraph' && previous.contentType === type) {
+      previous.props.items = [...(previous.props.items || []), ...items];
       return null;
     }
 
@@ -1014,9 +1022,10 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 
     if (rawType === 'BulletList' || rawType === 'NumberedList') {
       pendingImageMediaId = null;
+      // A list block may hold an items array or a single item in data.text.
       const items = Array.isArray(node?.data?.items)
-        ? node.data.items.map((item) => normalizeText(item)).filter(Boolean)
-        : [];
+        ? node.data.items.map((item) => normalizeBulletItem(item)).filter(Boolean)
+        : [normalizeBulletItem(node?.data?.text)].filter(Boolean);
 
       if (!items.length) return;
 
@@ -1025,11 +1034,15 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         return;
       }
 
-      content.push({
-        type: 'paragraph',
-        items,
-        listType: rawType === 'NumberedList' ? 'numbered' : 'bullet',
-      });
+      const listType = rawType === 'NumberedList' ? 'numbered' : 'bullet';
+      // Single-item blocks arrive consecutively; keep them in one list.
+      const previous = content[content.length - 1];
+      if (previous?.type === 'paragraph' && previous.listType === listType) {
+        previous.items = [...(previous.items || []), ...items];
+        return;
+      }
+
+      content.push({ type: 'paragraph', items, listType });
       return;
     }
 

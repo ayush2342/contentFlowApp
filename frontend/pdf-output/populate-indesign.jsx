@@ -19,7 +19,9 @@ var DYNAMIC_LAYOUT = {
     // regardless of the template's saved measurement units.
     blockGap: 6,            // ~8px / 0.5rem uniform gap between every block
     imageCaptionGap: 6,
+    imageCaptionReserve: 40, // height kept free below a full-bleed image for its caption
     afterImageGap: 12,      // space below image/caption before the next block
+    listTailGap: 8,         // space after the last bullet/numbered item
     prototypeOffPageTop: -2000,
     minTextFrameHeight: 24,
     defaultImageFrameHeight: 180
@@ -3405,6 +3407,35 @@ function getBlockText(data, listStyle) {
 }
 
 /**
+ * List blocks may arrive one item per block with a plain "text" field instead of
+ * an "items" array. Those still need a bullet or number, and numbered runs keep
+ * counting across consecutive blocks until another block type interrupts them.
+ */
+function applySingleItemListMarker(layoutState, itemType, data, text) {
+    var stripped;
+
+    if (!text || (data && data.items && data.items.length)) {
+        return text;
+    }
+
+    if (itemType !== "BulletList" && itemType !== "NumberedList") {
+        return text;
+    }
+
+    stripped = trimString(text).replace(/^([\u2022•\-\*]|\d+[.)])\s*/, "");
+    if (!stripped) {
+        return text;
+    }
+
+    if (itemType === "NumberedList") {
+        layoutState.numberedListRun = (layoutState.numberedListRun || 0) + 1;
+        return layoutState.numberedListRun + ". " + stripped;
+    }
+
+    return "\u2022 " + stripped;
+}
+
+/**
  * Parse cendoc-style inline HTML from output JSON into plain text + style runs.
  * Supports: i/em, b/strong, span (glossary → plain), sup (endnote → superscript), br, a (text only).
  */
@@ -4684,6 +4715,73 @@ function getFullPageMarginBounds(page) {
     };
 }
 
+/**
+ * Opener hero images run edge to edge, so they ignore the page margins used by
+ * body copy. Vertical bounds stay column-based for page-break math.
+ */
+function getFullBleedBounds(page, layoutBounds) {
+    var bounds;
+
+    try {
+        bounds = page.bounds;
+    } catch (boundsError) {
+        return layoutBounds;
+    }
+
+    return {
+        top: layoutBounds.top,
+        left: bounds[1],
+        bottom: layoutBounds.bottom,
+        right: bounds[3]
+    };
+}
+
+/**
+ * Keep a placed image inside the remaining column height, shrinking it
+ * proportionally (and re-centering) rather than letting it run off the page.
+ */
+function constrainImageFrameHeight(frame, maxBottom, boundsLeft, boundsRight) {
+    var bounds;
+    var height;
+    var width;
+    var available;
+    var scale;
+    var newWidth;
+    var newLeft;
+
+    try {
+        bounds = frame.geometricBounds;
+    } catch (boundsError) {
+        return;
+    }
+
+    height = bounds[2] - bounds[0];
+    width = bounds[3] - bounds[1];
+    available = maxBottom - bounds[0];
+
+    if (available < 48 || height <= available) {
+        return;
+    }
+
+    scale = available / height;
+    newWidth = width * scale;
+    newLeft = boundsLeft + ((boundsRight - boundsLeft) - newWidth) / 2;
+
+    try {
+        frame.geometricBounds = [
+            bounds[0],
+            newLeft,
+            bounds[0] + available,
+            newLeft + newWidth
+        ];
+        frame.fit(FitOptions.FILL_PROPORTIONALLY);
+        appendRenderLog(
+            "Image constrained to column height => width=" + newWidth +
+            " height=" + available
+        );
+    } catch (constrainError) {}
+}
+
 function getFrameHeight(frame, fallbackHeight) {
     var bounds;
 
@@ -5115,6 +5213,7 @@ function placeChapterNumberBar(layoutState, text, style) {
     var gapAfter;
     var isBar;
     var barRuns;
+    var bleedBounds;
 
     appliedStyle = style || FRAME_STYLES.chapterNumber || FRAME_STYLES_DEFAULTS.chapterNumber;
     pointSize = (appliedStyle && appliedStyle.pointSize) || 36;
@@ -5126,6 +5225,14 @@ function placeChapterNumberBar(layoutState, text, style) {
 
     layoutBounds = ensureLayoutSpace(layoutState, barHeight);
     frameTop = layoutState.cursorY;
+
+    // On opener pages the bar sits directly under the full-bleed hero image, so
+    // it runs edge to edge too; the label keeps its margin alignment via inset.
+    if (isBar && isOpenerLayoutPage(layoutState) && (layoutState.columnCount || 1) === 1) {
+        bleedBounds = getFullBleedBounds(layoutState.page, layoutBounds);
+        padX = Math.max(padX, layoutBounds.left - bleedBounds.left);
+        layoutBounds = bleedBounds;
+    }
 
     frame = createTextFrameOnPage(
         layoutState.page,
@@ -5198,9 +5305,11 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     var protoFrame;
     var protoHeight;
     var frame;
-    var cleanText = getBlockText(
+    var cleanText = applySingleItemListMarker(
+        layoutState,
+        itemType,
         data,
-        itemType === "NumberedList" ? "numbered" : null
+        getBlockText(data, itemType === "NumberedList" ? "numbered" : null)
     );
 
     appendRenderLog("---");
@@ -5383,6 +5492,7 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
     var imageFile;
     var protoHeight;
     var cleanCaption;
+    var fullBleed = false;
     var urlOrPath = data.url;
     var scaleResult = resolveImageScalePercent(data, layoutState);
     var scalePercent = scaleResult.scalePercent;
@@ -5450,9 +5560,14 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         if (layoutState.cursorY < layoutBounds.top) {
             layoutState.cursorY = layoutBounds.top;
         }
+        // Opener hero images bleed past the side margins to the page edges.
+        if (isOpenerLayoutPage(layoutState)) {
+            layoutBounds = getFullBleedBounds(layoutState.page, layoutBounds);
+            fullBleed = true;
+        }
         appendRenderLog(
-            "Image full-page bounds => left=" + layoutBounds.left +
-            ", right=" + layoutBounds.right
+            "Image " + (fullBleed ? "full-bleed" : "full-page") + " bounds => left=" +
+            layoutBounds.left + ", right=" + layoutBounds.right
         );
     }
     appendRenderLog("Image block cursor trace [after ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
@@ -5469,13 +5584,22 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
             } catch (removeFailedFrameError) {}
             return;
         }
+        cleanCaption = trimString(data.caption || data.text || "");
+        if (fullBleed) {
+            constrainImageFrameHeight(
+                imageFrame,
+                getFullPageMarginBounds(layoutState.page).bottom -
+                    (cleanCaption ? DYNAMIC_LAYOUT.imageCaptionReserve : 0),
+                layoutBounds.left,
+                layoutBounds.right
+            );
+        }
         populatedCount += 1;
         layoutState.lastImageFrame = imageFrame;
         layoutState.lastImageHadCaption = false;
         appendRenderLog("Resolved image file: " + imageFile.fsName);
         appendRenderLog("Image status: populated (dynamic frame created on Content layer)");
 
-        cleanCaption = trimString(data.caption || data.text || "");
         if (!cleanCaption) {
             advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, null, resolveBlockSpacing(registryEntry));
             return;
@@ -5593,6 +5717,7 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
     var top;
     var blockBottom;
     var logoFrame;
+    var logoPlaced = false;
     var textFrame;
     var logoTextRuns;
     var imageFile;
@@ -5623,11 +5748,6 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
     }
 
     logoLeft = layoutBounds.left;
-    textLeft = logoLeft + logoWidth + LOGO_TEXT_GAP;
-    textWidth = layoutBounds.right - textLeft;
-    if (textWidth < 1) {
-        textWidth = layoutBounds.right - layoutBounds.left;
-    }
     textHeight = logoHeight;
 
     imageFile = resolveImageFile(urlOrPath, scriptFolder, blockIndex);
@@ -5643,6 +5763,7 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
             logoFrame = createLogoGraphicFrame(layoutState.page, logoProto, top, logoLeft, logoWidth, logoHeight);
             if (placeImageContentInFrame(logoFrame, imageFile)) {
                 populatedCount += 1;
+                logoPlaced = true;
                 appendRenderLog("Logo image status: populated");
                 if (getFrameBottomY(logoFrame) > blockBottom) {
                     blockBottom = getFrameBottomY(logoFrame);
@@ -5659,6 +5780,13 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
     } else {
         appendRenderLog("Logo image file not found on disk; rendering text only.");
         warnings.push('Logo image not found for "' + urlOrPath + '".');
+    }
+
+    // Without a logo the label starts at the margin — no reserved empty gap.
+    textLeft = logoPlaced ? logoLeft + logoWidth + LOGO_TEXT_GAP : logoLeft;
+    textWidth = layoutBounds.right - textLeft;
+    if (textWidth < 1) {
+        textWidth = layoutBounds.right - layoutBounds.left;
     }
 
     if (cleanText) {
@@ -6363,6 +6491,11 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
         data = item.data || {};
         registryEntry = resolveRegistryEntry(itemType);
 
+        // Numbering restarts whenever a non-list block breaks the run.
+        if (itemType !== "NumberedList") {
+            layoutState.numberedListRun = 0;
+        }
+
         if (!registryEntry) {
             logUnsupportedBlockType(itemType);
             continue;
@@ -6444,6 +6577,22 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
                     normalizeBlockType(split.body[i + 1].type) !== "LessonOverview")
             ) {
                 layoutState.cursorY += resolveLessonOverviewTailGap();
+            }
+
+            if (itemType === "BulletList" || itemType === "NumberedList") {
+                if (
+                    i + 1 < split.body.length &&
+                    normalizeBlockType(split.body[i + 1].type) === itemType
+                ) {
+                    // Mid-run: tighten so the items read as a single list.
+                    layoutState.cursorY -= Math.min(
+                        4,
+                        Number(registryEntry.spacingAfter) || 0
+                    );
+                } else {
+                    // End of run: separate the list from the body copy.
+                    layoutState.cursorY += DYNAMIC_LAYOUT.listTailGap;
+                }
             }
             continue;
         }
