@@ -1,5 +1,6 @@
 import { GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../config/env.js';
+import { expandMarkdownRichText } from '../../../shared/markdown-rich-text.js';
 
 const s3Client = new S3Client({
   region: env.awsRegion,
@@ -47,6 +48,10 @@ export const getDocumentFromS3 = async (tenantId, documentId) => {
       page.page_type = 'opener';
     }
   }
+
+  // ParagraphText blocks may carry Markdown; parse once here so the web
+  // renderer and the InDesign job both receive the same parsed structure.
+  expandMarkdownRichText(data);
 
   return {
     key,

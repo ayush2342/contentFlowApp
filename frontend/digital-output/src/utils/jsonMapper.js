@@ -1,4 +1,5 @@
 import { getPageColumns } from '../../../../shared/layout-formats.js';
+import { hasMarkdown, parseMarkdownRichText } from '../../../../shared/markdown-rich-text.js';
 
 const COMPONENT_TYPE_MAP = {
   heading: 'Heading',
@@ -6,6 +7,14 @@ const COMPONENT_TYPE_MAP = {
   image: 'ImageBlock',
   learningObjective: 'LearningObjective',
   iconLabel: 'IconLabel',
+};
+
+const resolveParagraphRichText = (block, text) => {
+  if (Array.isArray(block?.data?.rich_text) && block.data.rich_text.length) {
+    return block.data.rich_text;
+  }
+  if (hasMarkdown(text)) return parseMarkdownRichText(text);
+  return null;
 };
 
 
@@ -90,6 +99,7 @@ const mapContentItem = (item, media, index, options = {}) => {
         text: item.text,
         items: item.items,
         listType: item.listType || 'bullet',
+        richText: item.richText,
       },
     };
   }
@@ -493,7 +503,7 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
   }
 
   if ((type === 'ParagraphText' || type === 'Text') && text) {
-    if (ctx.pendingLearningObjective) {
+    if (ctx.pendingLearningObjective && !hasMarkdown(text) && !block?.data?.rich_text?.length) {
       const introMatch = text.match(
         /^(By the end of this section,?\s*you will be able to:?)\s*/i
       );
@@ -516,11 +526,13 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
       ctx.pendingLearningObjective = null;
     }
 
+    const richText = resolveParagraphRichText(block, text);
+
     return {
       id: `content-${index}`,
       type: 'Paragraph',
       contentType: type === 'Text' ? 'ParagraphText' : type,
-      props: { text },
+      props: richText?.length ? { richText } : { text },
     };
   }
 
@@ -1064,7 +1076,7 @@ const mapClassTemplateJson = (nodes, options = {}) => {
 
     if ((type === 'Text' || type === 'ParagraphText') && dataText) {
       pendingImageMediaId = null;
-      if (captureLearningObjectives) {
+      if (captureLearningObjectives && !hasMarkdown(dataText) && !node?.data?.rich_text?.length) {
         if (/^By the end of this section,?\s*/i.test(dataText)) {
           captureLearningObjectives.introText = dataText;
           return;
@@ -1080,7 +1092,12 @@ const mapClassTemplateJson = (nodes, options = {}) => {
         flushLearningObjectives();
       }
 
-      content.push({ type: 'paragraph', text: dataText });
+      const richText = resolveParagraphRichText(node, dataText);
+      content.push({
+        type: 'paragraph',
+        text: dataText,
+        richText: richText?.length ? richText : undefined,
+      });
       return;
     }
 
