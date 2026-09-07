@@ -2337,7 +2337,13 @@ function applyRunningChromeStyle(frame, style) {
     var i;
     var pointSize;
 
-    if (!frame || !style) {
+    if (!frame) {
+        return;
+    }
+
+    clearFrameStroke(frame);
+
+    if (!style) {
         return;
     }
 
@@ -2375,7 +2381,7 @@ function applyRunningChromeStyle(frame, style) {
 
     try {
         frame.textFramePreferences.insetSpacing = [0, 0, 0, 0];
-        frame.strokeWeight = 0;
+        clearFrameStroke(frame);
     } catch (prefError) {}
 }
 
@@ -4091,6 +4097,25 @@ function createGraphicFrameOnPage(page, layoutBounds, top, height) {
     );
 
     return frame;
+}
+
+/** Remove the default InDesign text-frame stroke (shows as a box in PDF). */
+function clearFrameStroke(frame) {
+    if (!frame) {
+        return;
+    }
+
+    try {
+        frame.strokeWeight = 0;
+    } catch (strokeWeightError) {}
+
+    try {
+        frame.strokeColor = app.activeDocument.swatches.itemByName("None");
+    } catch (strokeColorError) {
+        try {
+            frame.strokeTint = 0;
+        } catch (tintError) {}
+    }
 }
 
 /** Match web: no border/stroke around images. */
@@ -6934,8 +6959,10 @@ function placePageHeadersOnRenderedPages(layoutState, document, headerItems, sta
             });
             assignFrameToContentLayer(frame);
             clearRuntimeLabel(frame);
+            clearFrameStroke(frame);
             headerRuns = setFrameContentsWithMarkup(frame, headerText);
             applyRunningChromeStyle(frame, style);
+            clearFrameStroke(frame);
             if (style) {
                 applyInlineMarkupRuns(frame, headerRuns, style);
             }
@@ -7007,9 +7034,11 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
             });
             assignFrameToContentLayer(frame);
             clearRuntimeLabel(frame);
+            clearFrameStroke(frame);
             footerRuns = setFrameContentsWithMarkup(frame, footerText);
             applyRunningChromeStyle(frame, style);
             applyInlineMarkupRuns(frame, footerRuns, style);
+            clearFrameStroke(frame);
             populatedCount += 1;
         } catch (footerError) {
             warnings.push("Could not place footer on page index " + pageIndex + ": " + footerError.message);
