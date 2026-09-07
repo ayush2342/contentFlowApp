@@ -3532,57 +3532,27 @@ function applySingleItemListMarker(layoutState, itemType, data, text) {
  * Parse cendoc-style inline HTML from output JSON into plain text + style runs.
  * Supports: i/em, b/strong, span (glossary → plain), sup (endnote → superscript), br, a (text only).
  */
-var NAMED_HTML_COLORS = {
-    red: "#FF0000",
-    blue: "#0000FF",
-    green: "#008000",
-    black: "#000000",
-    white: "#FFFFFF",
-    orange: "#FFA500",
-    purple: "#800080",
-    yellow: "#FFFF00",
-    maroon: "#800000",
-    navy: "#000080",
-    teal: "#008080",
-    gray: "#808080",
-    grey: "#808080"
-};
-
-/** Extract a color from an inline style attribute (hex or CSS name). */
+/** Extract a hex color from an inline style attribute, e.g. style="color: #c31427;". */
 function parseInlineStyleColor(attrs) {
-    // Leading [^-a-zA-Z] skips "background-color".
-    var match = /(?:^|[^-a-zA-Z])color\s*:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)/.exec(String(attrs || ""));
-    var token;
+    // The property is usually preceded by the style attribute's quote, so match
+    // on any non-name character; the leading [^-a-zA-Z] also skips
+    // "background-color".
+    var match = /(?:^|[^-a-zA-Z])color\s*:\s*(#[0-9a-fA-F]{3,6})/.exec(String(attrs || ""));
     var hex;
-    var named;
 
     if (!match) {
         return "";
     }
 
-    token = match[1];
-    if (token.charAt(0) === "#") {
-        hex = token.replace(/^#/, "");
-        if (hex.length === 3) {
-            hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
-        }
-        if (hex.length !== 6) {
-            return "";
-        }
-        return "#" + hex;
+    hex = match[1].replace(/^#/, "");
+    if (hex.length === 3) {
+        hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
+    }
+    if (hex.length !== 6) {
+        return "";
     }
 
-    named = NAMED_HTML_COLORS[token.toLowerCase()];
-    return named || "";
-}
-
-function parseHrefAttr(attrs) {
-    var match = /href\s*=\s*(["'])([^"']+)\1/i.exec(String(attrs || ""));
-    if (match) {
-        return match[2];
-    }
-    match = /href\s*=\s*([^\s>]+)/i.exec(String(attrs || ""));
-    return match ? match[1] : "";
+    return "#" + hex;
 }
 
 function parseInlineMarkup(raw) {
@@ -3603,8 +3573,6 @@ function parseInlineMarkup(raw) {
     var runBold;
     var runSuper;
     var runColor;
-    var runHighlight;
-    var runHref;
 
     text = fixUtf8Mojibake(String(raw || ""));
     text = text
@@ -3640,8 +3608,7 @@ function parseInlineMarkup(raw) {
                 tag === "strong" ||
                 tag === "span" ||
                 tag === "sup" ||
-                tag === "a" ||
-                tag === "mark"
+                tag === "a"
             ) {
                 stack.push({
                     tag: tag,
@@ -3649,8 +3616,6 @@ function parseInlineMarkup(raw) {
                     italic: tag === "i" || tag === "em",
                     bold: tag === "b" || tag === "strong",
                     superscript: tag === "sup",
-                    highlight: tag === "mark",
-                    href: tag === "a" ? parseHrefAttr(attrs) : "",
                     color: parseInlineStyleColor(attrs)
                 });
             }
@@ -3664,30 +3629,21 @@ function parseInlineMarkup(raw) {
                     runBold = open.bold;
                     runSuper = open.superscript;
                     runColor = open.color;
-                    runHighlight = open.highlight;
-                    runHref = open.href || "";
                     // Inherit open emphasis/color from parents still on the stack.
                     var p;
                     for (p = 0; p < stack.length; p++) {
                         if (stack[p].italic) runItalic = true;
                         if (stack[p].bold) runBold = true;
                         if (stack[p].superscript) runSuper = true;
-                        if (stack[p].highlight) runHighlight = true;
                         if (!runColor && stack[p].color) runColor = stack[p].color;
-                        if (!runHref && stack[p].href) runHref = stack[p].href;
                     }
-                    if (
-                        plain.length > open.start &&
-                        (runItalic || runBold || runSuper || runColor || runHighlight || runHref)
-                    ) {
+                    if (plain.length > open.start && (runItalic || runBold || runSuper || runColor)) {
                         runs.push({
                             start: open.start,
                             end: plain.length,
                             italic: runItalic,
                             bold: runBold,
                             superscript: runSuper,
-                            highlight: runHighlight,
-                            href: runHref,
                             color: runColor
                         });
                     }
@@ -3715,7 +3671,6 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
     var range;
     var runStyle;
     var base;
-    var existingSize;
 
     if (!frame || !runs || !runs.length) {
         return;
@@ -3741,39 +3696,22 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
         toIdx = run.end - 1;
         try {
             range = story.characters.itemByRange(fromIdx, toIdx);
-            existingSize = 0;
-            try {
-                existingSize = range.pointSize;
-            } catch (sizeReadError) {}
             runStyle = {
                 font: base.fontFamily || base.font || "",
                 fontFamily: base.fontFamily || base.font || "",
-                pointSize: existingSize || base.pointSize,
+                pointSize: base.pointSize,
                 bold: run.bold ? true : isTruthyFlag(base.bold),
                 italic: run.italic ? true : isTruthyFlag(base.italic),
-                color: run.color
-                    ? hexToRgb(run.color)
-                    : (run.href ? [5, 99, 193] : base.color)
+                color: run.color ? hexToRgb(run.color) : base.color
             };
             applyThemeFontAndEmphasis(range, runStyle);
-            if (run.color || run.href) {
+            if (run.color) {
                 applyTextColor(range, runStyle);
             }
             if (run.superscript) {
                 try {
                     range.position = Position.SUPERSCRIPT;
                 } catch (supError) {}
-            }
-            if (run.highlight) {
-                applyHighlightToRange(range);
-            }
-            if (run.href && /^https?:\/\//i.test(run.href)) {
-                applyHyperlinkToRange(story, range, run.href);
-                if (!run.highlight) {
-                    try {
-                        range.underline = true;
-                    } catch (linkUnderlineError) {}
-                }
             }
         } catch (rangeError) {}
     }
@@ -3811,310 +3749,11 @@ function dropRunColors(runs) {
             italic: runs[i].italic,
             bold: runs[i].bold,
             superscript: runs[i].superscript,
-            highlight: runs[i].highlight,
-            href: runs[i].href || "",
             color: ""
         });
     }
 
     return out;
-}
-
-function applyHighlightToRange(range) {
-    var doc;
-    var color;
-    var weight;
-
-    if (!range) {
-        return;
-    }
-
-    try {
-        doc = app.activeDocument;
-        color = ensureDocumentColor(doc, "JSON_HIGHLIGHT", [255, 230, 102]);
-        weight = 8;
-        try {
-            weight = Math.max(7, Number(range.pointSize) * 0.9);
-        } catch (weightError) {}
-        range.underline = true;
-        if (color) {
-            range.underlineColor = color;
-        }
-        range.underlineWeight = weight;
-        range.underlineOffset = -(weight * 0.32);
-        range.underlineTint = 100;
-    } catch (highlightError) {}
-}
-
-function applyHyperlinkToRange(story, range, url) {
-    var doc;
-    var dest;
-    var source;
-    var name;
-
-    if (!story || !range || !url) {
-        return;
-    }
-
-    try {
-        doc = story.parent;
-        name = "md-link-" + (new Date().getTime()) + "-" + Math.floor(Math.random() * 100000);
-        dest = doc.hyperlinkURLDestinations.add(url, { name: name + "-d" });
-        source = doc.hyperlinkTextSources.add(range);
-        doc.hyperlinks.add(source, dest, { name: name });
-    } catch (linkError) {}
-}
-
-function escapeMarkupAttr(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/"/g, "&quot;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-}
-
-function markdownInlineToHtml(value) {
-    var text = String(value || "");
-    if (!text) {
-        return "";
-    }
-
-    text = text.replace(/\\\*/g, "\u0000").replace(/\\_/g, "\u0001");
-    text = text.replace(
-        /\[([^\]\n]+)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g,
-        function (match, label, href) {
-            return "<a href=\"" + escapeMarkupAttr(href) + "\">" + label + "</a>";
-        }
-    );
-    text = text.replace(/\*\*([^\n]+?)\*\*/g, "<b>$1</b>");
-    text = text.replace(/__([^\n]+?)__/g, "<b>$1</b>");
-    text = text.replace(/\*([^*\n]+?)\*/g, "<i>$1</i>");
-    text = text.replace(/(^|[\s(])_([^_\n]+?)_(?=$|[\s.,;:!?)])/g, "$1<i>$2</i>");
-    return text.replace(/\u0000/g, "*").replace(/\u0001/g, "_");
-}
-
-function classifyMarkdownLine(rawLine) {
-    var line = String(rawLine || "").replace(/\s+$/, "");
-    var trimmed = line.replace(/^\s+/, "");
-    var match;
-
-    if (!trimmed) {
-        return { kind: "blank", text: "" };
-    }
-
-    match = /^(#{1,6})\s+(.*)$/.exec(trimmed);
-    if (match) {
-        return { kind: match[1].length === 1 ? "h1" : "h2", text: match[2] };
-    }
-
-    match = /^>\s?(.*)$/.exec(trimmed);
-    if (match) {
-        return { kind: "quote", text: match[1] };
-    }
-
-    match = /^[-*+]\s+(.*)$/.exec(trimmed);
-    if (match) {
-        return { kind: "bullet", text: match[1] };
-    }
-
-    match = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);
-    if (match) {
-        return { kind: "number", text: match[2] };
-    }
-
-    return { kind: "paragraph", text: trimmed };
-}
-
-function looksLikeMarkdown(value) {
-    var text = String(value || "");
-    if (!text) {
-        return false;
-    }
-    return (
-        /^\s{0,3}#{1,6}\s+\S/m.test(text) ||
-        /^\s{0,3}>\s+\S/m.test(text) ||
-        /^\s{0,3}[-*+]\s+\S/m.test(text) ||
-        /^\s{0,3}\d+[.)]\s+\S/m.test(text) ||
-        /\*\*[^*\n]+\*\*/.test(text) ||
-        /__[^_\n]+__/.test(text) ||
-        /\*[^*\n]+\*/.test(text) ||
-        /<mark[\s>]/i.test(text) ||
-        /\[[^\]\n]+\]\([^)\s]+\)/.test(text)
-    );
-}
-
-function parseMarkdownRichTextLocal(value) {
-    var text = String(value || "");
-    var out = [];
-    var paragraphLines = [];
-    var numberCounter = 0;
-    var lines;
-    var i;
-    var line;
-
-    function flushParagraph() {
-        if (!paragraphLines.length) {
-            return;
-        }
-        out.push({
-            kind: "paragraph",
-            html: markdownInlineToHtml(paragraphLines.join(" "))
-        });
-        paragraphLines = [];
-    }
-
-    if (!text.replace(/^\s+|\s+$/g, "")) {
-        return out;
-    }
-
-    lines = text.split(/\r\n|\r|\n/);
-    for (i = 0; i < lines.length; i++) {
-        line = classifyMarkdownLine(lines[i]);
-        if (line.kind !== "paragraph") {
-            flushParagraph();
-        }
-        if (line.kind !== "number") {
-            numberCounter = 0;
-        }
-
-        if (line.kind === "blank") {
-            continue;
-        }
-        if (line.kind === "paragraph") {
-            paragraphLines.push(line.text);
-            continue;
-        }
-        if (line.kind === "number") {
-            numberCounter += 1;
-            out.push({
-                kind: "number",
-                html: markdownInlineToHtml(line.text),
-                number: numberCounter
-            });
-            continue;
-        }
-        out.push({ kind: line.kind, html: markdownInlineToHtml(line.text) });
-    }
-    flushParagraph();
-
-    for (i = out.length - 1; i >= 0; i--) {
-        if (!out[i].html) {
-            out.splice(i, 1);
-        }
-    }
-    return out;
-}
-
-function getParagraphRichText(data) {
-    if (data && data.rich_text && data.rich_text.length) {
-        return data.rich_text;
-    }
-    if (data && looksLikeMarkdown(data.text)) {
-        return parseMarkdownRichTextLocal(data.text);
-    }
-    return null;
-}
-
-function composeRichTextMarkup(entries) {
-    var parts = [];
-    var i;
-    var entry;
-    var prefix;
-
-    for (i = 0; i < entries.length; i++) {
-        entry = entries[i] || {};
-        prefix = "";
-        if (entry.kind === "bullet") {
-            prefix = "\u2022 ";
-        } else if (entry.kind === "number") {
-            prefix = String(entry.number || parts.length + 1) + ". ";
-        }
-        parts.push(prefix + String(entry.html || ""));
-    }
-    return parts.join("\r");
-}
-
-/**
- * Style each composed paragraph from paragraphText: headings scaled and bold,
- * lists hanging-indented, quotes italic and inset. Inline runs are reapplied
- * afterwards so bold/italic/color inside items survive.
- */
-function applyMarkdownParagraphKinds(frame, entries, baseStyle) {
-    var story;
-    var i;
-    var paraIndex = 0;
-    var paragraph;
-    var entry;
-    var baseSize;
-    var headingStyle;
-
-    if (!frame || !entries || !entries.length) {
-        return;
-    }
-
-    try {
-        story = frame.parentStory;
-    } catch (storyError) {
-        return;
-    }
-    if (!story) {
-        return;
-    }
-
-    baseSize = (baseStyle && baseStyle.pointSize) || 10;
-
-    for (i = 0; i < entries.length && paraIndex < story.paragraphs.length; i++) {
-        entry = entries[i];
-        paragraph = story.paragraphs[paraIndex];
-        paraIndex += 1;
-
-        try {
-            paragraph.justification = Justification.LEFT_ALIGN;
-            paragraph.spaceBefore = 0;
-            paragraph.spaceAfter = 4;
-            paragraph.leftIndent = 0;
-            paragraph.firstLineIndent = 0;
-        } catch (resetError) {}
-
-        if (entry.kind === "h1" || entry.kind === "h2") {
-            headingStyle = {
-                font: baseStyle.fontFamily || baseStyle.font || "",
-                fontFamily: baseStyle.fontFamily || baseStyle.font || "",
-                pointSize: Math.round(baseSize * (entry.kind === "h1" ? 1.6 : 1.3)),
-                bold: true,
-                italic: false,
-                color: baseStyle.color
-            };
-            try {
-                paragraph.pointSize = headingStyle.pointSize;
-                paragraph.spaceBefore = i === 0 ? 0 : 10;
-                paragraph.spaceAfter = 6;
-            } catch (headingSizeError) {}
-            applyThemeFontAndEmphasis(paragraph, headingStyle);
-        } else if (entry.kind === "bullet" || entry.kind === "number") {
-            try {
-                paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
-                paragraph.firstLineIndent = -DYNAMIC_LAYOUT.listHangingIndent;
-                paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
-                paragraph.spaceAfter = DYNAMIC_LAYOUT.listItemGap;
-            } catch (listError) {}
-        } else if (entry.kind === "quote") {
-            headingStyle = {
-                font: baseStyle.fontFamily || baseStyle.font || "",
-                fontFamily: baseStyle.fontFamily || baseStyle.font || "",
-                pointSize: baseSize,
-                bold: false,
-                italic: true,
-                color: baseStyle.color
-            };
-            try {
-                paragraph.leftIndent = 18;
-                paragraph.spaceBefore = 6;
-                paragraph.spaceAfter = 6;
-            } catch (quoteIndentError) {}
-            applyThemeFontAndEmphasis(paragraph, headingStyle);
-        }
-    }
 }
 
 function normalizeBlockType(itemType) {
@@ -6126,7 +5765,6 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     var protoFrame;
     var protoHeight;
     var frame;
-    var richEntries = null;
     var cleanText = applySingleItemListMarker(
         layoutState,
         itemType,
@@ -6143,16 +5781,6 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
     if (!cleanText || isPlaceholderText(cleanText)) {
         appendRenderLog("Status: not populated - empty or placeholder text in JSON");
         return;
-    }
-
-    if (itemType === "ParagraphText" || itemType === "Text") {
-        richEntries = getParagraphRichText(data);
-        if (richEntries && richEntries.length) {
-            cleanText = composeRichTextMarkup(richEntries);
-            appendRenderLog("ParagraphText Markdown entries: " + richEntries.length);
-        } else {
-            richEntries = null;
-        }
     }
 
     // Opener only: PartNumber sits on the hero image (top-left), not in flow.
@@ -6217,9 +5845,6 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
         protoResult.usedFallback ? protoResult.label : protoLabel,
         protoResult.usedFallback ? protoLabel : null
     );
-    if (richEntries) {
-        protoHeight = Math.max(protoHeight, Math.min(240, richEntries.length * 18));
-    }
 
     try {
         frame = flowDynamicText(
@@ -6231,10 +5856,6 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
         );
         if (itemType === "BulletList" || itemType === "NumberedList") {
             applyListParagraphFormatting(frame);
-        }
-        if (richEntries) {
-            applyMarkdownParagraphKinds(frame, richEntries, registryEntry.style);
-            growTextFrameToFitContent(frame);
         }
         advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
         populatedCount += 1;

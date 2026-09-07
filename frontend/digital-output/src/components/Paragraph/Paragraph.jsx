@@ -12,78 +12,7 @@ const splitIntroductionPrefix = (text) => {
   };
 };
 
-const groupRichText = (entries) => {
-  const groups = [];
-  (entries || []).forEach((entry) => {
-    if (entry?.kind === 'bullet' || entry?.kind === 'number') {
-      const last = groups[groups.length - 1];
-      if (last?.kind === entry.kind) {
-        last.items.push(entry);
-        return;
-      }
-      groups.push({ kind: entry.kind, items: [entry] });
-      return;
-    }
-    groups.push(entry);
-  });
-  return groups;
-};
-
-const RichTextBlock = ({ richText }) => {
-  const groups = groupRichText(richText);
-  const borderStyle = getTypographyBorderStyle('paragraphText');
-
-  return (
-    <div className={styles.richText} style={borderStyle}>
-      {groups.map((entry, index) => {
-        if (entry.kind === 'h1') {
-          return (
-            <h2 key={`md-h1-${index}`} className={styles.mdH1}>
-              {renderInlineHtml(entry.html)}
-            </h2>
-          );
-        }
-        if (entry.kind === 'h2') {
-          return (
-            <h3 key={`md-h2-${index}`} className={styles.mdH2}>
-              {renderInlineHtml(entry.html)}
-            </h3>
-          );
-        }
-        if (entry.kind === 'quote') {
-          return (
-            <blockquote key={`md-quote-${index}`} className={styles.mdQuote}>
-              {renderInlineHtml(entry.html)}
-            </blockquote>
-          );
-        }
-        if (entry.kind === 'bullet' || entry.kind === 'number') {
-          const isNumbered = entry.kind === 'number';
-          const ListTag = isNumbered ? 'ol' : 'ul';
-          const listClass = isNumbered ? styles.numberedList : styles.bulletList;
-          return (
-            <ListTag key={`md-list-${index}`} className={listClass}>
-              {entry.items.map((item, itemIndex) => (
-                <li key={`md-li-${itemIndex}`}>{renderInlineHtml(item.html)}</li>
-              ))}
-            </ListTag>
-          );
-        }
-        return (
-          <p key={`md-p-${index}`} className={styles.paragraph}>
-            {renderInlineHtml(entry.html)}
-          </p>
-        );
-      })}
-    </div>
-  );
-};
-
-const Paragraph = ({ text, items, listType = 'bullet', richText }) => {
-  if (Array.isArray(richText) && richText.length) {
-    return <RichTextBlock richText={richText} />;
-  }
-
+const Paragraph = ({ text, items, listType = 'bullet' }) => {
   if (Array.isArray(items) && items.length) {
     const isNumbered = listType === 'numbered' || listType === 'ordered';
     const ListTag = isNumbered ? 'ol' : 'ul';

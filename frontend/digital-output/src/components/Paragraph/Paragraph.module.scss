@@ -32,86 +32,10 @@
     text-decoration: underline;
     word-break: break-all;
   }
-
-  :global(mark),
-  :global(.cendoc-mark) {
-    background: #ffe066;
-    color: inherit;
-    padding: 0 0.12em;
-  }
 }
 
 .leadLabel {
   font-weight: 700;
-}
-
-.richText {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin: 0 0 0.85rem;
-
-  .paragraph {
-    margin-bottom: 0.55rem;
-  }
-
-  .bulletList,
-  .numberedList {
-    margin-bottom: 0.55rem;
-    font-family: var(--typography-paragraphText-font, var(--font-family));
-    font-size: var(--typography-paragraphText-size, 9pt);
-    color: var(--typography-paragraphText-color, var(--paragraph-color));
-    font-weight: var(--typography-paragraphText-weight, 400);
-  }
-}
-
-.mdH1 {
-  margin: 0.35rem 0 0.45rem;
-  font-family: var(--typography-paragraphText-font, var(--font-family));
-  font-size: calc(var(--typography-paragraphText-size, 9pt) * 1.6);
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--typography-paragraphText-color, var(--paragraph-color));
-
-  :global(mark),
-  :global(.cendoc-mark) {
-    background: #ffe066;
-    color: inherit;
-  }
-
-  a {
-    color: var(--primary-color);
-  }
-}
-
-.mdH2 {
-  margin: 0.55rem 0 0.35rem;
-  font-family: var(--typography-paragraphText-font, var(--font-family));
-  font-size: calc(var(--typography-paragraphText-size, 9pt) * 1.3);
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--typography-paragraphText-color, var(--paragraph-color));
-
-  :global(mark),
-  :global(.cendoc-mark) {
-    background: #ffe066;
-    color: inherit;
-  }
-
-  a {
-    color: var(--primary-color);
-  }
-}
-
-.mdQuote {
-  margin: 0.55rem 0 0.7rem;
-  padding: 0.15rem 0 0.15rem 1rem;
-  border-left: 3px solid var(--border-color, #dddddd);
-  font-family: var(--typography-paragraphText-font, var(--font-family));
-  font-size: var(--typography-paragraphText-size, 9pt);
-  font-style: italic;
-  line-height: 1.55;
-  color: var(--typography-paragraphText-color, var(--paragraph-color));
 }
 
 .bulletList {
@@ -141,18 +65,6 @@
   strong {
     font-weight: 700;
   }
-
-  a {
-    color: var(--primary-color);
-    text-decoration: underline;
-  }
-
-  :global(mark),
-  :global(.cendoc-mark) {
-    background: #ffe066;
-    color: inherit;
-    padding: 0 0.12em;
-  }
 }
 
 .numberedList {
@@ -181,17 +93,5 @@
 
   strong {
     font-weight: 700;
-  }
-
-  a {
-    color: var(--primary-color);
-    text-decoration: underline;
-  }
-
-  :global(mark),
-  :global(.cendoc-mark) {
-    background: #ffe066;
-    color: inherit;
-    padding: 0 0.12em;
   }
 }

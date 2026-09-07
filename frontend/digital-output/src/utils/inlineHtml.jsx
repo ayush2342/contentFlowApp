@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'SPAN', 'SUP', 'A', 'BR', 'MARK']);
+const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'SPAN', 'SUP', 'A', 'BR']);
 
 const getAttr = (el, name) => {
   try {
@@ -44,15 +44,6 @@ const walkNodes = (nodes, keyPrefix = 'n', options = {}) => {
 
     if (tag === 'BR') {
       out.push(<br key={key} />);
-      return;
-    }
-
-    if (tag === 'MARK') {
-      out.push(
-        <mark key={key} className="cendoc-mark">
-          {children}
-        </mark>
-      );
       return;
     }
 
