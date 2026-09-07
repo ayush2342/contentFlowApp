@@ -460,6 +460,7 @@ export const blockTypeToStyleKey = {
   Quote: 'quotation',
   Table: 'table',
   Footer: 'footer',
+  PageHeader: 'pageHeader',
 };
 
 export const getStyleForBlockType = (blockType, themeId = DEFAULT_THEME_ID) => {

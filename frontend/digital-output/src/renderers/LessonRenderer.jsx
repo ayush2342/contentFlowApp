@@ -32,18 +32,22 @@ const DynamicComponent = ({ component }) => {
 /** One JSON page = one sheet. Left fills to this height, then right. */
 const PDF_PAGE_CONTENT_HEIGHT_PX = 1240;
 
+/** Running heads and footers sit outside the column flow, pinned to the sheet. */
 const splitBodyAndFooters = (components = []) => {
   const body = [];
   const footers = [];
+  const headers = [];
   (components || []).forEach((component) => {
     if (!component) return;
     if (component.type === 'Footer' || component.contentType === 'Footer') {
       footers.push(component);
+    } else if (component.type === 'PageHeader' || component.contentType === 'PageHeader') {
+      headers.push(component);
     } else {
       body.push(component);
     }
   });
-  return { body, footers };
+  return { body, footers, headers };
 };
 
 /**
@@ -53,6 +57,7 @@ const splitBodyAndFooters = (components = []) => {
 const TwoColumnPageSheet = ({
   components = [],
   footers = [],
+  headers = [],
   pageHeightPx = PDF_PAGE_CONTENT_HEIGHT_PX,
 }) => {
   const measureRef = useRef(null);
@@ -132,6 +137,14 @@ const TwoColumnPageSheet = ({
 
   return (
     <div className={styles.pageSheet}>
+      {headers.length ? (
+        <div className={styles.pageHeader}>
+          {headers.map((component, index) => (
+            <DynamicComponent key={component.id || `header-${index}`} component={component} />
+          ))}
+        </div>
+      ) : null}
+
       <div ref={measureRef} className={styles.measureColumn} aria-hidden="true">
         {blocks.map((item) => (
           <div key={`measure-${item.key}`} className={styles.measureBlock}>
@@ -215,7 +228,7 @@ const LessonRenderer = ({
     layoutOverride || getLocalFormatDocument(templateId);
   const pageType = page.pageType || 'opener';
   const pageColumns = page.pageColumns || getPageColumns(formatDoc, pageType);
-  const { body, footers } = splitBodyAndFooters(page.components || []);
+  const { body, footers, headers } = splitBodyAndFooters(page.components || []);
 
   const scopedTypography = resolveTypographyStylesFromPayload(typographyProp, templateId);
   const sectionColor =
@@ -242,6 +255,7 @@ const LessonRenderer = ({
       <article className={`${styles.lesson} ${styles.twoColumnLesson}`} style={pageStyleVars}>
         <TwoColumnPageSheet
           components={body}
+          headers={headers}
           footers={footers}
           pageHeightPx={PDF_PAGE_CONTENT_HEIGHT_PX}
         />
@@ -254,6 +268,13 @@ const LessonRenderer = ({
 
   return (
     <article className={`${styles.lesson} ${styles.pageSheet}`} style={pageStyleVars}>
+      {headers.length ? (
+        <div className={styles.pageHeader}>
+          {headers.map((component, index) => (
+            <DynamicComponent key={component.id || `header-${index}`} component={component} />
+          ))}
+        </div>
+      ) : null}
       <div className={styles.pageBody}>
         {segments.map((segment, segmentIndex) => {
           if (segment.columns === 2) {

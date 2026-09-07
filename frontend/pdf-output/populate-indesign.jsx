@@ -1284,6 +1284,12 @@ var BLOCK_REGISTRY = {
         style: FRAME_STYLES.footer,
         kind: "footer",
         spacingAfter: 0
+    },
+    PageHeader: {
+        label: "pageHeader",
+        style: FRAME_STYLES.pageHeader,
+        kind: "header",
+        spacingAfter: 0
     }
 };
 
@@ -3731,7 +3737,10 @@ function normalizeBlockType(itemType) {
         quote: "Quotation",
         table: "Table",
         tableblock: "Table",
-        footer: "Footer"
+        footer: "Footer",
+        pageheader: "PageHeader",
+        header: "PageHeader",
+        runninghead: "PageHeader"
     };
 
     if (aliases[compact]) {
@@ -4717,6 +4726,11 @@ function getPageLayoutBounds(page) {
         usableBottom -= footerReserve;
     }
 
+    var headerReserve = 0;
+    if (layoutState && layoutState.headerReserve) {
+        headerReserve = layoutState.headerReserve;
+    }
+
     var columnWidth =
         (usableWidth - ((columnCount - 1) * gutter)) /
         columnCount;
@@ -4737,7 +4751,7 @@ function getPageLayoutBounds(page) {
     );
 
     return {
-        top: bounds[0] + topMargin,
+        top: bounds[0] + topMargin + headerReserve,
         left: left,
         bottom: usableBottom,
         right: right
@@ -5204,6 +5218,7 @@ function createLayoutState(document, page) {
         gutter: 18,
         pageType: "opener",
         footerReserve: 0,
+        headerReserve: 0,
         lastImageFrame: null,
         lastImageHadCaption: false
     };
@@ -6226,6 +6241,7 @@ function populateDynamicLogoBlock(layoutState, document, registryEntry, data, bl
 function splitBodyAndFooters(contentItems) {
     var body = [];
     var footers = [];
+    var headers = [];
     var i;
     var item;
     var itemType;
@@ -6235,12 +6251,14 @@ function splitBodyAndFooters(contentItems) {
         itemType = normalizeBlockType(item.type);
         if (itemType === "Footer") {
             footers.push(item);
+        } else if (itemType === "PageHeader") {
+            headers.push(item);
         } else {
             body.push(item);
         }
     }
 
-    return { body: body, footers: footers };
+    return { body: body, footers: footers, headers: headers };
 }
 
 function getFooterDisplayText(data) {
@@ -6798,6 +6816,75 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
     }
 }
 
+function placePageHeadersOnRenderedPages(layoutState, document, headerItems, startPageIndex) {
+    var combined = [];
+    var i;
+    var data;
+    var text;
+    var headerText;
+    var style;
+    var endPageIndex;
+    var pageIndex;
+    var page;
+    var fullBounds;
+    var headerRuns;
+    var headerHeight = 22;
+    var frame;
+
+    for (i = 0; i < headerItems.length; i++) {
+        data = headerItems[i].data || {};
+        text = trimString(data.text || "");
+        if (text) {
+            combined.push(text);
+        }
+    }
+
+    if (!combined.length) {
+        appendRenderLog("PageHeader: no text to place");
+        return;
+    }
+
+    headerText = combined.join("  |  ");
+    style = FRAME_STYLES.pageHeader || null;
+    endPageIndex = getPageDocumentOffset(layoutState.page);
+
+    for (pageIndex = startPageIndex; pageIndex <= endPageIndex; pageIndex++) {
+        try {
+            page = document.pages[pageIndex];
+        } catch (pageError) {
+            continue;
+        }
+
+        fullBounds = getFullPageMarginBounds(page);
+        try {
+            frame = page.textFrames.add({
+                geometricBounds: [
+                    fullBounds.top,
+                    fullBounds.left,
+                    fullBounds.top + headerHeight,
+                    fullBounds.right
+                ]
+            });
+            assignFrameToContentLayer(frame);
+            clearRuntimeLabel(frame);
+            headerRuns = setFrameContentsWithMarkup(frame, headerText);
+            if (style) {
+                applyFrameStyle(frame, style);
+                applyInlineMarkupRuns(frame, headerRuns, style);
+            } else {
+                applyInlineMarkupRuns(frame, headerRuns, {});
+            }
+            populatedCount += 1;
+        } catch (headerError) {
+            warnings.push("Could not place page header on page index " + pageIndex + ": " + headerError.message);
+        }
+    }
+
+    appendRenderLog(
+        "PageHeader placed on pages " + startPageIndex + "-" + endPageIndex
+    );
+}
+
 function placeFootersOnRenderedPages(layoutState, document, footerItems, startPageIndex) {
     var combined = [];
     var i;
@@ -6881,6 +6968,8 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
     split = splitBodyAndFooters(contentItems || []);
     startPageIndex = getPageDocumentOffset(layoutState.page);
     layoutState.footerReserve = split.footers.length ? 36 : 0;
+    layoutState.headerReserve = split.headers.length ? 26 : 0;
+    layoutState.cursorY = getPageLayoutBounds(layoutState.page).top;
 
     for (i = 0; i < split.body.length; i++) {
         item = split.body[i];
@@ -6996,11 +7085,16 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
         logUnsupportedBlockType(itemType);
     }
 
+    if (split.headers && split.headers.length) {
+        placePageHeadersOnRenderedPages(layoutState, document, split.headers, startPageIndex);
+    }
+
     if (split.footers.length) {
         placeFootersOnRenderedPages(layoutState, document, split.footers, startPageIndex);
     }
 
     layoutState.footerReserve = 0;
+    layoutState.headerReserve = 0;
 }
 
 // -----------------------------------------------------------------------------
@@ -7027,6 +7121,10 @@ function populateInJsonOrder(document, contentItems, scriptFolder) {
         }
 
         blockIndex = getBlockTypeCount(typeCounts, itemType);
+
+        if (registryEntry.kind === "footer" || registryEntry.kind === "header") {
+            continue;
+        }
 
         if (registryEntry.kind === "image") {
             populateImageBlock(document, registryEntry, data, blockIndex, scriptFolder);
@@ -7164,7 +7262,7 @@ function logResolvedTypographySample() {
         "chapterTitle", "sectionTitle", "paragraphText", "topic",
         "imageCaption", "imageFigureNumber", "figureCaption", "logoText",
         "partNumber", "subTitlesList", "greenSubSectionTitle", "subTitle",
-        "quotation", "table", "footer"
+        "quotation", "table", "footer", "pageHeader"
     ];
     var i;
     var key;
@@ -7236,6 +7334,7 @@ function rebuildBlockRegistry() {
     BLOCK_REGISTRY.Quotation.style = FRAME_STYLES.quotation || FRAME_STYLES_DEFAULTS.quotation;
     BLOCK_REGISTRY.Table.style = FRAME_STYLES.table || FRAME_STYLES_DEFAULTS.table;
     BLOCK_REGISTRY.Footer.style = FRAME_STYLES.footer || FRAME_STYLES_DEFAULTS.footer;
+    BLOCK_REGISTRY.PageHeader.style = FRAME_STYLES.pageHeader || null;
 }
 
 // -----------------------------------------------------------------------------

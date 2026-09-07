@@ -328,6 +328,9 @@ const NORMALIZED_CLASS_TYPE_MAP = {
   quote: 'Quotation',
   table: 'Table',
   footer: 'Footer',
+  pageheader: 'PageHeader',
+  header: 'PageHeader',
+  runninghead: 'PageHeader',
 };
 
 const normalizeClassTemplateRawType = (rawType) => {
@@ -703,6 +706,17 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
           rows,
         },
       },
+    };
+  }
+
+  if (type === 'PageHeader') {
+    const headerText = normalizeText(block?.data?.text);
+    if (!headerText) return null;
+    return {
+      id: `content-${index}`,
+      type: 'PageHeader',
+      contentType: 'PageHeader',
+      props: { text: headerText },
     };
   }
 

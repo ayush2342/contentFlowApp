@@ -11,6 +11,7 @@ import Activity from '../components/Activity';
 import Assessment from '../components/Assessment';
 import IconLabel from '../components/IconLabel';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 
 const componentRegistry = {
   Heading,
@@ -26,6 +27,7 @@ const componentRegistry = {
   Assessment,
   IconLabel,
   Footer,
+  PageHeader,
 };
 
 export default componentRegistry;

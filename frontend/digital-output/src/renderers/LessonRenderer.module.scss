@@ -22,6 +22,11 @@
   min-height: var(--pdf-page-height, 864px);
 }
 
+.pageHeader {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
 .pageBody {
   flex: 1 1 auto;
   width: 100%;
