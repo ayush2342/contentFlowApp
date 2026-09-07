@@ -22,6 +22,10 @@ var DYNAMIC_LAYOUT = {
     imageCaptionReserve: 72, // height kept free below a full-bleed image for its caption
     afterImageGap: 12,      // space below image/caption before the next block
     listTailGap: 8,         // space after the last bullet/numbered item
+    listIndent: 18,         // left indent for list items
+    listHangingIndent: 9,   // marker hangs this far left of the item text
+    listItemGap: 5,         // space between consecutive list items
+    listAutoLeading: 140,   // line spacing (%) inside a wrapped list item
     prototypeOffPageTop: -2000,
     minTextFrameHeight: 24,
     defaultImageFrameHeight: 180
@@ -659,6 +663,7 @@ function buildCanonicalStyleMap(styleSet) {
     var quotation = pickRawTypographyEntry(styleSet, ["quotation", "quote"]);
     var table = pickRawTypographyEntry(styleSet, ["table"]);
     var footer = pickTypographyEntry(styleSet, ["footer"]);
+    var pageHeader = pickTypographyEntry(styleSet, ["pageHeader"]);
     var subSectionHeading = pickTypographyEntry(styleSet, ["subSectionHeading", "subsectionHeading"]);
 
     return {
@@ -689,7 +694,8 @@ function buildCanonicalStyleMap(styleSet) {
         logoText: subSectionTitle || greenSubSectionTitle,
         quotation: quotation,
         table: table,
-        footer: footer
+        footer: footer,
+        pageHeader: pageHeader
     };
 }
 
@@ -3469,7 +3475,10 @@ function applySingleItemListMarker(layoutState, itemType, data, text) {
  */
 /** Extract a hex color from an inline style attribute, e.g. style="color: #c31427;". */
 function parseInlineStyleColor(attrs) {
-    var match = /(?:^|;|\s)color\s*:\s*(#[0-9a-fA-F]{3,6})/.exec(String(attrs || ""));
+    // The property is usually preceded by the style attribute's quote, so match
+    // on any non-name character; the leading [^-a-zA-Z] also skips
+    // "background-color".
+    var match = /(?:^|[^-a-zA-Z])color\s*:\s*(#[0-9a-fA-F]{3,6})/.exec(String(attrs || ""));
     var hex;
 
     if (!match) {
@@ -5602,6 +5611,53 @@ function placeChapterNumberBar(layoutState, text, style) {
     return frame;
 }
 
+/**
+ * Bullet/numbered items: indent the block, hang the marker to the left of the
+ * text, and open up the leading so wrapped lines do not read as one paragraph.
+ */
+function applyListParagraphFormatting(frame) {
+    var story;
+    var i;
+    var paragraph;
+
+    if (!frame) {
+        return;
+    }
+
+    try {
+        story = frame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+
+    if (!story) {
+        return;
+    }
+
+    try {
+        for (i = 0; i < story.paragraphs.length; i++) {
+            paragraph = story.paragraphs[i];
+            paragraph.justification = Justification.LEFT_ALIGN;
+            paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
+            paragraph.firstLineIndent = -DYNAMIC_LAYOUT.listHangingIndent;
+            paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
+            paragraph.spaceBefore = 0;
+            // Only matters when one frame holds several items (data.items).
+            paragraph.spaceAfter =
+                i < story.paragraphs.length - 1 ? DYNAMIC_LAYOUT.listItemGap : 0;
+        }
+    } catch (listFormatError) {
+        warnings.push("Could not apply list indents: " + listFormatError.message);
+    }
+
+    try {
+        story.recompose();
+    } catch (recomposeError) {}
+
+    // Indents and leading change the line count, so re-fit the frame.
+    growTextFrameToFitContent(frame);
+}
+
 function populateDynamicTextBlock(layoutState, document, registryEntry, itemType, data, blockIndex) {
     var protoLabel = registryEntry.prototype;
     var protoResult;
@@ -5697,6 +5753,9 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
             DYNAMIC_LAYOUT.minTextFrameHeight,
             protoHeight
         );
+        if (itemType === "BulletList" || itemType === "NumberedList") {
+            applyListParagraphFormatting(frame);
+        }
         advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
         populatedCount += 1;
         appendRenderLog("Status: populated (dynamic frame created on Content layer)");
@@ -6922,11 +6981,10 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
                     i + 1 < split.body.length &&
                     normalizeBlockType(split.body[i + 1].type) === itemType
                 ) {
-                    // Mid-run: tighten so the items read as a single list.
-                    layoutState.cursorY -= Math.min(
-                        4,
-                        Number(registryEntry.spacingAfter) || 0
-                    );
+                    // Mid-run: replace the block spacing with the list item gap
+                    // so consecutive items read as one evenly spaced list.
+                    layoutState.cursorY +=
+                        DYNAMIC_LAYOUT.listItemGap - (Number(registryEntry.spacingAfter) || 0);
                 } else {
                     // End of run: separate the list from the body copy.
                     layoutState.cursorY += DYNAMIC_LAYOUT.listTailGap;

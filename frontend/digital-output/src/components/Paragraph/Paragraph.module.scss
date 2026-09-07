@@ -40,7 +40,7 @@
 
 .bulletList {
   margin: 0 0 0.85rem;
-  padding-left: 1.25rem;
+  padding-left: 1.6rem;
   line-height: 1.6;
   list-style: disc;
   font-family: var(--typography-bulletList-font, var(--font-family));
@@ -49,7 +49,7 @@
   font-weight: var(--typography-bulletList-weight, 400);
 
   li {
-    margin: 0 0 0.35rem;
+    margin: 0 0 0.45rem;
     padding-left: 0.15rem;
   }
 
@@ -69,7 +69,7 @@
 
 .numberedList {
   margin: 0 0 0.85rem;
-  padding-left: 1.25rem;
+  padding-left: 1.6rem;
   line-height: 1.6;
   list-style: decimal;
   font-family: var(--typography-numberedList-font, var(--typography-bulletList-font, var(--font-family)));
@@ -78,7 +78,7 @@
   font-weight: var(--typography-numberedList-weight, var(--typography-bulletList-weight, 400));
 
   li {
-    margin: 0 0 0.35rem;
+    margin: 0 0 0.45rem;
     padding-left: 0.15rem;
   }
 

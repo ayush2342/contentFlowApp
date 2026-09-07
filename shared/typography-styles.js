@@ -130,6 +130,7 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
   const quotationRaw = pickRawStyle(styleSet, ['quotation', 'quote']);
   const tableRaw = pickRawStyle(styleSet, ['table']);
   const footer = pickFlatStyle(styleSet, ['footer']);
+  const pageHeader = pickFlatStyle(styleSet, ['pageHeader']);
   const subSectionHeading = pickFlatStyle(styleSet, ['subSectionHeading', 'subsectionHeading']);
   const logoWithText = pickFlatStyle(styleSet, ['logoWithText', 'logoText']);
 
@@ -162,6 +163,7 @@ export const normalizeStylePreset = (styleSet = TYPOGRAPHY_STYLES) => {
     quotation: quotationRaw,
     table: tableRaw,
     footer,
+    pageHeader,
   };
 };
 

@@ -86,6 +86,18 @@
       "size": 7.5,
       "color": "#000000",
       "bold": false
+    },
+    "pageHeader": {
+      "font": "Mulish",
+      "size": 7.5,
+      "color": "#A5A5A5",
+      "bold": true
+    },
+    "footer": {
+      "font": "Mulish",
+      "size": 7.5,
+      "color": "#A5A5A5",
+      "bold": true
     }
   }
 }

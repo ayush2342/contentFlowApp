@@ -127,13 +127,13 @@
       "textTransform": "uppercase"
     },
     "imageFigureNumber": {
-      "font": "Arial",
+      "font": "Mulish",
       "size": 7.5,
       "color": "#C31427",
       "bold": true
     },
     "imageFigureText": {
-      "font": "Arial",
+      "font": "IBM Plex Sans Regular",
       "size": 7.5,
       "color": "#000000",
       "bold": false

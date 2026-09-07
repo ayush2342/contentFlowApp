@@ -115,6 +115,7 @@ const LEGACY_THEME_KEY_MAP = {
   Quotation: 'quotation',
   LogoWithText: 'logoWithText',
   Table: 'table',
+  PageHeader: 'pageHeader',
   Footer: 'footer',
 };
 
