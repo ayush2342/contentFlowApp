@@ -269,6 +269,58 @@ const loadThemeFromS3 = async (key, templateId) => {
   };
 };
 
+const mergeMissingLocalThemeFields = async (stylesheetResult) => {
+  if (!stylesheetResult?.document || stylesheetResult.source !== 's3') {
+    return stylesheetResult;
+  }
+
+  let localDocument;
+  try {
+    const localTheme = await loadLocalThemeDocument(stylesheetResult.themeId);
+    localDocument = localTheme.document;
+  } catch {
+    return stylesheetResult;
+  }
+
+  const s3Styles = extractThemeStylesMap(stylesheetResult.document) || {};
+  const localStyles = extractThemeStylesMap(localDocument) || {};
+  const filled = [];
+
+  const mergedStyles = { ...s3Styles };
+  for (const [key, value] of Object.entries(localStyles)) {
+    if (mergedStyles[key] == null && value != null) {
+      mergedStyles[key] = value;
+      filled.push(key);
+    }
+  }
+
+  const s3Options =
+    stylesheetResult.document.OPTIONS &&
+    typeof stylesheetResult.document.OPTIONS === 'object'
+      ? stylesheetResult.document.OPTIONS
+      : {};
+  const localOptions =
+    localDocument.OPTIONS && typeof localDocument.OPTIONS === 'object'
+      ? localDocument.OPTIONS
+      : {};
+  const mergedOptions = { ...localOptions, ...s3Options };
+
+  if (filled.length) {
+    console.info(
+      `[theme] S3 theme ${stylesheetResult.themeId} missing ${filled.join(', ')}; filled from local ${stylesheetResult.themeId}.json`
+    );
+  }
+
+  return {
+    ...stylesheetResult,
+    document: {
+      ...stylesheetResult.document,
+      STYLES: mergedStyles,
+      OPTIONS: mergedOptions,
+    },
+  };
+};
+
 /**
  * Resolve theme + format using templateId:
  * 1) Theme from S3 {env}/appearance/theme/{id}.json, else local themes/
@@ -282,7 +334,7 @@ export const resolveStylesheet = async ({ templateId } = {}) => {
     try {
       const fromS3 = await loadThemeFromS3(themeKey, requestedTemplateId);
       console.info(`[theme] loaded from S3: ${themeKey}`);
-      return attachLayout(fromS3);
+      return attachLayout(await mergeMissingLocalThemeFields(fromS3));
     } catch (error) {
       console.warn(
         `[theme] S3 fetch failed for "${themeKey}" (${error.message}); falling back to local theme for templateId=${requestedTemplateId}`

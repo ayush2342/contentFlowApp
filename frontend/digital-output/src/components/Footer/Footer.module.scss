@@ -1,17 +1,17 @@
 .footer {
   margin-top: auto;
-  padding-top: 0.75rem;
-  border-top: 1px solid #e5e5e5;
+  padding-top: 0.35rem;
   width: 100%;
 }
 
 .text {
   margin: 0;
   font-family: var(--typography-footer-font, Arial, sans-serif);
-  font-size: var(--typography-footer-size, 9pt);
-  font-weight: var(--typography-footer-weight, 400);
-  color: var(--typography-footer-color, #000000);
+  font-size: var(--typography-footer-size, 7.5pt);
+  font-weight: var(--typography-footer-weight, 700);
+  color: var(--typography-footer-color, #a5a5a5);
   line-height: 1.3;
+  text-align: left;
 }
 
 .row {
@@ -20,9 +20,9 @@
   gap: 0.75rem;
   align-items: center;
   font-family: var(--typography-footer-font, Arial, sans-serif);
-  font-size: var(--typography-footer-size, 9pt);
-  font-weight: var(--typography-footer-weight, 400);
-  color: var(--typography-footer-color, #000000);
+  font-size: var(--typography-footer-size, 7.5pt);
+  font-weight: var(--typography-footer-weight, 700);
+  color: var(--typography-footer-color, #a5a5a5);
 }
 
 .side:last-child {

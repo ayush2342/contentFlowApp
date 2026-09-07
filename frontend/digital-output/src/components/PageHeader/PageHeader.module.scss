@@ -1,13 +1,13 @@
 .pageHeader {
   width: 100%;
-  padding-bottom: 0.6rem;
+  padding-bottom: 0.35rem;
 }
 
 .text {
   margin: 0;
   font-family: var(--typography-pageHeader-font, Arial, sans-serif);
   font-size: var(--typography-pageHeader-size, 7.5pt);
-  font-weight: var(--typography-pageHeader-weight, 400);
-  color: var(--typography-pageHeader-color, #000000);
+  font-weight: var(--typography-pageHeader-weight, 700);
+  color: var(--typography-pageHeader-color, #a5a5a5);
   line-height: 1.3;
 }

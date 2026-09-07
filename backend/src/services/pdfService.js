@@ -176,7 +176,7 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
       'utf8'
     );
     console.info(
-      `[pdf] typography source=${stylesheet.source} templateId=${resolvedTemplateId} theme=${stylesheet.themeId} format=${stylesheet.formatId} layoutSource=${stylesheet.layoutSource}`
+      `[pdf] typography source=${stylesheet.source} templateId=${resolvedTemplateId} theme=${stylesheet.themeId} format=${stylesheet.formatId} layoutSource=${stylesheet.layoutSource} pageHeader=${JSON.stringify(typographyConfig.STYLES?.pageHeader || null)} footer=${JSON.stringify(typographyConfig.STYLES?.footer || null)}`
     );
   } catch (typographyError) {
     console.warn(

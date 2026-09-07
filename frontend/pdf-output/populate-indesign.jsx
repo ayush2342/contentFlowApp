@@ -22,10 +22,8 @@ var DYNAMIC_LAYOUT = {
     imageCaptionReserve: 72, // height kept free below a full-bleed image for its caption
     afterImageGap: 12,      // space below image/caption before the next block
     listTailGap: 8,         // space after the last bullet/numbered item
-    listIndent: 18,         // left indent for list items
-    listHangingIndent: 9,   // marker hangs this far left of the item text
+    listIndent: 14,         // left indent; keep marker and text on the same line
     listItemGap: 5,         // space between consecutive list items
-    listAutoLeading: 140,   // line spacing (%) inside a wrapped list item
     prototypeOffPageTop: -2000,
     minTextFrameHeight: 24,
     defaultImageFrameHeight: 180
@@ -2332,6 +2330,55 @@ function ensureDocumentColor(document, colorName, rgb) {
     }
 }
 
+function applyRunningChromeStyle(frame, style) {
+    var story;
+    var textRange;
+    var p;
+    var i;
+    var pointSize;
+
+    if (!frame || !style) {
+        return;
+    }
+
+    try {
+        story = frame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+
+    if (!story || !story.texts.length) {
+        return;
+    }
+
+    prepareStoryForDirectFormatting(story);
+    textRange = story.texts[0];
+    pointSize = style.pointSize || 7.5;
+
+    try {
+        textRange.pointSize = pointSize;
+    } catch (sizeError) {}
+
+    applyThemeFontAndEmphasis(textRange, style);
+    applyTextColor(textRange, style);
+
+    try {
+        for (i = 0; i < story.paragraphs.length; i++) {
+            p = story.paragraphs[i];
+            p.justification = Justification.LEFT_ALIGN;
+            p.spaceBefore = 0;
+            p.spaceAfter = 0;
+            p.leftIndent = 0;
+            p.firstLineIndent = 0;
+        }
+    } catch (paraError) {}
+
+    try {
+        frame.textFramePreferences.insetSpacing = [0, 0, 0, 0];
+        frame.strokeWeight = 0;
+    } catch (prefError) {}
+}
+
 function applyTextColor(textRange, style) {
     var color;
     var colorName;
@@ -4444,7 +4491,9 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     var tailPadding = 1;
     var preserveFullWidth =
         style === FRAME_STYLES.chapterNumber || style === FRAME_STYLES.chapterHeading;
-    var preserveColumnWidth = !preserveFullWidth && styleHasBorders(style);
+    var isListStyle =
+        style === FRAME_STYLES.bulletList || style === FRAME_STYLES.numberedList;
+    var preserveColumnWidth = !preserveFullWidth && (styleHasBorders(style) || isListStyle);
     var chapterBarHeight = preserveFullWidth
         ? Math.max(((style && style.pointSize) || 36) + 20, 52)
         : 0;
@@ -5627,13 +5676,15 @@ function placeChapterNumberBar(layoutState, text, style) {
 }
 
 /**
- * Bullet/numbered items: indent the block, hang the marker to the left of the
- * text, and open up the leading so wrapped lines do not read as one paragraph.
+ * Bullet/numbered items: modest left indent only. A hanging indent smaller than
+ * the marker width pushed the item text onto the next line.
  */
 function applyListParagraphFormatting(frame) {
     var story;
     var i;
     var paragraph;
+    var bounds;
+    var layoutBounds;
 
     if (!frame) {
         return;
@@ -5649,15 +5700,26 @@ function applyListParagraphFormatting(frame) {
         return;
     }
 
+    // FRAME_TO_CONTENT can shrink width before indents are applied; restore
+    // the column so the item stays on one line.
+    try {
+        bounds = frame.geometricBounds;
+        layoutBounds = getPageLayoutBounds(frame.parentPage);
+        frame.geometricBounds = [
+            bounds[0],
+            layoutBounds.left,
+            bounds[2],
+            layoutBounds.right
+        ];
+    } catch (widthError) {}
+
     try {
         for (i = 0; i < story.paragraphs.length; i++) {
             paragraph = story.paragraphs[i];
             paragraph.justification = Justification.LEFT_ALIGN;
             paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
-            paragraph.firstLineIndent = -DYNAMIC_LAYOUT.listHangingIndent;
-            paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
+            paragraph.firstLineIndent = 0;
             paragraph.spaceBefore = 0;
-            // Only matters when one frame holds several items (data.items).
             paragraph.spaceAfter =
                 i < story.paragraphs.length - 1 ? DYNAMIC_LAYOUT.listItemGap : 0;
         }
@@ -5669,7 +5731,6 @@ function applyListParagraphFormatting(frame) {
         story.recompose();
     } catch (recomposeError) {}
 
-    // Indents and leading change the line count, so re-fit the frame.
     growTextFrameToFitContent(frame);
 }
 
@@ -6828,7 +6889,7 @@ function placePageHeadersOnRenderedPages(layoutState, document, headerItems, sta
     var page;
     var fullBounds;
     var headerRuns;
-    var headerHeight = 22;
+    var headerHeight = 14;
     var frame;
 
     for (i = 0; i < headerItems.length; i++) {
@@ -6846,6 +6907,12 @@ function placePageHeadersOnRenderedPages(layoutState, document, headerItems, sta
 
     headerText = combined.join("  |  ");
     style = FRAME_STYLES.pageHeader || null;
+    appendRenderLog(
+        "PageHeader style => " +
+        (style
+            ? ("size=" + style.pointSize + " color=" + style.color + " font=" + (style.fontFamily || style.font))
+            : "(none)")
+    );
     endPageIndex = getPageDocumentOffset(layoutState.page);
 
     for (pageIndex = startPageIndex; pageIndex <= endPageIndex; pageIndex++) {
@@ -6868,11 +6935,9 @@ function placePageHeadersOnRenderedPages(layoutState, document, headerItems, sta
             assignFrameToContentLayer(frame);
             clearRuntimeLabel(frame);
             headerRuns = setFrameContentsWithMarkup(frame, headerText);
+            applyRunningChromeStyle(frame, style);
             if (style) {
-                applyFrameStyle(frame, style);
                 applyInlineMarkupRuns(frame, headerRuns, style);
-            } else {
-                applyInlineMarkupRuns(frame, headerRuns, {});
             }
             populatedCount += 1;
         } catch (headerError) {
@@ -6897,7 +6962,7 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
     var page;
     var fullBounds;
     var footerRuns;
-    var footerHeight = 28;
+    var footerHeight = 14;
     var frame;
 
     for (i = 0; i < footerItems.length; i++) {
@@ -6915,6 +6980,12 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
 
     footerText = combined.join("  |  ");
     style = FRAME_STYLES.footer || FRAME_STYLES_DEFAULTS.footer;
+    appendRenderLog(
+        "Footer style => size=" + style.pointSize +
+        " color=" + style.color +
+        " font=" + (style.fontFamily || style.font) +
+        (FRAME_STYLES.footer ? "" : " (Arial-9 default)")
+    );
     endPageIndex = getPageDocumentOffset(layoutState.page);
 
     for (pageIndex = startPageIndex; pageIndex <= endPageIndex; pageIndex++) {
@@ -6937,7 +7008,7 @@ function placeFootersOnRenderedPages(layoutState, document, footerItems, startPa
             assignFrameToContentLayer(frame);
             clearRuntimeLabel(frame);
             footerRuns = setFrameContentsWithMarkup(frame, footerText);
-            applyFrameStyle(frame, style);
+            applyRunningChromeStyle(frame, style);
             applyInlineMarkupRuns(frame, footerRuns, style);
             populatedCount += 1;
         } catch (footerError) {
@@ -6967,8 +7038,8 @@ function populateInJsonOrderDynamic(document, contentItems, scriptFolder) {
 
     split = splitBodyAndFooters(contentItems || []);
     startPageIndex = getPageDocumentOffset(layoutState.page);
-    layoutState.footerReserve = split.footers.length ? 36 : 0;
-    layoutState.headerReserve = split.headers.length ? 26 : 0;
+    layoutState.footerReserve = split.footers.length ? 22 : 0;
+    layoutState.headerReserve = split.headers.length ? 18 : 0;
     layoutState.cursorY = getPageLayoutBounds(layoutState.page).top;
 
     for (i = 0; i < split.body.length; i++) {
