@@ -242,14 +242,18 @@ const FONT_STYLE_SUFFIX_WEIGHTS = {
   semibold: 600,
   demibold: 600,
   bold: 700,
+  extrabold: 800,
+  ultrabold: 800,
   black: 900,
   heavy: 900,
+  extrablack: 950,
 };
 
 /**
- * Theme fonts are named the way designers get them ("Mulish SemiBold").
- * The browser needs the base family plus a numeric weight, so split the
- * style suffix off and keep the full name first for locally installed fonts.
+ * Theme fonts are named the way Adobe Fonts lists them
+ * ("Mulish Variable SemiBold"). The browser needs the base family plus a
+ * numeric weight, so split the style suffix off and keep the full name first
+ * for locally installed fonts.
  */
 export const toWebFont = (font) => {
   const families = String(font || '')
@@ -262,7 +266,7 @@ export const toWebFont = (font) => {
   }
 
   const [primary, ...rest] = families;
-  const match = /^(.*?)[\s-]+(thin|extra\s?light|ultra\s?light|light|book|regular|roman|medium|semi\s?bold|demi\s?bold|semi|bold|black|heavy)$/i.exec(
+  const match = /^(.*?)[\s-]+(thin|extra\s?light|ultra\s?light|light|book|regular|roman|medium|semi\s?bold|demi\s?bold|semi|extra\s?bold|ultra\s?bold|bold|extra\s?black|black|heavy)$/i.exec(
     primary
   );
 
@@ -278,8 +282,13 @@ export const toWebFont = (font) => {
     }
   }
 
-  // Adobe Fonts installs several of these under their variable family name.
-  names.push(`${names[names.length - 1]} Variable`);
+  const last = names[names.length - 1];
+  if (/\bvariable\b/i.test(last)) {
+    const withoutVar = last.replace(/\s*variable\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (withoutVar) names.push(withoutVar);
+  } else {
+    names.push(`${last} Variable`);
+  }
 
   const stack = names
     .concat(rest)

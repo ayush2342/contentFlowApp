@@ -2412,7 +2412,7 @@ function getFontBaseName(family) {
     }
 
     return trimmed.replace(
-        /\s+(Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Oblique|Condensed)$/i,
+        /\s+(ExtraLight|Extra\s*Light|ExtraBold|Extra\s*Bold|ExtraBlack|Extra\s*Black|Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Oblique|Condensed)$/i,
         ""
     );
 }
@@ -2420,7 +2420,7 @@ function getFontBaseName(family) {
 function getEmbeddedFontWeight(family) {
     var trimmed = trimString(family || "");
     var match = trimmed.match(
-        /\s+(Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Condensed)$/i
+        /\s+(ExtraLight|Extra\s*Light|ExtraBold|Extra\s*Bold|ExtraBlack|Extra\s*Black|Medium|Regular|Bold|Light|Book|Roman|Black|Heavy|Thin|SemiBold|Semi\s*Bold|Demi\s*Bold|Condensed)$/i
     );
 
     return match ? match[1] : "";
@@ -2432,15 +2432,23 @@ function normalizeFontToken(value) {
 
 function buildFontCandidateNames(style) {
     var family = trimString(style.fontFamily || style.font || "");
-    var baseName = getFontBaseName(family);
-    var embedded = getEmbeddedFontWeight(family);
-    var styleNames = getFontStyleCandidates(
-        isTruthyFlag(style.bold),
-        isTruthyFlag(style.italic)
-    );
+    var baseName;
+    var embedded;
+    var styleNames;
     var results = [];
     var seen = {};
     var i;
+
+    if (family.indexOf(",") >= 0) {
+        family = trimString(family.split(",")[0]);
+    }
+
+    baseName = getFontBaseName(family);
+    embedded = getEmbeddedFontWeight(family);
+    styleNames = getFontStyleCandidates(
+        isTruthyFlag(style.bold),
+        isTruthyFlag(style.italic)
+    );
 
     function pushCandidate(name) {
         if (!name || seen[name]) {
@@ -2455,6 +2463,37 @@ function buildFontCandidateNames(style) {
     if (embedded && baseName) {
         pushCandidate(baseName + "\t" + embedded);
         pushCandidate(baseName + " " + embedded);
+    }
+
+    // Adobe Fonts family page is "Adobe Garamond"; installed faces are often
+    // still named "Adobe Garamond Pro Regular".
+    if (normalizeFontToken(baseName) === "adobegaramond") {
+        if (embedded) {
+            pushCandidate("Adobe Garamond Pro\t" + embedded);
+            pushCandidate("Adobe Garamond Pro " + embedded);
+        }
+        pushCandidate("Adobe Garamond Pro");
+    }
+
+    // Futura PT has Book (not Regular) and Bold.
+    if (normalizeFontToken(baseName) === "futurapt") {
+        if (!embedded || /^(regular|roman|normal|book)$/i.test(embedded)) {
+            pushCandidate("Futura PT\tBook");
+            pushCandidate("Futura PT Book");
+        }
+        if (/^bold$/i.test(embedded) || isTruthyFlag(style.bold)) {
+            pushCandidate("Futura PT\tBold");
+            pushCandidate("Futura PT Bold");
+        }
+        if (isTruthyFlag(style.italic)) {
+            if (isTruthyFlag(style.bold) || /^bold$/i.test(embedded)) {
+                pushCandidate("Futura PT\tBold Oblique");
+                pushCandidate("Futura PT Bold Oblique");
+            } else {
+                pushCandidate("Futura PT\tBook Oblique");
+                pushCandidate("Futura PT Book Oblique");
+            }
+        }
     }
 
     if (baseName) {
@@ -2475,26 +2514,6 @@ function buildFontCandidateNames(style) {
     pushCandidate(baseName);
 
     return results;
-}
-
-function describeAppliedFont(textRange) {
-    var font;
-
-    try {
-        font = textRange.appliedFont;
-        if (!font) {
-            return "(none)";
-        }
-        return (font.fontFamily || font.name || "(unknown)") +
-            " / " + (font.fontStyle || font.name || "");
-    } catch (describeError) {
-        try {
-            return String(textRange.fontFamily || "(unknown)") + " / " +
-                String(textRange.fontStyle || "");
-        } catch (fallbackDescribeError) {
-            return "(unknown)";
-        }
-    }
 }
 
 var CACHED_INSTALLED_FONTS = null;
@@ -2566,6 +2585,26 @@ function getCachedInstalledFonts() {
     return list;
 }
 
+function describeAppliedFont(textRange) {
+    var font;
+
+    try {
+        font = textRange.appliedFont;
+        if (!font) {
+            return "(none)";
+        }
+        return (font.fontFamily || font.name || "(unknown)") +
+            " / " + (font.fontStyle || font.name || "");
+    } catch (describeError) {
+        try {
+            return String(textRange.fontFamily || "(unknown)") + " / " +
+                String(textRange.fontStyle || "");
+        } catch (fallbackDescribeError) {
+            return "(unknown)";
+        }
+    }
+}
+
 function findInstalledFont(style) {
     var candidates = buildFontCandidateNames(style);
     var i;
@@ -2576,12 +2615,16 @@ function findInstalledFont(style) {
     var wantBold = isTruthyFlag(style.bold);
     var wantItalic = isTruthyFlag(style.italic);
     var family = trimString(style.fontFamily || style.font || "");
-    var baseName = getFontBaseName(family);
+    var baseName;
     var bestMatch = null;
     var bestScore = -1;
     var score;
     var candNorm;
 
+    if (family.indexOf(",") >= 0) {
+        family = trimString(family.split(",")[0]);
+    }
+    baseName = getFontBaseName(family);
     fonts = getCachedInstalledFonts();
 
     for (i = 0; i < candidates.length; i++) {

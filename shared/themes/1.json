@@ -8,13 +8,13 @@
   },
   "STYLES": {
     "chapterNumber": {
-      "font": "Mulish Regular",
+      "font": "Mulish Variable Regular",
       "size": 15,
       "color": "#0074BC",
       "bold": false
     },
     "chapterHeading": {
-      "font": "Mulish Regular",
+      "font": "Mulish Variable Regular",
       "size": 15,
       "color": "#0074BC",
       "bold": false
@@ -26,7 +26,7 @@
       "bold": false
     },
     "chapterOverview": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 9,
       "color": "#0074BC",
       "bold": true,
@@ -39,25 +39,25 @@
       "bold": true
     },
     "lessonTitle": {
-      "font": "Mulish SemiBold",
+      "font": "Mulish Variable SemiBold",
       "size": 13,
       "color": "#0074BC",
       "bold": false
     },
     "sectionTitle": {
-      "font": "Mulish SemiBold",
+      "font": "Mulish Variable SemiBold",
       "size": 11,
       "color": "#0074BC",
       "bold": false
     },
     "subSectionTitle": {
-      "font": "Mulish SemiBold",
+      "font": "Mulish Variable SemiBold",
       "size": 9,
       "color": "#0074BC",
       "bold": false
     },
     "learningObjectives": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 9,
       "color": "#0074BC",
       "bold": true,
@@ -70,13 +70,13 @@
       "bold": false
     },
     "bulletList": {
-      "font": "Arial",
+      "font": "Arial Regular",
       "size": 9,
       "color": "#000000",
       "bold": false
     },
     "imageFigureNumber": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 7.5,
       "color": "#C31427",
       "bold": true
@@ -88,13 +88,13 @@
       "bold": false
     },
     "pageHeader": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 7.5,
       "color": "#A5A5A5",
       "bold": true
     },
     "footer": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 7.5,
       "color": "#A5A5A5",
       "bold": true

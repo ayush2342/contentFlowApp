@@ -43,7 +43,7 @@
       }
     },
     "lessonTitle": {
-      "font": "Futura Std",
+      "font": "Futura PT Bold",
       "size": 18,
       "color": "#214880",
       "bold": true
@@ -69,7 +69,7 @@
       "bold": true
     },
     "subSectionHeading": {
-      "font": "Neue Kabel Medium, Arial",
+      "font": "Neue Kabel Medium, Arial Regular",
       "size": 12,
       "color": "#CA5027",
       "bold": false
@@ -108,26 +108,26 @@
       "bold": false
     },
     "bulletList": {
-      "font": "Adobe Garamond Pro Regular",
+      "font": "Adobe Garamond Regular",
       "size": 11,
       "color": "#000000",
       "bold": false
     },
     "numberedList": {
-      "font": "Adobe Garamond Pro Regular",
+      "font": "Adobe Garamond Regular",
       "size": 11,
       "color": "#000000",
       "bold": false
     },
     "logoWithText": {
-      "font": "Mulish Black",
+      "font": "Mulish Variable Black",
       "size": 10.8,
       "color": "#000000",
       "bold": false,
       "textTransform": "uppercase"
     },
     "imageFigureNumber": {
-      "font": "Mulish",
+      "font": "Mulish Variable Bold",
       "size": 7.5,
       "color": "#C31427",
       "bold": true
@@ -155,21 +155,21 @@
     },
     "table": {
       "headingText": {
-        "font": "Arial",
+        "font": "Arial Bold",
         "size": 13,
         "color": "#FFFFFF",
         "bold": true,
         "backgroundColor": "#CA5027"
       },
       "subHeadingText": {
-        "font": "Arial",
+        "font": "Arial Regular",
         "size": 11,
         "color": "#000000",
         "bold": false,
         "backgroundColor": "#E7B193"
       },
       "rowsText": {
-        "font": "Arial",
+        "font": "Arial Regular",
         "size": 9,
         "color": "#000000",
         "bold": false,
@@ -178,7 +178,7 @@
       }
     },
     "footer": {
-      "font": "Arial",
+      "font": "Arial Regular",
       "size": 9,
       "color": "#000000",
       "bold": false
