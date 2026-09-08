@@ -2457,6 +2457,11 @@ function buildFontCandidateNames(style) {
         pushCandidate(baseName + " " + embedded);
     }
 
+    if (baseName) {
+        pushCandidate(baseName + " Variable");
+        pushCandidate(baseName + " Var");
+    }
+
     for (i = 0; i < styleNames.length; i++) {
         if (baseName) {
             pushCandidate(baseName + "\t" + styleNames[i]);
@@ -2492,14 +2497,82 @@ function describeAppliedFont(textRange) {
     }
 }
 
+var CACHED_INSTALLED_FONTS = null;
+
+function isUsableInstalledFont(font) {
+    try {
+        if (!font) {
+            return false;
+        }
+        try {
+            if (font.isValid === false) {
+                return false;
+            }
+        } catch (validError) {}
+        try {
+            if (typeof FontStatus !== "undefined" && font.status === FontStatus.NOT_AVAILABLE) {
+                return false;
+            }
+        } catch (statusError) {}
+        return Boolean(font.fontFamily);
+    } catch (usableError) {
+        return false;
+    }
+}
+
+/**
+ * app.fonts.item(name) returns a placeholder even when the face is missing, so
+ * we index fonts that InDesign actually has installed and match on family+style.
+ */
+function getCachedInstalledFonts() {
+    var list;
+    var i;
+    var font;
+    var family;
+    var styleName;
+    var name;
+
+    if (CACHED_INSTALLED_FONTS) {
+        return CACHED_INSTALLED_FONTS;
+    }
+
+    list = [];
+    try {
+        for (i = 0; i < app.fonts.length; i++) {
+            font = app.fonts[i];
+            if (!isUsableInstalledFont(font)) {
+                continue;
+            }
+            try {
+                name = String(font.name || "");
+                family = String(font.fontFamily || "");
+                styleName = String(font.fontStyle || "");
+                list.push({
+                    font: font,
+                    name: name,
+                    family: family,
+                    style: styleName,
+                    normName: normalizeFontToken(name),
+                    normFamily: normalizeFontToken(family),
+                    normStyle: normalizeFontToken(styleName),
+                    normFamilyStyle: normalizeFontToken(family + " " + styleName)
+                });
+            } catch (entryError) {}
+        }
+    } catch (fontsError) {}
+
+    CACHED_INSTALLED_FONTS = list;
+    appendRenderLog("Indexed " + list.length + " installed fonts for theme matching");
+    return list;
+}
+
 function findInstalledFont(style) {
     var candidates = buildFontCandidateNames(style);
     var i;
-    var font;
-    var target;
     var j;
+    var entry;
     var fonts;
-    var normName;
+    var target;
     var wantBold = isTruthyFlag(style.bold);
     var wantItalic = isTruthyFlag(style.italic);
     var family = trimString(style.fontFamily || style.font || "");
@@ -2507,16 +2580,30 @@ function findInstalledFont(style) {
     var bestMatch = null;
     var bestScore = -1;
     var score;
-    var normFamily;
-    var normStyle;
+    var candNorm;
+
+    fonts = getCachedInstalledFonts();
 
     for (i = 0; i < candidates.length; i++) {
-        try {
-            font = app.fonts.item(candidates[i]);
-            if (font) {
-                return { font: font, name: candidates[i] };
+        candNorm = normalizeFontToken(String(candidates[i] || "").replace(/\t/g, " "));
+        if (!candNorm) {
+            continue;
+        }
+        for (j = 0; j < fonts.length; j++) {
+            entry = fonts[j];
+            if (
+                entry.normName === candNorm ||
+                entry.normFamilyStyle === candNorm ||
+                (entry.normFamily === candNorm && (
+                    entry.normStyle === "regular" ||
+                    entry.normStyle === "roman" ||
+                    entry.normStyle === "book" ||
+                    !entry.normStyle
+                ))
+            ) {
+                return { font: entry.font, name: entry.name };
             }
-        } catch (candidateError) {}
+        }
     }
 
     target = normalizeFontToken(baseName || family);
@@ -2524,43 +2611,41 @@ function findInstalledFont(style) {
         return null;
     }
 
-    try {
-        fonts = app.fonts;
-    } catch (fontsError) {
-        return null;
-    }
-
     for (j = 0; j < fonts.length; j++) {
-        font = fonts[j];
-        try {
-            normFamily = normalizeFontToken(font.fontFamily);
-            normName = normalizeFontToken(font.name);
-            normStyle = normalizeFontToken(font.fontStyle);
-            score = 0;
+        entry = fonts[j];
+        score = 0;
 
-            if (normFamily === target || normName === target) {
-                score += 10;
-            } else if (normName.indexOf(target) === 0 || normFamily.indexOf(target) === 0) {
-                score += 6;
-            } else {
-                continue;
-            }
+        if (entry.normFamily === target || entry.normName === target) {
+            score += 10;
+        } else if (
+            entry.normName.indexOf(target) === 0 ||
+            entry.normFamily.indexOf(target) === 0 ||
+            entry.normFamilyStyle.indexOf(target) === 0
+        ) {
+            score += 6;
+        } else {
+            continue;
+        }
 
-            if (wantBold && (normStyle.indexOf("bold") >= 0 || normName.indexOf("bold") >= 0)) {
-                score += 4;
-            } else if (!wantBold && normStyle.indexOf("bold") < 0 && normName.indexOf("bold") < 0) {
-                score += 2;
-            }
+        if (wantBold && (entry.normStyle.indexOf("bold") >= 0 || entry.normName.indexOf("bold") >= 0)) {
+            score += 4;
+        } else if (!wantBold && entry.normStyle.indexOf("bold") < 0 && entry.normName.indexOf("bold") < 0) {
+            score += 2;
+        }
 
-            if (wantItalic && (normStyle.indexOf("italic") >= 0 || normStyle.indexOf("oblique") >= 0)) {
-                score += 2;
-            }
+        if (wantItalic && (entry.normStyle.indexOf("italic") >= 0 || entry.normStyle.indexOf("oblique") >= 0)) {
+            score += 2;
+        } else if (
+            !wantItalic &&
+            (entry.normStyle === "regular" || entry.normStyle === "roman" || entry.normStyle === "book")
+        ) {
+            score += 2;
+        }
 
-            if (score > bestScore) {
-                bestScore = score;
-                bestMatch = { font: font, name: font.name };
-            }
-        } catch (scanError) {}
+        if (score > bestScore) {
+            bestScore = score;
+            bestMatch = { font: entry.font, name: entry.name };
+        }
     }
 
     return bestMatch;
@@ -2710,6 +2795,14 @@ function applyThemeFontAndEmphasis(textRange, style) {
             textRange.appliedFont = resolved.font;
             applied = true;
             styleApplied = true;
+            if (
+                family &&
+                describeAppliedFont(textRange).toLowerCase().indexOf("minion") >= 0 &&
+                family.toLowerCase().indexOf("minion") < 0
+            ) {
+                applied = false;
+                styleApplied = false;
+            }
         } catch (resolvedApplyError) {}
     }
 
@@ -2718,7 +2811,13 @@ function applyThemeFontAndEmphasis(textRange, style) {
 
         for (i = 0; i < candidates.length; i++) {
             try {
-                textRange.appliedFont = app.fonts.item(candidates[i]);
+                textRange.appliedFont = candidates[i];
+                if (
+                    describeAppliedFont(textRange).toLowerCase().indexOf("minion") >= 0 &&
+                    family.toLowerCase().indexOf("minion") < 0
+                ) {
+                    continue;
+                }
                 applied = true;
                 styleApplied = true;
                 break;
