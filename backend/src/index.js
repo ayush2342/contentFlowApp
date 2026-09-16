@@ -7,7 +7,8 @@ import healthRoutes from './routes/healthRoutes.js';
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+// /output/direct/* posts the whole output.json in the body, so keep this generous.
+app.use(express.json({ limit: '25mb' }));
 
 app.use('/api', outputRoutes);
 app.use('/api', healthRoutes);

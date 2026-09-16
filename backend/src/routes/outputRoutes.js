@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDocumentFromS3, getMediaStreamFromS3 } from '../services/s3Service.js';
+import { buildInlineDocument, getSessionDocument } from '../services/documentService.js';
 import { resolveTemplateId } from '../services/templateResolver.js';
 import { generatePdf } from '../services/pdfService.js';
 import { createOutputSession, getOutputSession } from '../services/outputSessionService.js';
@@ -16,15 +17,20 @@ const requireField = (value, fieldName) => {
   }
 };
 
-const buildOutputUrlPayload = async ({
+/**
+ * Creates the output session and response payload once the document is in hand.
+ * `document` from S3 (tenantId + documentId) or from inline request JSON.
+ */
+const buildOutputUrlPayload = ({
   userId,
   tenantId,
   documentId,
+  document,
+  inline,
   outputType,
   templateId,
   clientName,
 }) => {
-  const document = await getDocumentFromS3(tenantId, documentId);
   const resolvedTemplate = resolveTemplateId({
     templateId: templateId?.toString(),
     clientName: clientName?.toString(),
@@ -34,6 +40,8 @@ const buildOutputUrlPayload = async ({
     userId: userId || null,
     tenantId,
     documentId,
+    // Inline sessions carry the JSON so later reads never touch S3.
+    document: inline ? document : null,
     templateId: resolvedTemplate,
     clientName: clientName?.toString() || null,
   });
@@ -54,6 +62,27 @@ const buildOutputUrlPayload = async ({
   };
 };
 
+const buildS3OutputUrlPayload = async ({ tenantId, documentId, ...rest }) => {
+  const document = await getDocumentFromS3(tenantId, documentId);
+  return buildOutputUrlPayload({ ...rest, tenantId, documentId, document, inline: false });
+};
+
+/**
+ * Same output flow as the S3 routes, but the caller posts `data` (the output.json
+ * body) instead of tenantId/documentId. tenantId/documentId stay optional labels.
+ */
+const buildInlineOutputUrlPayload = ({ data, tenantId, documentId, ...rest }) => {
+  const document = buildInlineDocument(data);
+
+  return buildOutputUrlPayload({
+    ...rest,
+    tenantId: tenantId?.toString() || null,
+    documentId: documentId?.toString() || `inline-${document.etag.slice(0, 12)}`,
+    document,
+    inline: true,
+  });
+};
+
 router.post('/output', async (req, res, next) => {
   try {
     const { userId, tenantId, documentId, outputType = 'web', templateId, clientName } = req.body ?? {};
@@ -61,7 +90,7 @@ router.post('/output', async (req, res, next) => {
     requireField(documentId, 'documentId');
 
     const normalizedOutputType = outputType === 'pdf' ? 'pdf' : 'web';
-    const payload = await buildOutputUrlPayload({
+    const payload = await buildS3OutputUrlPayload({
       userId,
       tenantId,
       documentId,
@@ -82,7 +111,7 @@ router.post('/output/web', async (req, res, next) => {
     requireField(tenantId, 'tenantId');
     requireField(documentId, 'documentId');
 
-    const payload = await buildOutputUrlPayload({
+    const payload = await buildS3OutputUrlPayload({
       userId,
       tenantId,
       documentId,
@@ -103,7 +132,7 @@ router.post('/output/pdf', async (req, res, next) => {
     requireField(tenantId, 'tenantId');
     requireField(documentId, 'documentId');
 
-    const payload = await buildOutputUrlPayload({
+    const payload = await buildS3OutputUrlPayload({
       userId,
       tenantId,
       documentId,
@@ -113,6 +142,60 @@ router.post('/output/pdf', async (req, res, next) => {
     });
 
     return res.json(payload);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Direct-JSON variants of /output/web and /output/pdf: the caller posts the
+ * output.json body as `data` plus templateId, so nothing is read from S3.
+ */
+const requireDocumentData = (data) => {
+  if (!data || typeof data !== 'object') {
+    const error = new Error('Missing required field: data (output JSON object)');
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+router.post('/output/direct/web', (req, res, next) => {
+  try {
+    const { userId, data, templateId, clientName, tenantId, documentId } = req.body ?? {};
+    requireDocumentData(data);
+
+    return res.json(
+      buildInlineOutputUrlPayload({
+        userId,
+        data,
+        tenantId,
+        documentId,
+        outputType: 'web',
+        templateId,
+        clientName,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/output/direct/pdf', (req, res, next) => {
+  try {
+    const { userId, data, templateId, clientName, tenantId, documentId } = req.body ?? {};
+    requireDocumentData(data);
+
+    return res.json(
+      buildInlineOutputUrlPayload({
+        userId,
+        data,
+        tenantId,
+        documentId,
+        outputType: 'pdf',
+        templateId,
+        clientName,
+      })
+    );
   } catch (error) {
     next(error);
   }
@@ -154,7 +237,7 @@ router.get('/output/:outputId/document', async (req, res, next) => {
       return res.status(404).json({ message: 'Output session not found or expired.' });
     }
 
-    const document = await getDocumentFromS3(session.tenantId, session.documentId);
+    const document = await getSessionDocument(session);
     const stylesheet = await resolveStylesheet({ templateId: session.templateId });
     const typography = toPdfTypographyConfig(stylesheet);
 
@@ -271,7 +354,7 @@ router.get('/output/:outputId/pdf', async (req, res, next) => {
       return res.status(404).json({ message: 'Output session not found or expired.' });
     }
 
-    const document = await getDocumentFromS3(session.tenantId, session.documentId);
+    const document = await getSessionDocument(session);
     const pdf = await generatePdf({
       tenantId: session.tenantId,
       documentId: session.documentId,

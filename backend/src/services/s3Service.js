@@ -21,6 +21,25 @@ const streamToString = async (stream) => {
 export const buildDocumentKey = (tenantId, documentId) =>
   `${env.requestPrefix}/tenants/${tenantId}/documents/${documentId}/output.json`;
 
+/**
+ * Shape fixes every document needs, wherever the JSON came from (S3 or an
+ * inline request body).
+ */
+export const normalizeDocumentData = (data) => {
+  // TODO(temp): remove when transformation sends page_type=opener for chapter openers.
+  for (const page of data?.pages || []) {
+    if ((page.content || []).some((b) => String(b?.type || '').replace(/[\s_-]+/g, '').toLowerCase() === 'chapternumber')) {
+      page.page_type = 'opener';
+    }
+  }
+
+  // ParagraphText blocks may carry Markdown; parse once here so the web
+  // renderer and the InDesign job both receive the same parsed structure.
+  expandMarkdownRichText(data);
+
+  return data;
+};
+
 export const getDocumentFromS3 = async (tenantId, documentId) => {
   const key = buildDocumentKey(tenantId, documentId);
 
@@ -40,18 +59,7 @@ export const getDocumentFromS3 = async (tenantId, documentId) => {
   ]);
 
   const rawText = await streamToString(getResult.Body);
-  const data = JSON.parse(rawText);
-
-  // TODO(temp): remove when transformation sends page_type=opener for chapter openers.
-  for (const page of data?.pages || []) {
-    if ((page.content || []).some((b) => String(b?.type || '').replace(/[\s_-]+/g, '').toLowerCase() === 'chapternumber')) {
-      page.page_type = 'opener';
-    }
-  }
-
-  // ParagraphText blocks may carry Markdown; parse once here so the web
-  // renderer and the InDesign job both receive the same parsed structure.
-  expandMarkdownRichText(data);
+  const data = normalizeDocumentData(JSON.parse(rawText));
 
   return {
     key,

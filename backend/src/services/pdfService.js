@@ -31,6 +31,82 @@ const streamToBuffer = async (stream) => {
   return Buffer.concat(chunks);
 };
 
+const isHttpUrl = (value) => /^https?:\/\//i.test(String(value || ''));
+
+const EXTENSION_BY_CONTENT_TYPE = {
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/tiff': '.tif',
+  'image/svg+xml': '.svg',
+};
+
+/**
+ * Local asset name for a remote image. The ExtendScript looks for
+ * assets/<last path segment of data.url>, so this must be a plain file name;
+ * the hash keeps two different URLs with the same basename apart.
+ */
+const buildRemoteAssetFileName = (url, contentType) => {
+  let basename = '';
+  try {
+    basename = decodeURIComponent(new URL(url).pathname.split('/').pop() || '');
+  } catch {
+    basename = '';
+  }
+
+  basename = basename.replace(/[^A-Za-z0-9._-]/g, '_');
+  let extension = path.extname(basename);
+
+  if (!extension) {
+    extension = EXTENSION_BY_CONTENT_TYPE[String(contentType || '').split(';')[0].trim().toLowerCase()] || '.png';
+  }
+
+  const stem = (path.basename(basename, extension) || 'image').slice(0, 40);
+  const hash = crypto.createHash('md5').update(url).digest('hex').slice(0, 8);
+
+  return `${stem}_${hash}${extension}`;
+};
+
+const downloadRemoteImage = async (url) => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Image download failed (${response.status}) for ${url}`);
+  }
+
+  return {
+    buffer: Buffer.from(await response.arrayBuffer()),
+    fileName: buildRemoteAssetFileName(url, response.headers.get('content-type')),
+  };
+};
+
+/** Points image blocks at the local asset file names we just wrote. */
+const rewriteImageUrls = (data, urlMap) => {
+  if (!data || !urlMap.size) return data;
+
+  const rewriteBlocks = (blocks) => {
+    if (!Array.isArray(blocks)) return;
+    for (const item of blocks) {
+      const mapped = urlMap.get(item?.data?.url);
+      if (mapped) {
+        item.data.url = mapped;
+      }
+    }
+  };
+
+  if (Array.isArray(data)) {
+    rewriteBlocks(data);
+  } else if (Array.isArray(data.pages)) {
+    for (const page of data.pages) {
+      rewriteBlocks(page?.content);
+    }
+  }
+
+  return data;
+};
+
 const collectUrlsFromBlocks = (blocks, keys) => {
   if (!Array.isArray(blocks)) return;
   for (const item of blocks) {
@@ -184,15 +260,31 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
     );
   }
 
-  await fs.writeFile(runtimeJsonPath, JSON.stringify(data ?? [], null, 2), 'utf8');
-
+  // Images arrive either as S3 keys (tenant documents) or absolute http(s) URLs
+  // (JSON posted directly); remote URLs are downloaded and the JSON copy handed
+  // to InDesign points at the local file name.
+  const remoteUrlMap = new Map();
   const imageKeys = collectImageKeys(data);
+
   for (const key of imageKeys) {
+    if (isHttpUrl(key)) {
+      const { buffer, fileName } = await downloadRemoteImage(key);
+      await fs.writeFile(path.join(assetsDir, fileName), buffer);
+      remoteUrlMap.set(key, fileName);
+      continue;
+    }
+
     const media = await getMediaStreamFromS3(key);
     const fileName = path.basename(key);
     const fileBuffer = await streamToBuffer(media.body);
     await fs.writeFile(path.join(assetsDir, fileName), fileBuffer);
   }
+
+  const jobData = remoteUrlMap.size
+    ? rewriteImageUrls(structuredClone(data), remoteUrlMap)
+    : data;
+
+  await fs.writeFile(runtimeJsonPath, JSON.stringify(jobData ?? [], null, 2), 'utf8');
 
   await runInDesignScript({ scriptPath: runtimeScriptPath });
 

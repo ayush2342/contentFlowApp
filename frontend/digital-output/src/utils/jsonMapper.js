@@ -54,7 +54,14 @@ const normalizeScalePercent = (value) => {
   return Math.min(100, Math.max(5, percent));
 };
 
+const isAbsoluteMediaUrl = (value) => /^(https?:)?\/\/|^data:/i.test(String(value || ''));
+
 const resolveMediaSrc = (fileName, sourcePath, mediaBaseUrl, tenantId) => {
+  // JSON posted directly can carry absolute URLs; those bypass the S3 media proxy.
+  if (isAbsoluteMediaUrl(sourcePath)) {
+    return String(sourcePath).trim();
+  }
+
   const normalizedSourcePath = normalizePublicAssetPath(sourcePath);
 
   if (normalizedSourcePath && mediaBaseUrl) {
