@@ -12,6 +12,11 @@
 // -----------------------------------------------------------------------------
 var USE_DYNAMIC_LAYOUT = true;
 
+// One JSON page renders as exactly one PDF page. Content that does not fit is
+// dropped instead of flowing onto continuation pages, which would otherwise push
+// every later JSON page down by one (a single overflowing line was enough).
+var TRIM_JSON_PAGE_OVERFLOW = true;
+
 var DYNAMIC_LAYOUT = {
     protoPrefix: "proto:",
     // Spacing values are expressed in POINTS. The document ruler is forced to
@@ -1595,6 +1600,46 @@ function removeAllEmptyPages(document) {
             }
         }
     } while (removed);
+}
+
+/**
+ * Drops every page the renderer appended while laying out a single JSON page, so
+ * the JSON page keeps only the page it started on. Threaded frames that lived on
+ * the removed pages go with them; their text becomes overset in the surviving
+ * frame, and InDesign leaves overset text out of the exported PDF.
+ */
+function trimJsonPageOverflow(document, startPageIndex, pageLabel) {
+    var removed = 0;
+    var i;
+
+    if (!TRIM_JSON_PAGE_OVERFLOW) {
+        return;
+    }
+
+    try {
+        for (i = document.pages.length - 1; i > startPageIndex; i--) {
+            document.pages[i].remove();
+            removed++;
+        }
+    } catch (removeError) {
+        appendRenderLog(
+            "Could not trim overflow pages after JSON page " + pageLabel +
+            ": " + removeError
+        );
+    }
+
+    if (removed) {
+        appendRenderLog(
+            "JSON page " + pageLabel + ": trimmed " + removed +
+            " overflow page(s); content past the first page was dropped"
+        );
+    }
+
+    if (layoutState) {
+        try {
+            layoutState.page = document.pages[startPageIndex];
+        } catch (restoreError) {}
+    }
 }
 
 function removeTrailingEmptyPages(document) {
@@ -8122,6 +8167,7 @@ function main() {
 
         var p;
         var jsonPage;
+        var jsonPageBaseIndex;
         var pages = parsedJson.pages;
 
         if (!pages || !pages.length) {
@@ -8173,11 +8219,17 @@ function main() {
                 " columns"
             );
 
+            // Pages are always appended, so anything past this index once the
+            // page is populated is overflow belonging to this JSON page.
+            jsonPageBaseIndex = doc.pages.length - 1;
+
             populateInJsonOrderDynamic(
                 doc,
                 jsonPage.content,
                 scriptFolderPath
             );
+
+            trimJsonPageOverflow(doc, jsonPageBaseIndex, jsonPage.page_no);
         }
 
         removeAllEmptyPages(doc);
