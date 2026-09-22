@@ -1,3 +1,4 @@
+import { renderInlineHtml } from '../../utils/inlineHtml.jsx';
 import styles from './Quote.module.scss';
 
 const Quote = ({ text, author, children }) => {
@@ -14,8 +15,8 @@ const Quote = ({ text, author, children }) => {
         borderBottom: 'var(--typography-quotation-border-bottom, none)',
       }}
     >
-      {quoteText ? <p className={styles.text}>{quoteText}</p> : null}
-      {author ? <cite className={styles.author}>{author}</cite> : null}
+      {quoteText ? <p className={styles.text}>{renderInlineHtml(quoteText)}</p> : null}
+      {author ? <cite className={styles.author}>{renderInlineHtml(author)}</cite> : null}
     </blockquote>
   );
 };

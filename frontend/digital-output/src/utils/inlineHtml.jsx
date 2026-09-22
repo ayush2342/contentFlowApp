@@ -10,10 +10,35 @@ const getAttr = (el, name) => {
   }
 };
 
-/** Pull a color out of an inline style attribute, e.g. style="color: #c31427;". */
-const getInlineColor = (el) => {
-  const match = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(getAttr(el, 'style'));
-  return match ? match[1].trim() : '';
+const readStyleValue = (style, property) => {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Don't let "color" match the end of "background-color".
+  const match = new RegExp(`(?:^|;)\\s*(?<![\\w-])${escaped}\\s*:\\s*([^;]+)`, 'i').exec(style);
+  return match ? match[1].trim().replace(/^['"]+|['"]+$/g, '') : '';
+};
+
+/**
+ * Inline styles the PDF already honors on spans. Theme-owned badges pass
+ * ignoreColors so their CSS color, size, and fill win.
+ */
+const getSpanStyle = (el, options) => {
+  if (options.ignoreColors) return null;
+
+  const style = getAttr(el, 'style');
+  if (!style) return null;
+
+  const backgroundColor = readStyleValue(style, 'background-color');
+  const color = readStyleValue(style, 'color');
+  const fontSize = readStyleValue(style, 'font-size');
+  const fontFamily = readStyleValue(style, 'font-family');
+  const next = {};
+
+  if (color) next.color = color;
+  if (backgroundColor) next.backgroundColor = backgroundColor;
+  if (fontSize) next.fontSize = fontSize;
+  if (fontFamily) next.fontFamily = /\s/.test(fontFamily) ? `'${fontFamily}'` : fontFamily;
+
+  return Object.keys(next).length ? next : null;
 };
 
 /**
@@ -96,10 +121,10 @@ const walkNodes = (nodes, keyPrefix = 'n', options = {}) => {
         );
         return;
       }
-      const color = options.ignoreColors ? '' : getInlineColor(node);
-      if (color) {
+      const spanStyle = getSpanStyle(node, options);
+      if (spanStyle) {
         out.push(
-          <span key={key} style={{ color }}>
+          <span key={key} style={spanStyle}>
             {children}
           </span>
         );
