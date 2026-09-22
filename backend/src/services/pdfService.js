@@ -82,6 +82,41 @@ const downloadRemoteImage = async (url) => {
   };
 };
 
+const MISSING_IMAGE_LABEL = 'Image not available';
+
+/**
+ * A missing asset must not fail the whole PDF. The image block becomes a short
+ * text line (caption kept underneath) so the rest of the page still renders.
+ */
+const replaceMissingImages = (data, missingUrls) => {
+  if (!data || !missingUrls.size) return data;
+
+  const rewriteBlocks = (blocks) => {
+    if (!Array.isArray(blocks)) return;
+    for (const item of blocks) {
+      const url = item?.data?.url;
+      const blockType = String(item?.type || '').replace(/[\s_-]+/g, '').toLowerCase();
+      if (blockType !== 'image' || !url || !missingUrls.has(url)) continue;
+
+      const caption = String(item.data.caption || '').trim();
+      item.type = 'ParagraphText';
+      item.data = {
+        text: caption ? `${MISSING_IMAGE_LABEL}\n${caption}` : MISSING_IMAGE_LABEL,
+      };
+    }
+  };
+
+  if (Array.isArray(data)) {
+    rewriteBlocks(data);
+  } else if (Array.isArray(data.pages)) {
+    for (const page of data.pages) {
+      rewriteBlocks(page?.content);
+    }
+  }
+
+  return data;
+};
+
 /** Points image blocks at the local asset file names we just wrote. */
 const rewriteImageUrls = (data, urlMap) => {
   if (!data || !urlMap.size) return data;
@@ -264,25 +299,40 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   // (JSON posted directly); remote URLs are downloaded and the JSON copy handed
   // to InDesign points at the local file name.
   const remoteUrlMap = new Map();
+  const missingImageUrls = new Set();
   const imageKeys = collectImageKeys(data);
 
   for (const key of imageKeys) {
-    if (isHttpUrl(key)) {
-      const { buffer, fileName } = await downloadRemoteImage(key);
-      await fs.writeFile(path.join(assetsDir, fileName), buffer);
-      remoteUrlMap.set(key, fileName);
-      continue;
-    }
+    try {
+      if (isHttpUrl(key)) {
+        const { buffer, fileName } = await downloadRemoteImage(key);
+        await fs.writeFile(path.join(assetsDir, fileName), buffer);
+        remoteUrlMap.set(key, fileName);
+        continue;
+      }
 
-    const media = await getMediaStreamFromS3(key);
-    const fileName = path.basename(key);
-    const fileBuffer = await streamToBuffer(media.body);
-    await fs.writeFile(path.join(assetsDir, fileName), fileBuffer);
+      const media = await getMediaStreamFromS3(key);
+      const fileName = path.basename(key);
+      const fileBuffer = await streamToBuffer(media.body);
+      await fs.writeFile(path.join(assetsDir, fileName), fileBuffer);
+    } catch (imageError) {
+      missingImageUrls.add(key);
+      console.warn(
+        `[pdf] image unavailable, continuing without it: ${key} (${imageError.message})`
+      );
+    }
   }
 
-  const jobData = remoteUrlMap.size
-    ? rewriteImageUrls(structuredClone(data), remoteUrlMap)
-    : data;
+  let jobData = data;
+  if (remoteUrlMap.size || missingImageUrls.size) {
+    jobData = structuredClone(data);
+    if (remoteUrlMap.size) {
+      rewriteImageUrls(jobData, remoteUrlMap);
+    }
+    if (missingImageUrls.size) {
+      replaceMissingImages(jobData, missingImageUrls);
+    }
+  }
 
   await fs.writeFile(runtimeJsonPath, JSON.stringify(jobData ?? [], null, 2), 'utf8');
 
