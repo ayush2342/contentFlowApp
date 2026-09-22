@@ -5849,6 +5849,54 @@ function ensureLayoutSpace(layoutState, requiredHeight) {
     return bounds;
 }
 
+/**
+ * Column a frame actually sits in, derived from its left edge. Overflowing text
+ * can land in a column other than the one its block started in, and the cursor
+ * has to keep following that column instead of the original one.
+ */
+function resolveFrameColumnIndex(layoutState, frame) {
+    var columnCount = (layoutState && layoutState.columnCount) || 1;
+    var gutter = (layoutState && layoutState.gutter) || 18;
+    var page;
+    var bounds;
+    var margins;
+    var usableLeft;
+    var usableRight;
+    var columnWidth;
+    var frameLeft;
+    var index;
+
+    if (columnCount < 2 || !frame) {
+        return 0;
+    }
+
+    try {
+        frameLeft = frame.geometricBounds[1];
+        page = frame.parentPage || layoutState.page;
+        bounds = page.bounds;
+        margins = page.marginPreferences;
+        usableLeft = bounds[1] + margins.left + getContentLeftInset();
+        usableRight = bounds[3] - margins.right;
+    } catch (columnError) {
+        return layoutState.currentColumn || 0;
+    }
+
+    columnWidth = ((usableRight - usableLeft) - ((columnCount - 1) * gutter)) / columnCount;
+    if (!(columnWidth > 0)) {
+        return 0;
+    }
+
+    index = Math.floor((frameLeft - usableLeft + (gutter / 2)) / (columnWidth + gutter));
+    if (index < 0) {
+        index = 0;
+    }
+    if (index > columnCount - 1) {
+        index = columnCount - 1;
+    }
+
+    return index;
+}
+
 function advanceLayoutCursor(layoutState, frame, gapAfter) {
     var chainEnd;
     var gap = gapAfter !== undefined && gapAfter !== null ? gapAfter : 0;
@@ -5912,6 +5960,8 @@ function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFram
     var captionBottom;
     var captionEnd;
     var blockBottom;
+    var captionColumn;
+    var imageColumn;
     var gap = gapAfter;
 
     if (!imageFrame) {
@@ -5921,8 +5971,6 @@ function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFram
     if (gap === undefined || gap === null || gap < DYNAMIC_LAYOUT.afterImageGap) {
         gap = DYNAMIC_LAYOUT.afterImageGap;
     }
-
-    syncLayoutPageFromFrame(layoutState, captionFrame || imageFrame);
 
     imageBottom = getImageContentBottomY(imageFrame);
     blockBottom = imageBottom;
@@ -5939,15 +5987,29 @@ function advanceLayoutCursorAfterImageBlock(layoutState, imageFrame, captionFram
         if (!(captionBottom > 0)) {
             captionBottom = getFrameBottomY(captionEnd);
         }
-        if (captionBottom > blockBottom) {
+
+        captionColumn = resolveFrameColumnIndex(layoutState, captionEnd);
+        imageColumn = resolveFrameColumnIndex(layoutState, imageFrame);
+
+        // A long caption can overflow into the next column, leaving the image
+        // behind at the bottom of the previous one. The cursor must continue
+        // where the caption ended, otherwise the rest of the page is measured
+        // against the image's bottom and the remaining column is skipped.
+        if (captionColumn !== imageColumn) {
+            layoutState.currentColumn = captionColumn;
+            blockBottom = captionBottom;
+        } else if (captionBottom > blockBottom) {
             blockBottom = captionBottom;
         }
     }
 
+    syncLayoutPageFromFrame(layoutState, captionEnd || captionFrame || imageFrame);
+
     layoutState.cursorY = blockBottom + gap;
     appendRenderLog(
         "Image block cursorY: " + layoutState.cursorY +
-        " (bottom=" + blockBottom + ", gap=" + gap + ")"
+        " (bottom=" + blockBottom + ", gap=" + gap +
+        ", column=" + layoutState.currentColumn + ")"
     );
 }
 
