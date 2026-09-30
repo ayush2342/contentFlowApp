@@ -7929,6 +7929,26 @@ function exportActiveDocumentToPdf(document, scriptFolderPath) {
     return pdfFile;
 }
 
+// Save the populated book before the template is cleared back to prototypes.
+function savePopulatedIndd(document, scriptFolderPath) {
+    var inddFile = new File(scriptFolderPath + "/output.indd");
+
+    try {
+        if (inddFile.exists) {
+            inddFile.remove();
+        }
+    } catch (removeErr) {}
+
+    document.save(inddFile);
+    appendRenderLog("Saved populated InDesign file: " + inddFile.fsName);
+
+    if (!inddFile.exists) {
+        throw new Error("InDesign save completed, but output.indd was not created.");
+    }
+
+    return inddFile;
+}
+
 // -----------------------------------------------------------------------------
 // Initialize FRAME_STYLES from typography config and rebuild BLOCK_REGISTRY
 // -----------------------------------------------------------------------------
@@ -8236,6 +8256,7 @@ function main() {
         appendRenderLog("Pages in document before PDF export: " + doc.pages.length);
         flushRenderLog("populated");
         pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
+        savePopulatedIndd(doc, scriptFolderPath);
         restoreCleanTemplateState(doc);
     } else {
         prepareTemplateForJson(doc);
@@ -8243,6 +8264,7 @@ function main() {
         collapseUnusedLabeledFrames(doc);
         removeTrailingEmptyPages(doc);
         pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
+        savePopulatedIndd(doc, scriptFolderPath);
     }
 
     try {

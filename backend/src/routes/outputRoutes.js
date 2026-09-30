@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import archiver from 'archiver';
 import { getDocumentFromS3, getMediaStreamFromS3 } from '../services/s3Service.js';
 import { buildInlineDocument, getSessionDocument } from '../services/documentService.js';
 import { resolveTemplateId } from '../services/templateResolver.js';
@@ -144,6 +145,51 @@ router.post('/output/pdf', async (req, res, next) => {
     return res.json(payload);
   } catch (error) {
     next(error);
+  }
+});
+
+/**
+ * Same body as /output/pdf, but the response is a zip of the generated PDF,
+ * the populated InDesign file, and the JSON written for that job.
+ * /output/pdf itself still returns the URL payload.
+ */
+router.post('/output/pdf/package', async (req, res, next) => {
+  try {
+    const { tenantId, documentId, templateId, clientName } = req.body ?? {};
+    requireField(tenantId, 'tenantId');
+    requireField(documentId, 'documentId');
+
+    const resolvedTemplate = resolveTemplateId({
+      templateId: templateId?.toString(),
+      clientName: clientName?.toString(),
+    });
+    const document = await getDocumentFromS3(tenantId, documentId);
+    const files = await generatePdf({
+      tenantId,
+      documentId,
+      etag: document.etag,
+      templateId: resolvedTemplate,
+      data: document.data,
+      packageFiles: true,
+    });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${documentId}.zip"`
+    );
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', next);
+    archive.pipe(res);
+    archive.file(files.pdfPath, { name: 'output.pdf' });
+    archive.file(files.inddPath, { name: 'output.indd' });
+    archive.file(files.jsonPath, { name: 'output.json' });
+    await archive.finalize();
+  } catch (error) {
+    if (!res.headersSent) {
+      next(error);
+    }
   }
 });
 

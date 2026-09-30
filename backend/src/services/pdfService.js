@@ -241,15 +241,17 @@ const runInDesignScript = async ({ scriptPath }) =>
  * Generates PDF using InDesign + ExtendScript for the provided JSON payload.
  * Phase 1 keeps a short-lived in-memory cache; persistent/shared cache can be added later.
  */
-export const generatePdf = async ({ tenantId, documentId, etag, templateId, data }) => {
+export const generatePdf = async ({ tenantId, documentId, etag, templateId, data, packageFiles = false }) => {
   const resolvedTemplateId = normalizeAppearanceId(
     templateId || env.defaultThemeId,
     '2'
   );
   const cacheKey = `${tenantId}:${documentId}:${etag || 'no-etag'}:${resolvedTemplateId}`;
-  const cached = getCacheRecord(cacheKey);
-  if (cached) {
-    return { ...cached, fromCache: true };
+  if (!packageFiles) {
+    const cached = getCacheRecord(cacheKey);
+    if (cached) {
+      return { ...cached, fromCache: true };
+    }
   }
 
   const { scriptSourcePath, templateSourcePath } = resolveInDesignPaths();
@@ -261,6 +263,7 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   const runtimeTemplatePath = path.join(templatesDir, 'projectX.indd');
   const runtimeJsonPath = path.join(jobDir, 'tree_output.json');
   const runtimePdfPath = path.join(jobDir, 'output.pdf');
+  const runtimeInddPath = path.join(jobDir, 'output.indd');
   const runtimeTypographyPath = path.join(jobDir, 'typography-styles.json');
 
   await fs.mkdir(assetsDir, { recursive: true });
@@ -347,12 +350,25 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
     );
   }
 
+  if (packageFiles) {
+    try {
+      await fs.access(runtimeInddPath);
+    } catch {
+      throw new Error(
+        `InDesign did not produce output.indd for document ${documentId}. Check the PDF job log.`
+      );
+    }
+  }
+
   const record = {
     fileBuffer,
     contentType: 'application/pdf',
     fileName: `${documentId}.pdf`,
     createdAt: Date.now(),
     fromCache: false,
+    pdfPath: runtimePdfPath,
+    inddPath: runtimeInddPath,
+    jsonPath: runtimeJsonPath,
   };
   pdfCache.set(cacheKey, record);
   return record;
