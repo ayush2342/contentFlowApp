@@ -7487,11 +7487,12 @@ function scaleTableColumnWidths(widths, colCount, frameWidth) {
     return scaled;
 }
 
-function tableEdgeWeights(isHeader, colIndex, colCount, tableStyle) {
+function tableEdgeWeights(isHeader, rowIndex, rowCount, colIndex, colCount, tableStyle) {
     var width = 0.25;
     var side;
     var inner;
     var horizontal;
+    var isLastRow = rowIndex === rowCount - 1;
 
     if (tableStyle && tableStyle.borderWidth != null && !isNaN(Number(tableStyle.borderWidth))) {
         width = Number(tableStyle.borderWidth);
@@ -7504,11 +7505,13 @@ function tableEdgeWeights(isHeader, colIndex, colCount, tableStyle) {
     inner = !tableStyle || tableStyle.innerVerticalBorders !== false;
     horizontal = !tableStyle || tableStyle.horizontalBorders !== false;
 
+    // One stroke per shared edge. Top of this row is the line under the row
+    // above. Bottom is only the closing line, so two rules do not stack.
     return {
         top: horizontal ? width : 0,
-        bottom: horizontal ? width : 0,
+        bottom: horizontal && isLastRow ? width : 0,
         left: colIndex === 0 ? (side ? width : 0) : (inner ? width : 0),
-        right: colIndex === colCount - 1 ? (side ? width : 0) : (inner ? width : 0)
+        right: colIndex === colCount - 1 ? (side ? width : 0) : 0
     };
 }
 
@@ -7530,8 +7533,11 @@ function setCellEdge(cell, edge, weight, strokeType, strokeColor) {
     var weightName = edge + "EdgeStrokeWeight";
     var typeName = edge + "EdgeStrokeType";
     var colorName = edge + "EdgeStrokeColor";
+    var tintName = edge + "EdgeStrokeTint";
 
     if (!weight || weight <= 0) {
+        // Weight 0 is ignored by InDesign, so the tint is what hides the rule.
+        try { cell[tintName] = 0; } catch (tintOffError) {}
         try { cell[weightName] = 0; } catch (zeroNumberError) {}
         try { cell[weightName] = "0pt"; } catch (zeroTextError) {}
         if (strokeType) {
@@ -7540,6 +7546,7 @@ function setCellEdge(cell, edge, weight, strokeType, strokeColor) {
         return;
     }
 
+    try { cell[tintName] = 100; } catch (tintOnError) {}
     if (strokeType) {
         try { cell[typeName] = strokeType; } catch (solidTypeError) {}
     }
@@ -7867,7 +7874,7 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
                     applyTableCellInsets(cell, style);
                     applyTableCellBox(
                         cell,
-                        tableEdgeWeights(isHeader, c, colCount, style),
+                        tableEdgeWeights(isHeader, r, rowCount, c, colCount, style),
                         strokeColor,
                         noneStroke,
                         solidStroke
@@ -7896,7 +7903,7 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
                     applyTableCellInsets(cell, style);
                     applyTableCellBox(
                         cell,
-                        tableEdgeWeights(isHeader, c, colCount, style),
+                        tableEdgeWeights(isHeader, r, rowCount, c, colCount, style),
                         strokeColor,
                         noneStroke,
                         solidStroke
