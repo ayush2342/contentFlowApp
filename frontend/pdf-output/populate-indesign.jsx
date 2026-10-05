@@ -7557,12 +7557,43 @@ function applyTableCellInsets(cell, tableStyle) {
     try { cell.bottomInset = bottom; } catch (bottomInsetError) {}
 }
 
+function resizeFrameToTable(frame, table) {
+    var bounds;
+    var height = 0;
+    var bottom;
+
+    try {
+        frame.parentStory.recompose();
+    } catch (recomposeError) {}
+
+    try {
+        height = table.height;
+    } catch (heightError) {
+        height = 0;
+    }
+
+    try {
+        bounds = frame.geometricBounds;
+        if (!height || height < 12) {
+            return;
+        }
+        bottom = bounds[0] + height + 4;
+        frame.geometricBounds = [bounds[0], bounds[1], bottom, bounds[3]];
+    } catch (resizeError) {}
+}
+
 function applyTableCellText(cell, text, textStyle) {
     var justification = Justification.LEFT_ALIGN;
     var align;
     var vertical;
 
-    cell.contents = text || "";
+    try {
+        cell.contents = text || "";
+    } catch (contentsError) {
+        try {
+            cell.contents = String(text || "").replace(/\r/g, " ");
+        } catch (plainContentsError) {}
+    }
     styleTableCellText(cell, textStyle);
 
     align = String((textStyle && textStyle.horizontalAlignment) || "left").toLowerCase();
@@ -7658,21 +7689,29 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
             layoutState.cursorY,
             Math.min(estimatedHeight, getAvailableColumnHeight(layoutState))
         );
-        frame.contents = "";
+        frame.contents = "\r";
 
-        table = frame.insertionPoints.item(-1).tables.add();
-        table.columnCount = colCount;
-        // Keep every row in the body. The JSON already repeats the header on a
-        // continued table, so an InDesign header row would print it twice.
-        table.headerRowCount = 0;
-        table.bodyRowCount = rowCount > 0 ? rowCount : 1;
+        try {
+            table = frame.insertionPoints.item(0).tables.add({
+                columnCount: colCount,
+                bodyRowCount: rowCount > 0 ? rowCount : 1
+            });
+        } catch (addWithSizeError) {
+            table = frame.insertionPoints.item(0).tables.add();
+            table.columnCount = colCount;
+            table.bodyRowCount = rowCount > 0 ? rowCount : 1;
+        }
         try { table.strokeWeight = 0; } catch (tableStrokeError) {}
 
-        widths = scaleTableColumnWidths(matrix.columnWidths, colCount, frameWidth);
+        // Leave a point of slack so stroke width cannot make the columns wider
+        // than the frame, which makes InDesign reject the table.
+        widths = scaleTableColumnWidths(matrix.columnWidths, colCount, Math.max(12, frameWidth - 2));
         for (c = 0; c < colCount; c++) {
             try {
                 table.columns[c].width = widths[c];
-            } catch (columnWidthError) {}
+            } catch (columnWidthError) {
+                appendRenderLog("Table column width skipped: " + columnWidthError.message);
+            }
         }
 
         strokeColor = null;
@@ -7688,20 +7727,26 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
             isHeader = r < headerCount;
             textStyle = isHeader ? (headerStyle || rowsStyle) : rowsStyle;
             for (c = 0; c < colCount; c++) {
-                cell = table.rows[r].cells[c];
-                applyTableCellText(
-                    cell,
-                    isHeader
-                        ? (matrix.headerRows[r][c] || "")
-                        : (matrix.bodyRows[r - headerCount][c] || ""),
-                    textStyle
-                );
-                applyTableCellInsets(cell, style);
-                applyTableCellBox(
-                    cell,
-                    tableEdgeWeights(isHeader, c, colCount, style),
-                    strokeColor
-                );
+                try {
+                    cell = table.rows[r].cells[c];
+                    applyTableCellText(
+                        cell,
+                        isHeader
+                            ? (matrix.headerRows[r][c] || "")
+                            : (matrix.bodyRows[r - headerCount][c] || ""),
+                        textStyle
+                    );
+                    applyTableCellInsets(cell, style);
+                    applyTableCellBox(
+                        cell,
+                        tableEdgeWeights(isHeader, c, colCount, style),
+                        strokeColor
+                    );
+                } catch (cellError) {
+                    appendRenderLog(
+                        "Table cell " + r + "," + c + " skipped: " + cellError.message
+                    );
+                }
             }
         }
 
@@ -7710,18 +7755,27 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
             document.recompose();
         } catch (recomposeTableError) {}
 
-        tightenTextFrameToRenderedContent(frame);
+        // FRAME_TO_CONTENT collapses a text frame that holds a table, so the
+        // grid is built and then disappears. Size the frame from the table.
+        resizeFrameToTable(frame, table);
         advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
         populatedCount += 1;
         appendRenderLog("Status: populated (table " + colCount + "x" + rowCount + ")");
     } catch (tableError) {
         appendRenderLog("Status: not populated - " + tableError.message);
         warnings.push('Could not create table #' + blockIndex + ": " + tableError.message);
-        try {
-            if (frame) {
-                frame.remove();
-            }
-        } catch (removeFrameError) {}
+        if (!table) {
+            try {
+                if (frame) {
+                    frame.remove();
+                }
+            } catch (removeFrameError) {}
+        } else {
+            resizeFrameToTable(frame, table);
+            try {
+                advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));
+            } catch (advanceError) {}
+        }
     }
 }
 

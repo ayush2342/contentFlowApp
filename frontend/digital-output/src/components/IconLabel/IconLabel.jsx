@@ -1,3 +1,4 @@
+import { renderInlineHtml } from '../../utils/inlineHtml.jsx';
 import styles from './IconLabel.module.scss';
 
 const IconLabel = ({ src, text }) => (
@@ -14,7 +15,7 @@ const IconLabel = ({ src, text }) => (
         }}
       />
     ) : null}
-    <span className={styles.text}>{text}</span>
+    <span className={styles.text}>{renderInlineHtml(text)}</span>
   </div>
 );
 
