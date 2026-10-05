@@ -128,8 +128,8 @@
       "borderWidth": 0.25,
       "cellMarginLeft": 6.4,
       "cellMarginRight": 6.4,
-      "cellMarginTop": 3,
-      "cellMarginBottom": 3
+      "cellMarginTop": 5,
+      "cellMarginBottom": 5
     }
   }
 }

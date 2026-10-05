@@ -526,8 +526,8 @@ function resolveTableStyle(rawEntry) {
         borderWidth: isNaN(width) ? 0.25 : width,
         cellMarginLeft: rawEntry.cellMarginLeft == null ? 6.4 : Number(rawEntry.cellMarginLeft),
         cellMarginRight: rawEntry.cellMarginRight == null ? 6.4 : Number(rawEntry.cellMarginRight),
-        cellMarginTop: rawEntry.cellMarginTop == null ? 3 : Number(rawEntry.cellMarginTop),
-        cellMarginBottom: rawEntry.cellMarginBottom == null ? 3 : Number(rawEntry.cellMarginBottom)
+        cellMarginTop: rawEntry.cellMarginTop == null ? 5 : Number(rawEntry.cellMarginTop),
+        cellMarginBottom: rawEntry.cellMarginBottom == null ? 5 : Number(rawEntry.cellMarginBottom)
     };
 }
 
@@ -1094,8 +1094,8 @@ var FRAME_STYLES_DEFAULTS = {
         borderWidth: 0.25,
         cellMarginLeft: 6.4,
         cellMarginRight: 6.4,
-        cellMarginTop: 3,
-        cellMarginBottom: 3
+        cellMarginTop: 5,
+        cellMarginBottom: 5
     },
     footer: { fontFamily: "Arial", pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] }
 };
@@ -7512,49 +7512,95 @@ function tableEdgeWeights(isHeader, colIndex, colCount, tableStyle) {
     };
 }
 
-function applyTableCellBox(cell, weights, strokeColor) {
-    if (!cell) {
+function findStrokeStyle(document, names) {
+    var i;
+    var style;
+
+    for (i = 0; i < names.length; i++) {
+        try {
+            style = document.strokeStyles.itemByName(names[i]);
+            style.name;
+            return style;
+        } catch (missingStroke) {}
+    }
+    return null;
+}
+
+function setCellEdge(cell, edge, weight, strokeType, strokeColor) {
+    var weightName = edge + "EdgeStrokeWeight";
+    var typeName = edge + "EdgeStrokeType";
+    var colorName = edge + "EdgeStrokeColor";
+
+    if (!weight || weight <= 0) {
+        try { cell[weightName] = 0; } catch (zeroNumberError) {}
+        try { cell[weightName] = "0pt"; } catch (zeroTextError) {}
+        if (strokeType) {
+            try { cell[typeName] = strokeType; } catch (noneTypeError) {}
+        }
         return;
     }
-    try { cell.topEdgeStrokeWeight = weights.top; } catch (topWeightError) {}
-    try { cell.bottomEdgeStrokeWeight = weights.bottom; } catch (bottomWeightError) {}
-    try { cell.leftEdgeStrokeWeight = weights.left; } catch (leftWeightError) {}
-    try { cell.rightEdgeStrokeWeight = weights.right; } catch (rightWeightError) {}
-    if (strokeColor) {
-        try { if (weights.top) cell.topEdgeStrokeColor = strokeColor; } catch (topColorError) {}
-        try { if (weights.bottom) cell.bottomEdgeStrokeColor = strokeColor; } catch (bottomColorError) {}
-        try { if (weights.left) cell.leftEdgeStrokeColor = strokeColor; } catch (leftColorError) {}
-        try { if (weights.right) cell.rightEdgeStrokeColor = strokeColor; } catch (rightColorError) {}
+
+    if (strokeType) {
+        try { cell[typeName] = strokeType; } catch (solidTypeError) {}
     }
+    try { cell[weightName] = String(weight) + "pt"; } catch (weightTextError) {}
+    try { cell[weightName] = weight; } catch (weightNumberError) {}
+    if (strokeColor) {
+        try { cell[colorName] = strokeColor; } catch (strokeColorError) {}
+    }
+}
+
+function applyTableCellBox(cell, weights, strokeColor, noneStroke, solidStroke) {
+    if (!cell || !weights) {
+        return;
+    }
+    setCellEdge(cell, "top", weights.top, weights.top ? solidStroke : noneStroke, strokeColor);
+    setCellEdge(cell, "bottom", weights.bottom, weights.bottom ? solidStroke : noneStroke, strokeColor);
+    setCellEdge(cell, "left", weights.left, weights.left ? solidStroke : noneStroke, strokeColor);
+    setCellEdge(cell, "right", weights.right, weights.right ? solidStroke : noneStroke, strokeColor);
     try {
         cell.fillColor = app.activeDocument.swatches.itemByName("None");
     } catch (clearFillError) {}
 }
 
-function applyTableCellInsets(cell, tableStyle) {
-    var left = 6.4;
-    var right = 6.4;
-    var top = 3;
-    var bottom = 3;
+function readCellMargins(tableStyle) {
+    var margins = { left: 6.4, right: 6.4, top: 5, bottom: 5 };
 
-    if (tableStyle) {
-        if (tableStyle.cellMarginLeft != null && !isNaN(Number(tableStyle.cellMarginLeft))) {
-            left = Number(tableStyle.cellMarginLeft);
-        }
-        if (tableStyle.cellMarginRight != null && !isNaN(Number(tableStyle.cellMarginRight))) {
-            right = Number(tableStyle.cellMarginRight);
-        }
-        if (tableStyle.cellMarginTop != null && !isNaN(Number(tableStyle.cellMarginTop))) {
-            top = Number(tableStyle.cellMarginTop);
-        }
-        if (tableStyle.cellMarginBottom != null && !isNaN(Number(tableStyle.cellMarginBottom))) {
-            bottom = Number(tableStyle.cellMarginBottom);
-        }
+    if (!tableStyle) {
+        return margins;
     }
-    try { cell.leftInset = left; } catch (leftInsetError) {}
-    try { cell.rightInset = right; } catch (rightInsetError) {}
-    try { cell.topInset = top; } catch (topInsetError) {}
-    try { cell.bottomInset = bottom; } catch (bottomInsetError) {}
+    if (tableStyle.cellMarginLeft != null && !isNaN(Number(tableStyle.cellMarginLeft))) {
+        margins.left = Number(tableStyle.cellMarginLeft);
+    }
+    if (tableStyle.cellMarginRight != null && !isNaN(Number(tableStyle.cellMarginRight))) {
+        margins.right = Number(tableStyle.cellMarginRight);
+    }
+    if (tableStyle.cellMarginTop != null && !isNaN(Number(tableStyle.cellMarginTop))) {
+        margins.top = Number(tableStyle.cellMarginTop);
+    }
+    if (tableStyle.cellMarginBottom != null && !isNaN(Number(tableStyle.cellMarginBottom))) {
+        margins.bottom = Number(tableStyle.cellMarginBottom);
+    }
+    return margins;
+}
+
+function assignCellInset(cell, propertyName, points) {
+    try {
+        cell[propertyName] = String(points) + "pt";
+        return;
+    } catch (textInsetError) {}
+    try {
+        cell[propertyName] = points;
+    } catch (numberInsetError) {}
+}
+
+function applyTableCellInsets(cell, tableStyle) {
+    var margins = readCellMargins(tableStyle);
+
+    assignCellInset(cell, "leftInset", margins.left);
+    assignCellInset(cell, "rightInset", margins.right);
+    assignCellInset(cell, "topInset", margins.top);
+    assignCellInset(cell, "bottomInset", margins.bottom);
 }
 
 function resizeFrameToTable(frame, table) {
@@ -7582,31 +7628,84 @@ function resizeFrameToTable(frame, table) {
     } catch (resizeError) {}
 }
 
-function applyTableCellText(cell, text, textStyle) {
+function normalizeTableTextStyle(style) {
+    var normalized;
+
+    if (!style) {
+        return null;
+    }
+    if (style.pointSize && style.color && style.color.length) {
+        if (!style.fontFamily && style.font) {
+            style.fontFamily = style.font;
+        }
+        return style;
+    }
+    normalized = convertTypographyStyle(style);
+    if (!normalized.horizontalAlignment && style.horizontalAlignment) {
+        normalized.horizontalAlignment = style.horizontalAlignment;
+    }
+    if (!normalized.verticalAlignment && style.verticalAlignment) {
+        normalized.verticalAlignment = style.verticalAlignment;
+    }
+    return normalized;
+}
+
+function detachTableCellStyle(cell) {
+    try {
+        cell.appliedCellStyle = app.activeDocument.cellStyles.itemByName("[None]");
+    } catch (namedNoneError) {}
+    try {
+        cell.appliedCellStyle = app.activeDocument.cellStyles.item("[None]");
+    } catch (itemNoneError) {}
+}
+
+function applyTableParagraphLook(paragraph, textStyle) {
     var justification = Justification.LEFT_ALIGN;
     var align;
-    var vertical;
 
-    try {
-        cell.contents = text || "";
-    } catch (contentsError) {
-        try {
-            cell.contents = String(text || "").replace(/\r/g, " ");
-        } catch (plainContentsError) {}
+    if (!paragraph || !textStyle) {
+        return;
     }
-    styleTableCellText(cell, textStyle);
 
-    align = String((textStyle && textStyle.horizontalAlignment) || "left").toLowerCase();
+    align = String(textStyle.horizontalAlignment || "left").toLowerCase();
     if (align === "center") {
         justification = Justification.CENTER_ALIGN;
     } else if (align === "right") {
         justification = Justification.RIGHT_ALIGN;
     }
-    try { cell.texts[0].justification = justification; } catch (justifyError) {}
-    try { cell.paragraphs.everyItem().justification = justification; } catch (paragraphJustifyError) {}
-    if (textStyle && textStyle.underline) {
-        try { cell.texts[0].underline = true; } catch (underlineError) {}
+
+    if (textStyle.pointSize) {
+        try { paragraph.pointSize = textStyle.pointSize; } catch (sizeError) {}
     }
+    try { paragraph.justification = justification; } catch (justifyError) {}
+    applyThemeFontAndEmphasis(paragraph, textStyle);
+    applyTextColor(paragraph, textStyle);
+    if (textStyle.bold) {
+        try { paragraph.fontStyle = "Bold"; } catch (boldError) {}
+    } else {
+        try { paragraph.fontStyle = "Regular"; } catch (regularError) {}
+    }
+    if (textStyle.underline) {
+        try { paragraph.underline = true; } catch (underlineError) {}
+    }
+}
+
+function applyTableCellLook(cell, textStyle) {
+    var i;
+    var vertical;
+
+    if (!cell) {
+        return;
+    }
+
+    textStyle = normalizeTableTextStyle(textStyle);
+    detachTableCellStyle(cell);
+
+    try {
+        for (i = 0; i < cell.paragraphs.length; i++) {
+            applyTableParagraphLook(cell.paragraphs[i], textStyle);
+        }
+    } catch (paragraphLoopError) {}
 
     vertical = String((textStyle && textStyle.verticalAlignment) || "center").toLowerCase();
     try {
@@ -7618,6 +7717,17 @@ function applyTableCellText(cell, text, textStyle) {
             cell.verticalJustification = VerticalJustification.CENTER_ALIGN;
         }
     } catch (verticalError) {}
+}
+
+function applyTableCellText(cell, text, textStyle) {
+    try {
+        cell.contents = text || "";
+    } catch (contentsError) {
+        try {
+            cell.contents = String(text || "").replace(/\r/g, " ");
+        } catch (plainContentsError) {}
+    }
+    applyTableCellLook(cell, textStyle);
 }
 
 function populateDynamicTableBlock(layoutState, document, registryEntry, data, blockIndex) {
@@ -7641,6 +7751,8 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
     var frameWidth;
     var widths;
     var strokeColor;
+    var noneStroke;
+    var solidStroke;
     var headerCount;
 
     appendRenderLog("---");
@@ -7652,8 +7764,21 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
         return;
     }
 
-    headerStyle = (style && style.headerText) ? style.headerText : null;
-    rowsStyle = (style && style.rowsText) ? style.rowsText : null;
+    headerStyle = normalizeTableTextStyle(style && style.headerText);
+    rowsStyle = normalizeTableTextStyle(style && style.rowsText);
+    appendRenderLog(
+        "Table header style: font=" +
+        ((headerStyle && (headerStyle.fontFamily || headerStyle.font)) || "(none)") +
+        " size=" + ((headerStyle && headerStyle.pointSize) || "(none)") +
+        " bold=" + ((headerStyle && headerStyle.bold) || false) +
+        " align=" + ((headerStyle && headerStyle.horizontalAlignment) || "(none)")
+    );
+    appendRenderLog(
+        "Table row style: font=" +
+        ((rowsStyle && (rowsStyle.fontFamily || rowsStyle.font)) || "(none)") +
+        " size=" + ((rowsStyle && rowsStyle.pointSize) || "(none)") +
+        " align=" + ((rowsStyle && rowsStyle.horizontalAlignment) || "(none)")
+    );
     colCount = matrix.columnCount;
     headerCount = matrix.headerRows.length;
     rowCount = headerCount + matrix.bodyRows.length;
@@ -7722,6 +7847,9 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
                 hexToRgb((style && style.borderColor) || "#000000")
             );
         } catch (strokeColorError) {}
+        noneStroke = findStrokeStyle(document, ["None", "[None]"]);
+        solidStroke = findStrokeStyle(document, ["Solid", "[Solid]"]);
+        try { frame.strokeWeight = 0; } catch (frameStrokeError) {}
 
         for (r = 0; r < rowCount; r++) {
             isHeader = r < headerCount;
@@ -7740,7 +7868,9 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
                     applyTableCellBox(
                         cell,
                         tableEdgeWeights(isHeader, c, colCount, style),
-                        strokeColor
+                        strokeColor,
+                        noneStroke,
+                        solidStroke
                     );
                 } catch (cellError) {
                     appendRenderLog(
@@ -7754,6 +7884,26 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
             frame.parentStory.recompose();
             document.recompose();
         } catch (recomposeTableError) {}
+
+        // Recompose can put the default grid back. Apply rules again after it.
+        for (r = 0; r < rowCount; r++) {
+            isHeader = r < headerCount;
+            textStyle = isHeader ? (headerStyle || rowsStyle) : rowsStyle;
+            for (c = 0; c < colCount; c++) {
+                try {
+                    cell = table.rows[r].cells[c];
+                    applyTableCellLook(cell, textStyle);
+                    applyTableCellInsets(cell, style);
+                    applyTableCellBox(
+                        cell,
+                        tableEdgeWeights(isHeader, c, colCount, style),
+                        strokeColor,
+                        noneStroke,
+                        solidStroke
+                    );
+                } catch (restyleError) {}
+            }
+        }
 
         // FRAME_TO_CONTENT collapses a text frame that holds a table, so the
         // grid is built and then disappears. Size the frame from the table.
