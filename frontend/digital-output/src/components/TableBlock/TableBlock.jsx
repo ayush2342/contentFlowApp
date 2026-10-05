@@ -1,70 +1,94 @@
 import styles from './TableBlock.module.scss';
 
-/**
- * Supports:
- * {
- *   cols: ["col1", "col2"],
- *   index?: { name, values } | [{ name, values }, ...],
- *   rows: [["a","b"], ...]
- * }
- */
-const normalizeIndexes = (index) => {
-  if (!index) return [];
-  if (Array.isArray(index)) return index.filter((item) => item && Array.isArray(item.values));
-  if (typeof index === 'object' && Array.isArray(index.values)) return [index];
-  return [];
+const cellText = (cell) => {
+  if (cell == null) return '';
+  if (typeof cell === 'object') return cell.text == null ? '' : String(cell.text);
+  return String(cell);
 };
 
-const TableBlock = ({ title, table, cols, index, rows, headers }) => {
-  const tableData = table && typeof table === 'object' ? table : { cols, index, rows };
-  const columnHeaders = Array.isArray(tableData.cols)
-    ? tableData.cols
-    : Array.isArray(headers)
-      ? headers
-      : [];
-  const dataRows = Array.isArray(tableData.rows) ? tableData.rows : [];
-  const indexes = normalizeIndexes(tableData.index);
+const CellText = ({ value }) => {
+  const lines = cellText(value).split('\n');
+  return lines.map((line, index) => (
+    <span key={index}>
+      {index > 0 ? <br /> : null}
+      {line}
+    </span>
+  ));
+};
 
-  if (!columnHeaders.length && !dataRows.length) return null;
+const isObjectRow = (row) =>
+  Array.isArray(row) && row.length > 0 && row[0] !== null && typeof row[0] === 'object';
 
-  // Validate: each index.values length should match rows length when present.
-  const validIndexes = indexes.filter(
-    (idx) => !dataRows.length || idx.values.length === dataRows.length
+/**
+ * Cell-object tables (header_row_count + rows of { text }) and the older
+ * cols + string-rows shape. Fonts, alignment, and borders come from the theme.
+ */
+const TableBlock = ({ title, rows, cols, columnWidths, headerRowCount = 1 }) => {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const columnHeaders = Array.isArray(cols) ? cols : [];
+  const objectRows = sourceRows.length > 0 && isObjectRow(sourceRows[0]);
+
+  let headerRows = [];
+  let bodyRows = [];
+
+  if (objectRows) {
+    const count = headerRowCount > 0 ? headerRowCount : 1;
+    headerRows = sourceRows.slice(0, count);
+    bodyRows = sourceRows.slice(count);
+  } else if (columnHeaders.length) {
+    headerRows = [columnHeaders];
+    bodyRows = sourceRows;
+  } else {
+    bodyRows = sourceRows;
+  }
+
+  const columnCount = Math.max(
+    headerRows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0),
+    bodyRows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0),
+    columnHeaders.length
   );
+
+  if (!columnCount) return null;
+
+  const widths = Array.isArray(columnWidths) ? columnWidths : [];
+  const widthSum = widths.reduce((sum, width) => sum + (Number(width) || 0), 0);
+  const useWidths = widths.length === columnCount && widthSum > 0;
 
   return (
     <div className={styles.tableBlock}>
       {title ? <h4 className={styles.title}>{title}</h4> : null}
       <div className={styles.wrapper}>
         <table className={styles.table}>
-          <thead>
-            <tr>
-              {validIndexes.map((idx) => (
-                <th key={`idx-h-${idx.name || 'index'}`} className={styles.subHeading}>
-                  {idx.name || ''}
-                </th>
+          {useWidths ? (
+            <colgroup>
+              {widths.map((width, index) => (
+                <col key={`col-${index}`} style={{ width: `${(Number(width) / widthSum) * 100}%` }} />
               ))}
-              {columnHeaders.map((header, headerIndex) => (
-                <th key={`col-${headerIndex}`}>{header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {dataRows.map((row, rowIndex) => {
-              const cells = Array.isArray(row) ? row : [row];
-              return (
-                <tr key={`row-${rowIndex}`}>
-                  {validIndexes.map((idx) => (
-                    <td key={`idx-${idx.name || 'index'}-${rowIndex}`} className={styles.indexCell}>
-                      {idx.values[rowIndex] ?? ''}
-                    </td>
-                  ))}
-                  {columnHeaders.map((_, cellIndex) => (
-                    <td key={`cell-${rowIndex}-${cellIndex}`}>{cells[cellIndex] ?? ''}</td>
+            </colgroup>
+          ) : null}
+          {headerRows.length ? (
+            <thead>
+              {headerRows.map((row, rowIndex) => (
+                <tr key={`header-${rowIndex}`}>
+                  {Array.from({ length: columnCount }, (_, cellIndex) => (
+                    <th key={`header-${rowIndex}-${cellIndex}`}>
+                      <CellText value={Array.isArray(row) ? row[cellIndex] : ''} />
+                    </th>
                   ))}
                 </tr>
-              );
-            })}
+              ))}
+            </thead>
+          ) : null}
+          <tbody>
+            {bodyRows.map((row, rowIndex) => (
+              <tr key={`row-${rowIndex}`}>
+                {Array.from({ length: columnCount }, (_, cellIndex) => (
+                  <td key={`cell-${rowIndex}-${cellIndex}`}>
+                    <CellText value={Array.isArray(row) ? row[cellIndex] : row} />
+                  </td>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

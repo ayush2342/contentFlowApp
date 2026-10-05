@@ -1,5 +1,5 @@
 .tableBlock {
-  margin: 1rem 0;
+  margin: 0.6rem 0 1rem;
 }
 
 .title {
@@ -15,47 +15,55 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--typography-tableRows-font, Arial, sans-serif);
-  font-size: var(--typography-tableRows-size, 9pt);
-  color: var(--typography-tableRows-color, #000000);
+  table-layout: fixed;
+  background: transparent;
 
   th,
   td {
-    border: 1px solid #e0e0e0;
-    padding: 0.45rem 0.65rem;
-    text-align: left;
-    vertical-align: top;
+    padding: 0.28rem 0.4rem;
+    background: transparent;
+    border-top: var(--typography-table-rule, 0.25pt solid #000000);
+    border-bottom: var(--typography-table-rule, 0.25pt solid #000000);
+    border-left: none;
+    border-right: none;
+  }
+
+  th + th,
+  td + td {
+    border-left: var(--typography-table-inner-rule, 0.25pt solid #000000);
+  }
+
+  th:first-child,
+  td:first-child {
+    border-left: var(--typography-table-side-rule, none);
+  }
+
+  th:last-child,
+  td:last-child {
+    border-right: var(--typography-table-side-rule, none);
   }
 
   th {
-    font-family: var(--typography-tableHeading-font, Arial, sans-serif);
-    font-size: var(--typography-tableHeading-size, 13pt);
-    font-weight: var(--typography-tableHeading-weight, 700);
-    color: var(--typography-tableHeading-color, #000000);
-    /* Neutral fallback — never hardcode another theme's orange palette */
-    background: var(--typography-tableHeading-bg, #e8e8e8);
-  }
-
-  th.subHeading,
-  .subHeading {
-    font-family: var(--typography-tableSubHeading-font, Arial, sans-serif);
-    font-size: var(--typography-tableSubHeading-size, 11pt);
-    font-weight: var(--typography-tableSubHeading-weight, 400);
-    color: var(--typography-tableSubHeading-color, #000000);
-    background: var(--typography-tableSubHeading-bg, #f3f3f3);
+    border: var(--typography-table-header-rule, none);
+    font-family: var(--typography-tableHeader-font, "Mulish Variable", Mulish, sans-serif);
+    font-size: var(--typography-tableHeader-size, 9pt);
+    font-weight: var(--typography-tableHeader-weight, 700);
+    font-style: var(--typography-tableHeader-style, normal);
+    color: var(--typography-tableHeader-color, #000000);
+    text-align: var(--typography-tableHeader-align, center);
+    vertical-align: var(--typography-tableHeader-valign, middle);
+    text-decoration: var(--typography-tableHeader-decoration, none);
+    background: transparent;
   }
 
   td {
-    background: var(--typography-tableRows-bg, #ffffff);
+    font-family: var(--typography-tableRows-font, "IBM Plex Sans", sans-serif);
+    font-size: var(--typography-tableRows-size, 9pt);
     font-weight: var(--typography-tableRows-weight, 400);
-  }
-
-  tbody tr:nth-child(even) td {
-    background: var(--typography-tableRows-alt-bg, #fafafa);
-  }
-
-  .indexCell {
-    font-weight: 600;
-    background: var(--typography-tableSubHeading-bg, #f3f3f3);
+    font-style: var(--typography-tableRows-style, normal);
+    color: var(--typography-tableRows-color, #000000);
+    text-align: var(--typography-tableRows-align, left);
+    vertical-align: var(--typography-tableRows-valign, middle);
+    text-decoration: var(--typography-tableRows-decoration, none);
   }
 }

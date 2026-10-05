@@ -154,28 +154,36 @@
       "backgroundColor": "#C1D4C3"
     },
     "table": {
-      "headingText": {
-        "font": "Arial Bold",
-        "size": 13,
-        "color": "#FFFFFF",
-        "bold": true,
-        "backgroundColor": "#CA5027"
-      },
-      "subHeadingText": {
-        "font": "Arial Regular",
-        "size": 11,
+      "headerText": {
+        "font": "Mulish Variable Bold",
+        "size": 9,
         "color": "#000000",
-        "bold": false,
-        "backgroundColor": "#E7B193"
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "horizontalAlignment": "center",
+        "verticalAlignment": "center"
       },
       "rowsText": {
-        "font": "Arial Regular",
+        "font": "IBM Plex Sans Regular",
         "size": 9,
         "color": "#000000",
         "bold": false,
-        "backgroundColor": "#FFFFFF",
-        "altBackgroundColor": "#F9E5D9"
-      }
+        "italic": false,
+        "underline": false,
+        "horizontalAlignment": "left",
+        "verticalAlignment": "center"
+      },
+      "headerBorders": false,
+      "sideBorders": false,
+      "innerVerticalBorders": true,
+      "horizontalBorders": true,
+      "borderColor": "#000000",
+      "borderWidth": 0.25,
+      "cellMarginLeft": 6.4,
+      "cellMarginRight": 6.4,
+      "cellMarginTop": 3,
+      "cellMarginBottom": 3
     },
     "footer": {
       "font": "Arial Regular",

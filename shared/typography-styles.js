@@ -326,22 +326,47 @@ export const toCssVariables = (key, style) => {
     };
   }
 
-  // Table: headingText / subHeadingText / rowsText (+ alt row bg)
-  if (style.headingText || style.rowsText) {
-    const vars = {
-      ...toCssVariables(`${key}Heading`, style.headingText),
-      ...toCssVariables(`${key}SubHeading`, style.subHeadingText),
-      ...toCssVariables(`${key}Rows`, style.rowsText),
+  // Table: header row + body rows. Borders and alignment live on the table
+  // style so they are theme-specific, not copied from each cell.
+  if (style.headerText || style.headingText || style.rowsText) {
+    const header = style.headerText || style.headingText || {};
+    const rows = style.rowsText || {};
+    const rule =
+      style.horizontalBorders === false
+        ? 'none'
+        : `${style.borderWidth ?? 0.25}pt solid ${style.borderColor || '#000000'}`;
+    const innerRule = style.innerVerticalBorders === false ? 'none' : rule;
+    const sideRule = style.sideBorders ? rule : 'none';
+    const headerRule = style.headerBorders ? rule : 'none';
+    return {
+      ...toCssVariables(`${key}Header`, header),
+      ...toCssVariables(`${key}Heading`, header),
+      ...toCssVariables(`${key}Rows`, rows),
+      [`--typography-${key}Rows-bg`]: 'transparent',
+      [`--typography-${key}Rows-alt-bg`]: 'transparent',
+      [`--typography-${key}Header-bg`]: 'transparent',
+      [`--typography-${key}Heading-bg`]: 'transparent',
+      [`--typography-${key}-rule`]: rule,
+      [`--typography-${key}-inner-rule`]: innerRule,
+      [`--typography-${key}-side-rule`]: sideRule,
+      [`--typography-${key}-header-rule`]: headerRule,
+      [`--typography-${key}Header-align`]: header.horizontalAlignment || 'center',
+      [`--typography-${key}Rows-align`]: rows.horizontalAlignment || 'left',
+      [`--typography-${key}Header-valign`]:
+        header.verticalAlignment === 'top'
+          ? 'top'
+          : header.verticalAlignment === 'bottom'
+            ? 'bottom'
+            : 'middle',
+      [`--typography-${key}Rows-valign`]:
+        rows.verticalAlignment === 'top'
+          ? 'top'
+          : rows.verticalAlignment === 'bottom'
+            ? 'bottom'
+            : 'middle',
+      [`--typography-${key}Header-decoration`]: header.underline ? 'underline' : 'none',
+      [`--typography-${key}Rows-decoration`]: rows.underline ? 'underline' : 'none',
     };
-    const altBg =
-      style.rowsText?.altBackgroundColor ||
-      style.rowsText?.altbackgroundColor ||
-      null;
-    // Always set so a previous theme's table colors cannot stick.
-    vars[`--typography-${key}Rows-bg`] =
-      style.rowsText?.backgroundColor || 'transparent';
-    vars[`--typography-${key}Rows-alt-bg`] = altBg || 'transparent';
-    return vars;
   }
 
   const prefix = `--typography-${key}`;

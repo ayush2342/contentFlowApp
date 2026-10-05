@@ -713,17 +713,25 @@ const mapPagedBlockToComponent = (block, index, ctx) => {
     const cols = Array.isArray(tablePayload.cols) ? tablePayload.cols : [];
     const rows = Array.isArray(tablePayload.rows) ? tablePayload.rows : [];
     if (!cols.length && !rows.length) return null;
+    const headerRowCount = Number(tablePayload.header_row_count);
     return {
       id: `content-${index}`,
       type: 'TableBlock',
       contentType: 'Table',
       props: {
         title: normalizeText(block?.data?.title || tablePayload.title),
-        table: {
-          cols,
-          index: tablePayload.index,
-          rows,
-        },
+        rows,
+        cols,
+        columnWidths: Array.isArray(tablePayload.column_widths_pt)
+          ? tablePayload.column_widths_pt
+          : [],
+        // Cell-object tables use the first row as the header. The old cols
+        // shape keeps its header in `cols`, so headerRowCount stays 0.
+        headerRowCount: Number.isFinite(headerRowCount)
+          ? headerRowCount
+          : cols.length
+            ? 0
+            : 1,
       },
     };
   }

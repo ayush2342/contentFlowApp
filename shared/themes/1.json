@@ -98,6 +98,38 @@
       "size": 7.5,
       "color": "#A5A5A5",
       "bold": true
+    },
+    "table": {
+      "headerText": {
+        "font": "Mulish Variable Bold",
+        "size": 9,
+        "color": "#000000",
+        "bold": true,
+        "italic": false,
+        "underline": false,
+        "horizontalAlignment": "center",
+        "verticalAlignment": "center"
+      },
+      "rowsText": {
+        "font": "IBM Plex Sans Regular",
+        "size": 9,
+        "color": "#000000",
+        "bold": false,
+        "italic": false,
+        "underline": false,
+        "horizontalAlignment": "left",
+        "verticalAlignment": "center"
+      },
+      "headerBorders": false,
+      "sideBorders": false,
+      "innerVerticalBorders": true,
+      "horizontalBorders": true,
+      "borderColor": "#000000",
+      "borderWidth": 0.25,
+      "cellMarginLeft": 6.4,
+      "cellMarginRight": 6.4,
+      "cellMarginTop": 3,
+      "cellMarginBottom": 3
     }
   }
 }

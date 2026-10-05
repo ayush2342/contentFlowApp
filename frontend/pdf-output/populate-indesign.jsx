@@ -486,7 +486,10 @@ function convertTypographyStyle(style) {
         // Theme-driven rules (e.g. sectionTitle "2px solid #CA5021") — any block.
         borderTop: style.borderTop || null,
         borderBottom: style.borderBottom || null,
-        textTransform: style.textTransform || null
+        textTransform: style.textTransform || null,
+        underline: isTruthyFlag(style.underline),
+        horizontalAlignment: style.horizontalAlignment || "",
+        verticalAlignment: style.verticalAlignment || ""
     };
 }
 
@@ -505,7 +508,27 @@ function isQuotationStyle(value) {
 function isTableStyle(value) {
     return value &&
         typeof value === "object" &&
-        (value.headingText || value.rowsText);
+        (value.headerText || value.headingText || value.rowsText);
+}
+
+function resolveTableStyle(rawEntry) {
+    var headerSource = rawEntry.headerText || rawEntry.headingText || {};
+    var width = Number(rawEntry.borderWidth);
+
+    return {
+        headerText: convertTypographyStyle(headerSource),
+        rowsText: convertTypographyStyle(rawEntry.rowsText || {}),
+        headerBorders: rawEntry.headerBorders === true,
+        sideBorders: rawEntry.sideBorders === true,
+        innerVerticalBorders: rawEntry.innerVerticalBorders !== false,
+        horizontalBorders: rawEntry.horizontalBorders !== false,
+        borderColor: rawEntry.borderColor || "#000000",
+        borderWidth: isNaN(width) ? 0.25 : width,
+        cellMarginLeft: rawEntry.cellMarginLeft == null ? 6.4 : Number(rawEntry.cellMarginLeft),
+        cellMarginRight: rawEntry.cellMarginRight == null ? 6.4 : Number(rawEntry.cellMarginRight),
+        cellMarginTop: rawEntry.cellMarginTop == null ? 3 : Number(rawEntry.cellMarginTop),
+        cellMarginBottom: rawEntry.cellMarginBottom == null ? 3 : Number(rawEntry.cellMarginBottom)
+    };
 }
 
 function isRawCompositeStyle(value) {
@@ -605,11 +628,7 @@ function resolveConfigStyle(rawEntry) {
         };
     }
     if (isTableStyle(rawEntry)) {
-        return {
-            headingText: convertTypographyStyle(rawEntry.headingText || {}),
-            subHeadingText: convertTypographyStyle(rawEntry.subHeadingText || {}),
-            rowsText: convertTypographyStyle(rawEntry.rowsText || {})
-        };
+        return resolveTableStyle(rawEntry);
     }
     return convertTypographyStyle(rawEntry);
 }
@@ -634,11 +653,7 @@ function cloneFallbackStyle(key) {
         };
     }
     if (isTableStyle(fallback)) {
-        return {
-            headingText: convertTypographyStyle(fallback.headingText || {}),
-            subHeadingText: convertTypographyStyle(fallback.subHeadingText || {}),
-            rowsText: convertTypographyStyle(fallback.rowsText || {})
-        };
+        return resolveTableStyle(fallback);
     }
     return fallback;
 }
@@ -1053,28 +1068,34 @@ var FRAME_STYLES_DEFAULTS = {
         backgroundColor: "#C1D4C3"
     },
     table: {
-        headingText: {
-            font: "Arial",
-            size: 13,
-            color: "#FFFFFF",
-            bold: true,
-            backgroundColor: "#CA5027"
-        },
-        subHeadingText: {
-            font: "Arial",
-            size: 11,
+        headerText: {
+            font: "Mulish Variable Bold",
+            size: 9,
             color: "#000000",
-            bold: false,
-            backgroundColor: "#E7B193"
+            bold: true,
+            underline: false,
+            horizontalAlignment: "center",
+            verticalAlignment: "center"
         },
         rowsText: {
-            font: "Arial",
+            font: "IBM Plex Sans Regular",
             size: 9,
             color: "#000000",
             bold: false,
-            backgroundColor: "#FFFFFF",
-            altBackgroundColor: "#F9E5D9"
-        }
+            underline: false,
+            horizontalAlignment: "left",
+            verticalAlignment: "center"
+        },
+        headerBorders: false,
+        sideBorders: false,
+        innerVerticalBorders: true,
+        horizontalBorders: true,
+        borderColor: "#000000",
+        borderWidth: 0.25,
+        cellMarginLeft: 6.4,
+        cellMarginRight: 6.4,
+        cellMarginTop: 3,
+        cellMarginBottom: 3
     },
     footer: { fontFamily: "Arial", pointSize: 9, bold: false, italic: false, leftIndent: 0, color: [0, 0, 0] }
 };
@@ -7298,139 +7319,320 @@ function normalizeTableIndexes(index) {
     return out;
 }
 
+function tableCellText(cell) {
+    var text;
+
+    if (cell === null || cell === undefined) {
+        return "";
+    }
+    if (typeof cell === "object") {
+        text = cell.text === null || cell.text === undefined ? "" : String(cell.text);
+    } else {
+        text = String(cell);
+    }
+    return text.replace(/^\s+|\s+$/g, "").replace(/\n/g, "\r");
+}
+
+function isObjectCellRow(row) {
+    return row &&
+        row.length !== undefined &&
+        row.length > 0 &&
+        row[0] !== null &&
+        typeof row[0] === "object";
+}
+
 function buildTableMatrix(data) {
     var tableData;
     var cols;
     var rows;
-    var indexes;
-    var validIndexes;
-    var headers = [];
+    var headerCount;
+    var headerRows = [];
     var bodyRows = [];
+    var columnWidths = [];
+    var rowHeights = [];
     var i;
     var j;
     var row;
     var cells;
     var outRow;
+    var colCount;
 
     tableData = (data && data.table && typeof data.table === "object") ? data.table : (data || {});
-    cols = tableData.cols || data.headers || [];
+    cols = tableData.cols || data.cols || data.headers || [];
     if (!cols || cols.length === undefined) {
         cols = [];
     }
-    rows = tableData.rows || [];
+    rows = tableData.rows || data.rows || [];
     if (!rows || rows.length === undefined) {
         rows = [];
     }
-
-    indexes = normalizeTableIndexes(tableData.index);
-    validIndexes = [];
-    for (i = 0; i < indexes.length; i++) {
-        if (!rows.length || indexes[i].values.length === rows.length) {
-            validIndexes.push(indexes[i]);
-        }
+    columnWidths = tableData.column_widths_pt || data.columnWidths || [];
+    if (!columnWidths || columnWidths.length === undefined) {
+        columnWidths = [];
+    }
+    rowHeights = tableData.row_heights_pt || [];
+    if (!rowHeights || rowHeights.length === undefined) {
+        rowHeights = [];
     }
 
-    for (i = 0; i < validIndexes.length; i++) {
-        headers.push(trimString(validIndexes[i].name || ""));
-    }
-    for (i = 0; i < cols.length; i++) {
-        headers.push(trimString(cols[i] != null ? String(cols[i]) : ""));
-    }
-
-    for (i = 0; i < rows.length; i++) {
-        row = rows[i];
-        cells = (row && row.length !== undefined) ? row : [row];
-        outRow = [];
-        for (j = 0; j < validIndexes.length; j++) {
-            outRow.push(
-                validIndexes[j].values[i] != null
-                    ? String(validIndexes[j].values[i])
-                    : ""
-            );
+    if (rows.length && isObjectCellRow(rows[0])) {
+        headerCount = Number(tableData.header_row_count);
+        if (isNaN(headerCount)) {
+            headerCount = Number(data.headerRowCount);
         }
-        for (j = 0; j < cols.length; j++) {
-            outRow.push(cells[j] != null ? String(cells[j]) : "");
+        if (isNaN(headerCount)) {
+            headerCount = 1;
         }
-        bodyRows.push(outRow);
+        if (headerCount < 0) {
+            headerCount = 0;
+        }
+        if (headerCount > rows.length) {
+            headerCount = rows.length;
+        }
+        colCount = 0;
+        for (i = 0; i < rows.length; i++) {
+            cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+            if (cells.length > colCount) {
+                colCount = cells.length;
+            }
+            outRow = [];
+            for (j = 0; j < cells.length; j++) {
+                outRow.push(tableCellText(cells[j]));
+            }
+            if (i < headerCount) {
+                headerRows.push(outRow);
+            } else {
+                bodyRows.push(outRow);
+            }
+        }
+    } else {
+        colCount = cols.length;
+        for (i = 0; i < rows.length; i++) {
+            cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+            if (cells.length > colCount) {
+                colCount = cells.length;
+            }
+        }
+        if (cols.length) {
+            outRow = [];
+            for (i = 0; i < colCount; i++) {
+                outRow.push(tableCellText(cols[i]));
+            }
+            headerRows.push(outRow);
+        }
+        for (i = 0; i < rows.length; i++) {
+            cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+            outRow = [];
+            for (j = 0; j < colCount; j++) {
+                outRow.push(tableCellText(cells[j]));
+            }
+            bodyRows.push(outRow);
+        }
     }
 
     return {
         title: trimString((data && data.title) || tableData.title || ""),
-        headers: headers,
-        rows: bodyRows,
-        indexCount: validIndexes.length
+        headerRows: headerRows,
+        bodyRows: bodyRows,
+        columnWidths: columnWidths,
+        rowHeights: rowHeights,
+        columnCount: colCount
     };
 }
 
-function applyCellFillFromHex(cell, hex) {
-    var doc;
-    var rgb;
-    var colorName;
-    var color;
+function scaleTableColumnWidths(widths, colCount, frameWidth) {
+    var scaled = [];
+    var sum = 0;
+    var i;
+    var share;
+    var value;
 
-    if (!cell || !hex) {
-        return;
+    if (!frameWidth || frameWidth <= 0) {
+        frameWidth = 468;
+    }
+    if (!colCount) {
+        return scaled;
     }
 
-    rgb = hexToRgb(hex);
-    try {
-        doc = app.activeDocument;
-        colorName = "JSON_CELL_" + rgb.join("_");
-        color = ensureDocumentColor(doc, colorName, rgb);
-        if (color !== null) {
-            cell.fillColor = color;
+    if (!widths || widths.length !== colCount) {
+        share = frameWidth / colCount;
+        for (i = 0; i < colCount; i++) {
+            scaled.push(share);
         }
-    } catch (cellFillError) {}
+        return scaled;
+    }
+
+    for (i = 0; i < widths.length; i++) {
+        value = Number(widths[i]);
+        if (isNaN(value) || value < 0) {
+            value = 0;
+        }
+        sum += value;
+    }
+    if (sum <= 0) {
+        share = frameWidth / colCount;
+        for (i = 0; i < colCount; i++) {
+            scaled.push(share);
+        }
+        return scaled;
+    }
+
+    for (i = 0; i < widths.length; i++) {
+        value = Number(widths[i]);
+        if (isNaN(value) || value < 0) {
+            value = 0;
+        }
+        scaled.push(value * frameWidth / sum);
+    }
+    return scaled;
 }
 
-function styleTableCellText(cell, style) {
-    var texts;
+function tableEdgeWeights(isHeader, colIndex, colCount, tableStyle) {
+    var width = 0.25;
+    var side;
+    var inner;
+    var horizontal;
 
-    if (!cell || !style) {
-        return;
+    if (tableStyle && tableStyle.borderWidth != null && !isNaN(Number(tableStyle.borderWidth))) {
+        width = Number(tableStyle.borderWidth);
+    }
+    if (isHeader && (!tableStyle || tableStyle.headerBorders !== true)) {
+        return { top: 0, bottom: 0, left: 0, right: 0 };
     }
 
+    side = tableStyle && tableStyle.sideBorders === true;
+    inner = !tableStyle || tableStyle.innerVerticalBorders !== false;
+    horizontal = !tableStyle || tableStyle.horizontalBorders !== false;
+
+    return {
+        top: horizontal ? width : 0,
+        bottom: horizontal ? width : 0,
+        left: colIndex === 0 ? (side ? width : 0) : (inner ? width : 0),
+        right: colIndex === colCount - 1 ? (side ? width : 0) : (inner ? width : 0)
+    };
+}
+
+function applyTableCellBox(cell, weights, strokeColor) {
+    if (!cell) {
+        return;
+    }
+    try { cell.topEdgeStrokeWeight = weights.top; } catch (topWeightError) {}
+    try { cell.bottomEdgeStrokeWeight = weights.bottom; } catch (bottomWeightError) {}
+    try { cell.leftEdgeStrokeWeight = weights.left; } catch (leftWeightError) {}
+    try { cell.rightEdgeStrokeWeight = weights.right; } catch (rightWeightError) {}
+    if (strokeColor) {
+        try { if (weights.top) cell.topEdgeStrokeColor = strokeColor; } catch (topColorError) {}
+        try { if (weights.bottom) cell.bottomEdgeStrokeColor = strokeColor; } catch (bottomColorError) {}
+        try { if (weights.left) cell.leftEdgeStrokeColor = strokeColor; } catch (leftColorError) {}
+        try { if (weights.right) cell.rightEdgeStrokeColor = strokeColor; } catch (rightColorError) {}
+    }
     try {
-        texts = cell.texts[0];
-        applyTextRangeStyle(texts, style);
-    } catch (cellTextError) {}
+        cell.fillColor = app.activeDocument.swatches.itemByName("None");
+    } catch (clearFillError) {}
+}
+
+function applyTableCellInsets(cell, tableStyle) {
+    var left = 6.4;
+    var right = 6.4;
+    var top = 3;
+    var bottom = 3;
+
+    if (tableStyle) {
+        if (tableStyle.cellMarginLeft != null && !isNaN(Number(tableStyle.cellMarginLeft))) {
+            left = Number(tableStyle.cellMarginLeft);
+        }
+        if (tableStyle.cellMarginRight != null && !isNaN(Number(tableStyle.cellMarginRight))) {
+            right = Number(tableStyle.cellMarginRight);
+        }
+        if (tableStyle.cellMarginTop != null && !isNaN(Number(tableStyle.cellMarginTop))) {
+            top = Number(tableStyle.cellMarginTop);
+        }
+        if (tableStyle.cellMarginBottom != null && !isNaN(Number(tableStyle.cellMarginBottom))) {
+            bottom = Number(tableStyle.cellMarginBottom);
+        }
+    }
+    try { cell.leftInset = left; } catch (leftInsetError) {}
+    try { cell.rightInset = right; } catch (rightInsetError) {}
+    try { cell.topInset = top; } catch (topInsetError) {}
+    try { cell.bottomInset = bottom; } catch (bottomInsetError) {}
+}
+
+function applyTableCellText(cell, text, textStyle) {
+    var justification = Justification.LEFT_ALIGN;
+    var align;
+    var vertical;
+
+    cell.contents = text || "";
+    styleTableCellText(cell, textStyle);
+
+    align = String((textStyle && textStyle.horizontalAlignment) || "left").toLowerCase();
+    if (align === "center") {
+        justification = Justification.CENTER_ALIGN;
+    } else if (align === "right") {
+        justification = Justification.RIGHT_ALIGN;
+    }
+    try { cell.texts[0].justification = justification; } catch (justifyError) {}
+    try { cell.paragraphs.everyItem().justification = justification; } catch (paragraphJustifyError) {}
+    if (textStyle && textStyle.underline) {
+        try { cell.texts[0].underline = true; } catch (underlineError) {}
+    }
+
+    vertical = String((textStyle && textStyle.verticalAlignment) || "center").toLowerCase();
+    try {
+        if (vertical === "top") {
+            cell.verticalJustification = VerticalJustification.TOP_ALIGN;
+        } else if (vertical === "bottom") {
+            cell.verticalJustification = VerticalJustification.BOTTOM_ALIGN;
+        } else {
+            cell.verticalJustification = VerticalJustification.CENTER_ALIGN;
+        }
+    } catch (verticalError) {}
 }
 
 function populateDynamicTableBlock(layoutState, document, registryEntry, data, blockIndex) {
     var matrix = buildTableMatrix(data || {});
     var style = registryEntry.style || FRAME_STYLES.table || FRAME_STYLES_DEFAULTS.table;
-    var headingStyle;
-    var subHeadingStyle;
+    var headerStyle;
     var rowsStyle;
     var colCount;
     var rowCount;
     var estimatedHeight;
+    var heightSum;
     var layoutBounds;
     var frame;
     var table;
     var r;
     var c;
     var cell;
-    var cellStyle;
-    var fillHex;
+    var textStyle;
+    var isHeader;
     var titleFrame;
+    var frameWidth;
+    var widths;
+    var strokeColor;
+    var headerCount;
 
     appendRenderLog("---");
     appendRenderLog("JSON block type: Table");
     appendRenderLog("Occurrence: " + blockIndex);
 
-    if (!matrix.headers.length && !matrix.rows.length) {
+    if (!matrix.columnCount) {
         appendRenderLog("Status: not populated - empty table");
         return;
     }
 
-    headingStyle = (style && style.headingText) ? style.headingText : null;
-    subHeadingStyle = (style && style.subHeadingText) ? style.subHeadingText : null;
+    headerStyle = (style && style.headerText) ? style.headerText : null;
     rowsStyle = (style && style.rowsText) ? style.rowsText : null;
-
-    colCount = matrix.headers.length || 1;
-    rowCount = matrix.rows.length + (matrix.headers.length ? 1 : 0);
-    estimatedHeight = Math.max(48, rowCount * 18 + 24);
+    colCount = matrix.columnCount;
+    headerCount = matrix.headerRows.length;
+    rowCount = headerCount + matrix.bodyRows.length;
+    heightSum = 0;
+    for (r = 0; r < matrix.rowHeights.length; r++) {
+        if (!isNaN(Number(matrix.rowHeights[r]))) {
+            heightSum += Number(matrix.rowHeights[r]);
+        }
+    }
+    estimatedHeight = heightSum > 0 ? heightSum + 8 : Math.max(48, rowCount * 28 + 12);
 
     if (matrix.title) {
         try {
@@ -7448,6 +7650,7 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
     }
 
     layoutBounds = ensureLayoutSpace(layoutState, Math.min(estimatedHeight, 120));
+    frameWidth = layoutBounds.right - layoutBounds.left;
     try {
         frame = createTextFrameOnPage(
             layoutState.page,
@@ -7459,54 +7662,46 @@ function populateDynamicTableBlock(layoutState, document, registryEntry, data, b
 
         table = frame.insertionPoints.item(-1).tables.add();
         table.columnCount = colCount;
-        if (matrix.headers.length) {
-            table.headerRowCount = 1;
-            table.bodyRowCount = matrix.rows.length > 0 ? matrix.rows.length : 1;
-        } else {
-            table.headerRowCount = 0;
-            table.bodyRowCount = matrix.rows.length > 0 ? matrix.rows.length : 1;
+        // Keep every row in the body. The JSON already repeats the header on a
+        // continued table, so an InDesign header row would print it twice.
+        table.headerRowCount = 0;
+        table.bodyRowCount = rowCount > 0 ? rowCount : 1;
+        try { table.strokeWeight = 0; } catch (tableStrokeError) {}
+
+        widths = scaleTableColumnWidths(matrix.columnWidths, colCount, frameWidth);
+        for (c = 0; c < colCount; c++) {
+            try {
+                table.columns[c].width = widths[c];
+            } catch (columnWidthError) {}
         }
 
-        if (matrix.headers.length) {
+        strokeColor = null;
+        try {
+            strokeColor = ensureDocumentColor(
+                document,
+                "JSON_TABLE_RULE",
+                hexToRgb((style && style.borderColor) || "#000000")
+            );
+        } catch (strokeColorError) {}
+
+        for (r = 0; r < rowCount; r++) {
+            isHeader = r < headerCount;
+            textStyle = isHeader ? (headerStyle || rowsStyle) : rowsStyle;
             for (c = 0; c < colCount; c++) {
-                cell = table.rows[0].cells[c];
-                cell.contents = matrix.headers[c] || "";
-                if (c < matrix.indexCount) {
-                    styleTableCellText(cell, subHeadingStyle || headingStyle);
-                    applyCellFillFromHex(
-                        cell,
-                        (subHeadingStyle && subHeadingStyle.backgroundColor) ||
-                            (headingStyle && headingStyle.backgroundColor)
-                    );
-                } else {
-                    styleTableCellText(cell, headingStyle);
-                    applyCellFillFromHex(
-                        cell,
-                        headingStyle && headingStyle.backgroundColor
-                    );
-                }
-            }
-        }
-
-        for (r = 0; r < matrix.rows.length; r++) {
-            for (c = 0; c < colCount; c++) {
-                cell = table.rows[r + (matrix.headers.length ? 1 : 0)].cells[c];
-                cell.contents = matrix.rows[r][c] != null ? String(matrix.rows[r][c]) : "";
-
-                if (c < matrix.indexCount) {
-                    cellStyle = subHeadingStyle || rowsStyle;
-                    fillHex = (subHeadingStyle && subHeadingStyle.backgroundColor) ||
-                        (rowsStyle && rowsStyle.backgroundColor);
-                } else {
-                    cellStyle = rowsStyle;
-                    fillHex = rowsStyle && rowsStyle.backgroundColor;
-                    if (r % 2 === 1 && rowsStyle && rowsStyle.altBackgroundColor) {
-                        fillHex = rowsStyle.altBackgroundColor;
-                    }
-                }
-
-                styleTableCellText(cell, cellStyle);
-                applyCellFillFromHex(cell, fillHex);
+                cell = table.rows[r].cells[c];
+                applyTableCellText(
+                    cell,
+                    isHeader
+                        ? (matrix.headerRows[r][c] || "")
+                        : (matrix.bodyRows[r - headerCount][c] || ""),
+                    textStyle
+                );
+                applyTableCellInsets(cell, style);
+                applyTableCellBox(
+                    cell,
+                    tableEdgeWeights(isHeader, c, colCount, style),
+                    strokeColor
+                );
             }
         }
 
@@ -8035,7 +8230,7 @@ function logResolvedTypographySample() {
             continue;
         }
         if (isTableStyle(style)) {
-            appendRenderLog("  style " + key + ": table heading/subHeading/rows");
+            appendRenderLog("  style " + key + ": table header/rows");
             continue;
         }
         color = style.color ? ("[" + style.color.join(",") + "]") : "(none)";
