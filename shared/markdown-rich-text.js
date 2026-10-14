@@ -8,8 +8,10 @@
  * block type untouched.
  *
  * The result is attached as `data.rich_text`: a flat list of
- * `{ kind, html, number? }` entries, where `html` uses the inline markup both
- * renderers already understand (b/i/span/mark/a/sup). Renderers only decide how
+ * `{ kind, html, number?, markerColor? }` entries, where `html` uses the inline
+ * markup both renderers already understand (b/i/u/span/mark/a/sup/sub/br).
+ * A single newline stays inside the paragraph as `<br>`. A blank line starts
+ * the next block. Renderers only decide how
  * each `kind` looks; they do no Markdown parsing.
  */
 
@@ -21,10 +23,16 @@ const MARKDOWN_SIGNALS = [
   /^\s{0,3}>\s+\S/m, // > quote
   /^\s{0,3}[-*+]\s+\S/m, // - item
   /^\s{0,3}\d+[.)]\s+\S/m, // 1. item
+  /\*\*\*[^*\n]+?\*\*\*/, // ***bold italic***
   /\*\*[^*\n]+\*\*/, // **bold**
   /__[^_\n]+__/, // __bold__
   /(^|[^*\n])\*(?!\s)[^*\n]+?\*(?!\*)/, // *italic*
   /<mark[\s>]/i, // <mark>
+  /<u[\s>]/i, // <u>
+  /<sub[\s>]/i, // <sub>
+  /<span\b[^>]*font-size\s*:/i,
+  /<span\b[^>]*background-color\s*:/i,
+  /<span\b[^>]*(?:^|[^-a-zA-Z])color\s*:/i,
   /\[[^\]\n]+\]\([^)\s]+\)/, // [text](url)
 ];
 
@@ -59,6 +67,7 @@ export const markdownInlineToHtml = (value) => {
     (match, label, href) => `<a href="${escapeAttribute(href)}">${label}</a>`
   );
 
+  text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<b><i>$1</i></b>');
   text = text.replace(/\*\*([^\n]+?)\*\*/g, '<b>$1</b>');
   text = text.replace(/__([^\n]+?)__/g, '<b>$1</b>');
   // Single markers only run after the double ones are gone, so no lookbehind.
@@ -97,8 +106,8 @@ const classifyLine = (rawLine) => {
 
 /**
  * Parse a Markdown snippet into the flat block list renderers consume.
- * Consecutive plain lines are joined into one paragraph (soft wraps), and
- * numbered items are renumbered sequentially per run.
+ * Consecutive plain lines stay one paragraph, joined with `<br>`. A blank line
+ * starts the next block. Numbered items are renumbered sequentially per run.
  */
 export const parseMarkdownRichText = (value) => {
   const text = String(value ?? '');
@@ -110,7 +119,8 @@ export const parseMarkdownRichText = (value) => {
 
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
-    out.push({ kind: 'paragraph', html: markdownInlineToHtml(paragraphLines.join(' ')) });
+    // One newline is a line break. A blank line already flushed this paragraph.
+    out.push({ kind: 'paragraph', html: markdownInlineToHtml(paragraphLines.join('<br>')) });
     paragraphLines = [];
   };
 
@@ -151,6 +161,16 @@ const normalizeType = (value) =>
 
 const PARAGRAPH_TYPES = new Set(['paragraphtext', 'paragraph']);
 
+export const normalizeMarkerColor = (value) => {
+  const raw = String(value ?? '').trim();
+  const hex = raw.replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) return `#${hex}`;
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    return `#${hex.split('').map((char) => char + char).join('')}`;
+  }
+  return '';
+};
+
 /**
  * Attach `data.rich_text` to every ParagraphText block whose text is Markdown.
  * Blocks without Markdown, and all other block types, are left alone.
@@ -168,6 +188,16 @@ export const expandMarkdownRichText = (document) => {
       if (!hasMarkdown(text)) continue;
 
       const richText = parseMarkdownRichText(text);
+      const markerColor = normalizeMarkerColor(
+        block?.data?.marker_color || block?.data?.markerColor
+      );
+      if (markerColor) {
+        richText.forEach((entry) => {
+          if (entry.kind === 'bullet' || entry.kind === 'number') {
+            entry.markerColor = markerColor;
+          }
+        });
+      }
       if (richText.length) block.data.rich_text = richText;
     }
   }

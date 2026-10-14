@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'SPAN', 'SUP', 'A', 'BR', 'MARK']);
+const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'U', 'SPAN', 'SUP', 'SUB', 'A', 'BR', 'MARK']);
 
 const getAttr = (el, name) => {
   try {
@@ -88,6 +88,16 @@ const walkNodes = (nodes, keyPrefix = 'n', options = {}) => {
 
     if (tag === 'B' || tag === 'STRONG') {
       out.push(<strong key={key}>{children}</strong>);
+      return;
+    }
+
+    if (tag === 'U') {
+      out.push(<u key={key}>{children}</u>);
+      return;
+    }
+
+    if (tag === 'SUB') {
+      out.push(<sub key={key}>{children}</sub>);
       return;
     }
 

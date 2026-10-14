@@ -1,5 +1,9 @@
 import { getPageColumns } from '../../../../shared/layout-formats.js';
-import { hasMarkdown, parseMarkdownRichText } from '../../../../shared/markdown-rich-text.js';
+import {
+  hasMarkdown,
+  normalizeMarkerColor,
+  parseMarkdownRichText,
+} from '../../../../shared/markdown-rich-text.js';
 
 const COMPONENT_TYPE_MAP = {
   heading: 'Heading',
@@ -10,11 +14,22 @@ const COMPONENT_TYPE_MAP = {
 };
 
 const resolveParagraphRichText = (block, text) => {
+  let rich = null;
   if (Array.isArray(block?.data?.rich_text) && block.data.rich_text.length) {
-    return block.data.rich_text;
+    rich = block.data.rich_text;
+  } else if (hasMarkdown(text)) {
+    rich = parseMarkdownRichText(text);
   }
-  if (hasMarkdown(text)) return parseMarkdownRichText(text);
-  return null;
+  if (!rich) return null;
+
+  const markerColor = normalizeMarkerColor(block?.data?.marker_color || block?.data?.markerColor);
+  if (!markerColor) return rich;
+
+  return rich.map((entry) =>
+    (entry?.kind === 'bullet' || entry?.kind === 'number') && !entry.markerColor
+      ? { ...entry, markerColor }
+      : entry
+  );
 };
 
 

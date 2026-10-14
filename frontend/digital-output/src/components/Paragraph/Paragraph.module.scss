@@ -114,6 +114,13 @@
   color: var(--typography-paragraphText-color, var(--paragraph-color));
 }
 
+.bulletList,
+.numberedList {
+  &.hasMarkerColor :global(li)::marker {
+    color: var(--md-marker-color);
+  }
+}
+
 .bulletList {
   margin: 0 0 0.85rem;
   padding-left: 1.25rem;

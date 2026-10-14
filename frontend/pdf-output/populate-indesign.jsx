@@ -3784,6 +3784,49 @@ function parseInlineStyleColor(attrs) {
     return named || "";
 }
 
+function parseInlineStyleBackground(attrs) {
+    var match = /background-color\s*:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)/i.exec(String(attrs || ""));
+    var token;
+    var hex;
+    var named;
+
+    if (!match) {
+        return "";
+    }
+
+    token = match[1];
+    if (token.charAt(0) === "#") {
+        hex = token.replace(/^#/, "");
+        if (hex.length === 3) {
+            hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2);
+        }
+        if (hex.length !== 6) {
+            return "";
+        }
+        return "#" + hex;
+    }
+
+    named = NAMED_HTML_COLORS[token.toLowerCase()];
+    return named || "";
+}
+
+function parseInlineStyleFontSize(attrs) {
+    var match = /font-size\s*:\s*(\d+(?:\.\d+)?)\s*(pt|px)?/i.exec(String(attrs || ""));
+    var size;
+
+    if (!match) {
+        return 0;
+    }
+    size = Number(match[1]);
+    if (!size || size <= 0) {
+        return 0;
+    }
+    if (String(match[2] || "").toLowerCase() === "px") {
+        size = size * 0.75;
+    }
+    return size;
+}
+
 function parseHrefAttr(attrs) {
     var match = /href\s*=\s*(["'])([^"']+)\1/i.exec(String(attrs || ""));
     if (match) {
@@ -3810,8 +3853,12 @@ function parseInlineMarkup(raw) {
     var runItalic;
     var runBold;
     var runSuper;
+    var runSub;
+    var runUnderline;
     var runColor;
     var runHighlight;
+    var runBackground;
+    var runFontSize;
     var runHref;
 
     text = fixUtf8Mojibake(String(raw || ""));
@@ -3846,8 +3893,10 @@ function parseInlineMarkup(raw) {
                 tag === "em" ||
                 tag === "b" ||
                 tag === "strong" ||
+                tag === "u" ||
                 tag === "span" ||
                 tag === "sup" ||
+                tag === "sub" ||
                 tag === "a" ||
                 tag === "mark"
             ) {
@@ -3856,10 +3905,14 @@ function parseInlineMarkup(raw) {
                     start: plain.length,
                     italic: tag === "i" || tag === "em",
                     bold: tag === "b" || tag === "strong",
+                    underline: tag === "u",
                     superscript: tag === "sup",
+                    subscript: tag === "sub",
                     highlight: tag === "mark",
                     href: tag === "a" ? parseHrefAttr(attrs) : "",
-                    color: parseInlineStyleColor(attrs)
+                    color: parseInlineStyleColor(attrs),
+                    backgroundColor: parseInlineStyleBackground(attrs),
+                    fontSize: parseInlineStyleFontSize(attrs)
                 });
             }
             // Unknown open tags are dropped; inner text is kept.
@@ -3870,31 +3923,44 @@ function parseInlineMarkup(raw) {
                     stack.splice(i, 1);
                     runItalic = open.italic;
                     runBold = open.bold;
+                    runUnderline = open.underline;
                     runSuper = open.superscript;
+                    runSub = open.subscript;
                     runColor = open.color;
                     runHighlight = open.highlight;
+                    runBackground = open.backgroundColor;
+                    runFontSize = open.fontSize;
                     runHref = open.href || "";
                     // Inherit open emphasis/color from parents still on the stack.
                     var p;
                     for (p = 0; p < stack.length; p++) {
                         if (stack[p].italic) runItalic = true;
                         if (stack[p].bold) runBold = true;
+                        if (stack[p].underline) runUnderline = true;
                         if (stack[p].superscript) runSuper = true;
+                        if (stack[p].subscript) runSub = true;
                         if (stack[p].highlight) runHighlight = true;
                         if (!runColor && stack[p].color) runColor = stack[p].color;
+                        if (!runBackground && stack[p].backgroundColor) runBackground = stack[p].backgroundColor;
+                        if (!runFontSize && stack[p].fontSize) runFontSize = stack[p].fontSize;
                         if (!runHref && stack[p].href) runHref = stack[p].href;
                     }
                     if (
                         plain.length > open.start &&
-                        (runItalic || runBold || runSuper || runColor || runHighlight || runHref)
+                        (runItalic || runBold || runUnderline || runSuper || runSub ||
+                            runColor || runHighlight || runBackground || runFontSize || runHref)
                     ) {
                         runs.push({
                             start: open.start,
                             end: plain.length,
                             italic: runItalic,
                             bold: runBold,
+                            underline: runUnderline,
                             superscript: runSuper,
+                            subscript: runSub,
                             highlight: runHighlight,
+                            backgroundColor: runBackground,
+                            fontSize: runFontSize,
                             href: runHref,
                             color: runColor
                         });
@@ -3956,7 +4022,7 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
             runStyle = {
                 font: base.fontFamily || base.font || "",
                 fontFamily: base.fontFamily || base.font || "",
-                pointSize: existingSize || base.pointSize,
+                pointSize: run.fontSize || existingSize || base.pointSize,
                 bold: run.bold ? true : isTruthyFlag(base.bold),
                 italic: run.italic ? true : isTruthyFlag(base.italic),
                 color: run.color
@@ -3964,6 +4030,11 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
                     : (run.href ? [5, 99, 193] : base.color)
             };
             applyThemeFontAndEmphasis(range, runStyle);
+            if (run.fontSize) {
+                try {
+                    range.pointSize = run.fontSize;
+                } catch (fontSizeError) {}
+            }
             if (run.color || run.href) {
                 applyTextColor(range, runStyle);
             }
@@ -3971,17 +4042,22 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
                 try {
                     range.position = Position.SUPERSCRIPT;
                 } catch (supError) {}
+            } else if (run.subscript) {
+                try {
+                    range.position = Position.SUBSCRIPT;
+                } catch (subError) {}
             }
-            if (run.highlight) {
+            if (run.backgroundColor) {
+                applyHighlightToRange(range, run.backgroundColor);
+            } else if (run.highlight) {
                 applyHighlightToRange(range);
+            } else if (run.underline || (run.href && /^https?:\/\//i.test(run.href))) {
+                try {
+                    range.underline = true;
+                } catch (underlineError) {}
             }
             if (run.href && /^https?:\/\//i.test(run.href)) {
                 applyHyperlinkToRange(story, range, run.href);
-                if (!run.highlight) {
-                    try {
-                        range.underline = true;
-                    } catch (linkUnderlineError) {}
-                }
             }
         } catch (rangeError) {}
     }
@@ -4028,10 +4104,11 @@ function dropRunColors(runs) {
     return out;
 }
 
-function applyHighlightToRange(range) {
+function applyHighlightToRange(range, hexColor) {
     var doc;
     var color;
     var weight;
+    var rgb;
 
     if (!range) {
         return;
@@ -4039,7 +4116,12 @@ function applyHighlightToRange(range) {
 
     try {
         doc = app.activeDocument;
-        color = ensureDocumentColor(doc, "JSON_HIGHLIGHT", [255, 230, 102]);
+        rgb = hexColor ? hexToRgb(hexColor) : [255, 230, 102];
+        color = ensureDocumentColor(
+            doc,
+            "JSON_HIGHLIGHT_" + rgb.join("_"),
+            rgb
+        );
         weight = 8;
         try {
             weight = Math.max(7, Number(range.pointSize) * 0.9);
@@ -4094,6 +4176,7 @@ function markdownInlineToHtml(value) {
             return "<a href=\"" + escapeMarkupAttr(href) + "\">" + label + "</a>";
         }
     );
+    text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, "<b><i>$1</i></b>");
     text = text.replace(/\*\*([^\n]+?)\*\*/g, "<b>$1</b>");
     text = text.replace(/__([^\n]+?)__/g, "<b>$1</b>");
     text = text.replace(/\*([^*\n]+?)\*/g, "<i>$1</i>");
@@ -4143,10 +4226,16 @@ function looksLikeMarkdown(value) {
         /^\s{0,3}>\s+\S/m.test(text) ||
         /^\s{0,3}[-*+]\s+\S/m.test(text) ||
         /^\s{0,3}\d+[.)]\s+\S/m.test(text) ||
+        /\*\*\*[^*\n]+?\*\*\*/.test(text) ||
         /\*\*[^*\n]+\*\*/.test(text) ||
         /__[^_\n]+__/.test(text) ||
         /\*[^*\n]+\*/.test(text) ||
         /<mark[\s>]/i.test(text) ||
+        /<u[\s>]/i.test(text) ||
+        /<sub[\s>]/i.test(text) ||
+        /<span\b[^>]*font-size\s*:/i.test(text) ||
+        /<span\b[^>]*background-color\s*:/i.test(text) ||
+        /<span\b[^>]*(?:^|[^-a-zA-Z])color\s*:/i.test(text) ||
         /\[[^\]\n]+\]\([^)\s]+\)/.test(text)
     );
 }
@@ -4166,7 +4255,7 @@ function parseMarkdownRichTextLocal(value) {
         }
         out.push({
             kind: "paragraph",
-            html: markdownInlineToHtml(paragraphLines.join(" "))
+            html: markdownInlineToHtml(paragraphLines.join("<br>"))
         });
         paragraphLines = [];
     }
@@ -4213,14 +4302,56 @@ function parseMarkdownRichTextLocal(value) {
     return out;
 }
 
+function normalizeMarkerColor(value) {
+    var raw = trimString(String(value || ""));
+    var hex = raw.replace(/^#/, "");
+    var i;
+    var expanded = "";
+
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+        return "#" + hex;
+    }
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+        for (i = 0; i < hex.length; i++) {
+            expanded += hex.charAt(i) + hex.charAt(i);
+        }
+        return "#" + expanded;
+    }
+    return "";
+}
+
+function stampMarkerColor(entries, color) {
+    var i;
+
+    if (!entries || !color) {
+        return entries;
+    }
+    for (i = 0; i < entries.length; i++) {
+        if (
+            entries[i] &&
+            (entries[i].kind === "bullet" || entries[i].kind === "number") &&
+            !entries[i].markerColor
+        ) {
+            entries[i].markerColor = color;
+        }
+    }
+    return entries;
+}
+
 function getParagraphRichText(data) {
+    var entries = null;
+    var color = "";
+
     if (data && data.rich_text && data.rich_text.length) {
-        return data.rich_text;
+        entries = data.rich_text;
+    } else if (data && looksLikeMarkdown(data.text)) {
+        entries = parseMarkdownRichTextLocal(data.text);
     }
-    if (data && looksLikeMarkdown(data.text)) {
-        return parseMarkdownRichTextLocal(data.text);
+    if (!entries) {
+        return null;
     }
-    return null;
+    color = normalizeMarkerColor(data.marker_color || data.markerColor);
+    return stampMarkerColor(entries, color);
 }
 
 function composeRichTextMarkup(entries) {
@@ -4242,6 +4373,25 @@ function composeRichTextMarkup(entries) {
     return parts.join("\r");
 }
 
+function richEntryParagraphSpan(entry) {
+    var html = String((entry && entry.html) || "");
+    var breaks = html.match(/<br\s*\/?>/gi);
+    return 1 + (breaks ? breaks.length : 0);
+}
+
+function markdownMarkerText(entry) {
+    if (!entry || !entry.markerColor) {
+        return "";
+    }
+    if (entry.kind === "bullet") {
+        return "\u2022";
+    }
+    if (entry.kind === "number") {
+        return String(entry.number || "1") + ".";
+    }
+    return "";
+}
+
 /**
  * Style each composed paragraph from paragraphText: headings scaled and bold,
  * lists hanging-indented, quotes italic and inset. Inline runs are reapplied
@@ -4250,6 +4400,8 @@ function composeRichTextMarkup(entries) {
 function applyMarkdownParagraphKinds(frame, entries, baseStyle) {
     var story;
     var i;
+    var k;
+    var span;
     var paraIndex = 0;
     var paragraph;
     var entry;
@@ -4273,55 +4425,102 @@ function applyMarkdownParagraphKinds(frame, entries, baseStyle) {
 
     for (i = 0; i < entries.length && paraIndex < story.paragraphs.length; i++) {
         entry = entries[i];
-        paragraph = story.paragraphs[paraIndex];
-        paraIndex += 1;
+        span = richEntryParagraphSpan(entry);
 
-        try {
-            paragraph.justification = Justification.LEFT_ALIGN;
-            paragraph.spaceBefore = 0;
-            paragraph.spaceAfter = 4;
-            paragraph.leftIndent = 0;
-            paragraph.firstLineIndent = 0;
-        } catch (resetError) {}
+        for (k = 0; k < span && paraIndex < story.paragraphs.length; k++) {
+            paragraph = story.paragraphs[paraIndex];
+            paraIndex += 1;
 
-        if (entry.kind === "h1" || entry.kind === "h2") {
-            headingStyle = {
-                font: baseStyle.fontFamily || baseStyle.font || "",
-                fontFamily: baseStyle.fontFamily || baseStyle.font || "",
-                pointSize: Math.round(baseSize * (entry.kind === "h1" ? 1.6 : 1.3)),
-                bold: true,
-                italic: false,
-                color: baseStyle.color
-            };
             try {
-                paragraph.pointSize = headingStyle.pointSize;
-                paragraph.spaceBefore = i === 0 ? 0 : 10;
-                paragraph.spaceAfter = 6;
-            } catch (headingSizeError) {}
-            applyThemeFontAndEmphasis(paragraph, headingStyle);
-        } else if (entry.kind === "bullet" || entry.kind === "number") {
-            try {
-                paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
-                paragraph.firstLineIndent = -DYNAMIC_LAYOUT.listHangingIndent;
-                paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
-                paragraph.spaceAfter = DYNAMIC_LAYOUT.listItemGap;
-            } catch (listError) {}
-        } else if (entry.kind === "quote") {
-            headingStyle = {
-                font: baseStyle.fontFamily || baseStyle.font || "",
-                fontFamily: baseStyle.fontFamily || baseStyle.font || "",
-                pointSize: baseSize,
-                bold: false,
-                italic: true,
-                color: baseStyle.color
-            };
-            try {
-                paragraph.leftIndent = 18;
-                paragraph.spaceBefore = 6;
-                paragraph.spaceAfter = 6;
-            } catch (quoteIndentError) {}
-            applyThemeFontAndEmphasis(paragraph, headingStyle);
+                paragraph.justification = Justification.LEFT_ALIGN;
+                paragraph.spaceBefore = 0;
+                paragraph.spaceAfter = k === span - 1 ? 4 : 0;
+                paragraph.leftIndent = 0;
+                paragraph.firstLineIndent = 0;
+            } catch (resetError) {}
+
+            if (entry.kind === "h1" || entry.kind === "h2") {
+                headingStyle = {
+                    font: baseStyle.fontFamily || baseStyle.font || "",
+                    fontFamily: baseStyle.fontFamily || baseStyle.font || "",
+                    pointSize: Math.round(baseSize * (entry.kind === "h1" ? 1.6 : 1.3)),
+                    bold: true,
+                    italic: false,
+                    color: baseStyle.color
+                };
+                try {
+                    paragraph.pointSize = headingStyle.pointSize;
+                    paragraph.spaceBefore = i === 0 && k === 0 ? 0 : 10;
+                    paragraph.spaceAfter = 6;
+                } catch (headingSizeError) {}
+                applyThemeFontAndEmphasis(paragraph, headingStyle);
+            } else if (entry.kind === "bullet" || entry.kind === "number") {
+                try {
+                    paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
+                    paragraph.firstLineIndent = k === 0 ? -DYNAMIC_LAYOUT.listHangingIndent : 0;
+                    paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
+                    paragraph.spaceAfter = k === span - 1 ? DYNAMIC_LAYOUT.listItemGap : 0;
+                } catch (listError) {}
+            } else if (entry.kind === "quote") {
+                headingStyle = {
+                    font: baseStyle.fontFamily || baseStyle.font || "",
+                    fontFamily: baseStyle.fontFamily || baseStyle.font || "",
+                    pointSize: baseSize,
+                    bold: false,
+                    italic: true,
+                    color: baseStyle.color
+                };
+                try {
+                    paragraph.leftIndent = 18;
+                    paragraph.spaceBefore = k === 0 ? 6 : 0;
+                    paragraph.spaceAfter = k === span - 1 ? 6 : 0;
+                } catch (quoteIndentError) {}
+                applyThemeFontAndEmphasis(paragraph, headingStyle);
+            }
         }
+    }
+}
+
+function applyMarkdownMarkerColors(frame, entries) {
+    var story;
+    var i;
+    var span;
+    var paraIndex = 0;
+    var paragraph;
+    var entry;
+    var marker;
+    var range;
+
+    if (!frame || !entries || !entries.length) {
+        return;
+    }
+
+    try {
+        story = frame.parentStory;
+    } catch (storyError) {
+        return;
+    }
+    if (!story) {
+        return;
+    }
+
+    for (i = 0; i < entries.length && paraIndex < story.paragraphs.length; i++) {
+        entry = entries[i];
+        span = richEntryParagraphSpan(entry);
+        marker = markdownMarkerText(entry);
+        paragraph = story.paragraphs[paraIndex];
+        paraIndex += span;
+
+        if (!marker || !paragraph) {
+            continue;
+        }
+        try {
+            if (paragraph.characters.length < marker.length) {
+                continue;
+            }
+            range = paragraph.characters.itemByRange(0, marker.length - 1);
+            applyTextColor(range, { color: hexToRgb(entry.markerColor) });
+        } catch (markerError) {}
     }
 }
 
@@ -6504,6 +6703,8 @@ function populateDynamicTextBlock(layoutState, document, registryEntry, itemType
         }
         if (richEntries) {
             applyMarkdownParagraphKinds(frame, richEntries, registryEntry.style);
+            applyInlineMarkupRuns(frame, parseInlineMarkup(cleanText).runs, registryEntry.style);
+            applyMarkdownMarkerColors(frame, richEntries);
             growTextFrameToFitContent(frame);
         }
         advanceLayoutCursor(layoutState, frame, resolveBlockSpacing(registryEntry));

@@ -61,8 +61,13 @@ const RichTextBlock = ({ richText }) => {
           const isNumbered = entry.kind === 'number';
           const ListTag = isNumbered ? 'ol' : 'ul';
           const listClass = isNumbered ? styles.numberedList : styles.bulletList;
+          const markerColor = entry.items.find((item) => item.markerColor)?.markerColor;
           return (
-            <ListTag key={`md-list-${index}`} className={listClass}>
+            <ListTag
+              key={`md-list-${index}`}
+              className={markerColor ? `${listClass} ${styles.hasMarkerColor}` : listClass}
+              style={markerColor ? { '--md-marker-color': markerColor } : undefined}
+            >
               {entry.items.map((item, itemIndex) => (
                 <li key={`md-li-${itemIndex}`}>{renderInlineHtml(item.html)}</li>
               ))}
