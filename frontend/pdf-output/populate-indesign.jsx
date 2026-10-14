@@ -3836,6 +3836,126 @@ function parseHrefAttr(attrs) {
     return match ? match[1] : "";
 }
 
+function sameInlineRunStyle(a, b) {
+    return a.italic === b.italic &&
+        a.bold === b.bold &&
+        a.underline === b.underline &&
+        a.superscript === b.superscript &&
+        a.subscript === b.subscript &&
+        a.highlight === b.highlight &&
+        a.backgroundColor === b.backgroundColor &&
+        a.fontSize === b.fontSize &&
+        a.href === b.href &&
+        a.color === b.color;
+}
+
+/**
+ * Nested tags each emit a run for the whole span. The outer close only
+ * carries its own flag, so applying it last was clearing bold or italic
+ * that the inner tag had already set. Fold overlaps into one run per slice.
+ */
+function mergeInlineRuns(runs) {
+    var points = [];
+    var uniq = [];
+    var merged = [];
+    var i;
+    var j;
+    var run;
+    var start;
+    var end;
+    var slice;
+    var covering;
+
+    if (!runs || runs.length < 2) {
+        return runs || [];
+    }
+
+    for (i = 0; i < runs.length; i++) {
+        run = runs[i];
+        if (!run || run.end <= run.start) {
+            continue;
+        }
+        points.push(run.start);
+        points.push(run.end);
+    }
+    points.sort(function (a, b) { return a - b; });
+    for (i = 0; i < points.length; i++) {
+        if (!uniq.length || uniq[uniq.length - 1] !== points[i]) {
+            uniq.push(points[i]);
+        }
+    }
+
+    for (i = 0; i < uniq.length - 1; i++) {
+        start = uniq[i];
+        end = uniq[i + 1];
+        covering = [];
+        for (j = 0; j < runs.length; j++) {
+            run = runs[j];
+            if (!run || run.start >= end || run.end <= start) {
+                continue;
+            }
+            covering.push({ run: run, index: j });
+        }
+        if (!covering.length) {
+            continue;
+        }
+
+        slice = {
+            start: start,
+            end: end,
+            italic: false,
+            bold: false,
+            underline: false,
+            superscript: false,
+            subscript: false,
+            highlight: false,
+            backgroundColor: "",
+            fontSize: 0,
+            href: "",
+            color: ""
+        };
+        for (j = 0; j < covering.length; j++) {
+            run = covering[j].run;
+            if (run.italic) slice.italic = true;
+            if (run.bold) slice.bold = true;
+            if (run.underline) slice.underline = true;
+            if (run.superscript) slice.superscript = true;
+            if (run.subscript) slice.subscript = true;
+            if (run.highlight) slice.highlight = true;
+        }
+
+        // Tighter span wins for colour, size, and link. Equal spans keep the
+        // earlier run, which is the inner tag (it closes first).
+        covering.sort(function (a, b) {
+            var aSpan = a.run.end - a.run.start;
+            var bSpan = b.run.end - b.run.start;
+            if (aSpan !== bSpan) {
+                return aSpan - bSpan;
+            }
+            return a.index - b.index;
+        });
+        for (j = 0; j < covering.length; j++) {
+            run = covering[j].run;
+            if (!slice.color && run.color) slice.color = run.color;
+            if (!slice.backgroundColor && run.backgroundColor) slice.backgroundColor = run.backgroundColor;
+            if (!slice.fontSize && run.fontSize) slice.fontSize = run.fontSize;
+            if (!slice.href && run.href) slice.href = run.href;
+        }
+
+        if (
+            merged.length &&
+            merged[merged.length - 1].end === slice.start &&
+            sameInlineRunStyle(merged[merged.length - 1], slice)
+        ) {
+            merged[merged.length - 1].end = slice.end;
+        } else {
+            merged.push(slice);
+        }
+    }
+
+    return merged.length ? merged : runs;
+}
+
 function parseInlineMarkup(raw) {
     var text;
     var plain = "";
@@ -3977,7 +4097,7 @@ function parseInlineMarkup(raw) {
         plain += text.substring(last);
     }
 
-    return { plain: plain, runs: runs };
+    return { plain: plain, runs: mergeInlineRuns(runs) };
 }
 
 function applyInlineMarkupRuns(frame, runs, baseStyle) {
