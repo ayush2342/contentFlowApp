@@ -9,6 +9,7 @@ import { normalizeAppearanceId } from '../../../shared/layout-formats.js';
 
 const pdfCache = new Map();
 const defaultPdfSourceDir = path.resolve(process.cwd(), '..', 'frontend', 'pdf-output');
+const theme2SourceDir = path.join(defaultPdfSourceDir, 'theme2');
 const runtimeRoot = path.resolve(process.cwd(), 'runtime', 'pdf-jobs');
 
 const getCacheRecord = (cacheKey) => {
@@ -172,11 +173,15 @@ const collectImageKeys = (data) => {
   return keys;
 };
 
-const resolveInDesignPaths = () => {
-  const scriptSourcePath =
-    env.inDesignScriptPath || path.join(defaultPdfSourceDir, 'populate-indesign.jsx');
-  const templateSourcePath =
-    env.inDesignTemplatePath || path.join(defaultPdfSourceDir, 'templates', 'projectX.indd');
+const resolveInDesignPaths = (templateId) => {
+  const themeId = normalizeAppearanceId(templateId, '');
+  const useThemeMaster = themeId === '2';
+  const scriptSourcePath = useThemeMaster
+    ? path.join(theme2SourceDir, 'populate.jsx')
+    : env.inDesignScriptPath || path.join(defaultPdfSourceDir, 'populate-indesign.jsx');
+  const templateSourcePath = useThemeMaster
+    ? path.join(theme2SourceDir, 'templates', 'projectX.indd')
+    : env.inDesignTemplatePath || path.join(defaultPdfSourceDir, 'templates', 'projectX.indd');
 
   if (!env.inDesignExePath) {
     throw new Error(
@@ -185,9 +190,20 @@ const resolveInDesignPaths = () => {
   }
 
   return {
+    mode: useThemeMaster ? 'theme2' : 'generic',
     scriptSourcePath,
     templateSourcePath,
   };
+};
+
+const copyDocumentFonts = async (templateSourcePath, templatesDir) => {
+  const sourceDir = path.join(path.dirname(templateSourcePath), 'Document fonts');
+  try {
+    await fs.access(sourceDir);
+  } catch {
+    return;
+  }
+  await fs.cp(sourceDir, path.join(templatesDir, 'Document fonts'), { recursive: true });
 };
 
 const runInDesignScript = async ({ scriptPath }) =>
@@ -254,7 +270,7 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
     }
   }
 
-  const { scriptSourcePath, templateSourcePath } = resolveInDesignPaths();
+  const { mode, scriptSourcePath, templateSourcePath } = resolveInDesignPaths(resolvedTemplateId);
   const jobId = crypto.randomUUID();
   const jobDir = path.join(runtimeRoot, jobId);
   const assetsDir = path.join(jobDir, 'assets');
@@ -270,6 +286,10 @@ export const generatePdf = async ({ tenantId, documentId, etag, templateId, data
   await fs.mkdir(templatesDir, { recursive: true });
   await fs.copyFile(scriptSourcePath, runtimeScriptPath);
   await fs.copyFile(templateSourcePath, runtimeTemplatePath);
+  await copyDocumentFonts(templateSourcePath, templatesDir);
+  console.info(
+    `[pdf] indesign mode=${mode} templateId=${resolvedTemplateId} script=${scriptSourcePath} template=${templateSourcePath}`
+  );
 
   // Stylesheet + layout from templateId: S3 first, else local theme/format.
   try {

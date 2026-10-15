@@ -1,0 +1,444 @@
+%!Adobe-FontList 1.25
+%Locale:0x409
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:AGaramondPro-Italic
+FamilyName:Adobe Garamond Pro
+StyleName:Italic
+FullName:Adobe Garamond Pro Italic
+MenuName:Adobe Garamond Pro
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\AGaramondPro-Italic.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:92132
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:1
+DesignSize:120
+NameArray:0,Mac,4,Adobe Garamond Pro Italic
+NameArray:0,Win,1,Adobe Garamond Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:AGaramondPro-Regular
+FamilyName:Adobe Garamond Pro
+StyleName:Regular
+FullName:Adobe Garamond Pro
+MenuName:Adobe Garamond Pro
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\AGaramondPro-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:126904
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+DesignSize:120
+NameArray:0,Mac,4,Adobe Garamond Pro
+NameArray:0,Win,1,Adobe Garamond Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:FuturaStd-Bold
+FamilyName:Futura Std
+StyleName:Bold
+FullName:Futura Std Bold
+MenuName:Futura Std Book
+StyleBits:2
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\FuturaStd-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:29120
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:0
+DesignSize:120
+NameArray:0,Mac,4,Futura Std Bold
+NameArray:0,Win,1,Futura Std Book
+NameArray:0,Win,16,Futura Std
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:FuturaStd-Book
+FamilyName:Futura Std
+StyleName:Book
+FullName:Futura Std Book
+MenuName:Futura Std Book
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\FuturaStd-Book.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:27972
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+DesignSize:120
+NameArray:0,Mac,4,Futura Std Book
+NameArray:0,Win,1,Futura Std Book
+NameArray:0,Win,16,Futura Std
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:MinionPro-Regular
+FamilyName:Minion Pro
+StyleName:Regular
+FullName:Minion Pro
+MenuName:Minion Pro
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\MinionPro-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:216876
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+DesignSize:110
+NameArray:0,Mac,4,Minion Pro
+NameArray:0,Win,1,Minion Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NewCaledoniaLTStd-Bold
+FamilyName:New Caledonia LT Std
+StyleName:Bold
+FullName:New Caledonia LT Std Bold
+MenuName:New Caledonia LT Std
+StyleBits:2
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:52828
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:0
+DesignSize:120
+NameArray:0,Mac,4,New Caledonia LT Std Bold
+NameArray:0,Win,1,New Caledonia LT Std
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NewCaledoniaLTStd-It
+FamilyName:New Caledonia LT Std
+StyleName:Italic
+FullName:New Caledonia LT Std Italic
+MenuName:New Caledonia LT Std
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd-It.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:39796
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:1
+DesignSize:120
+NameArray:0,Mac,18,New Caledonia LT Std It
+NameArray:0,Mac,4,New Caledonia LT Std Italic
+NameArray:0,Win,1,New Caledonia LT Std
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NewCaledoniaLTStd
+FamilyName:New Caledonia LT Std
+StyleName:Regular
+FullName:New Caledonia LT Std
+MenuName:New Caledonia LT Std
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:51840
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+DesignSize:120
+NameArray:0,Mac,4,New Caledonia LT Std
+NameArray:0,Win,1,New Caledonia LT Std
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:OpenSans-Bold
+FamilyName:Open Sans
+StyleName:Bold
+FullName:Open Sans Bold
+MenuName:Open Sans
+StyleBits:2
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-Bold.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:224592
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Open Sans Bold
+NameArray:0,Win,1,Open Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:OpenSans-BoldItalic
+FamilyName:Open Sans
+StyleName:Bold Italic
+FullName:Open Sans Bold Italic
+MenuName:Open Sans
+StyleBits:3
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-BoldItalic.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:213292
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:1
+NameArray:0,Mac,4,Open Sans Bold Italic
+NameArray:0,Win,1,Open Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:OpenSans
+FamilyName:Open Sans
+StyleName:Regular
+FullName:Open Sans
+MenuName:Open Sans
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-Regular.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:217360
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Open Sans
+NameArray:0,Win,1,Open Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:TimesNewRomanPSMT
+FamilyName:Times New Roman
+StyleName:Regular
+FullName:Times New Roman
+MenuName:Times New Roman
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times New Roman.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:824920
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Times New Roman
+NameArray:0,Win,1,Times New Roman
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Times-Bold
+FamilyName:Times
+StyleName:Bold
+FullName:Times Bold
+MenuName:Times
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+TTCOffset:388
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:919104
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Times Bold
+NameArray:0,Mac,4,Times Gras
+NameArray:0,Mac,4,Times Fett
+NameArray:0,Mac,4,Times grassetto
+NameArray:0,Mac,4,Times vet
+NameArray:0,Mac,4,Times Fet
+NameArray:0,Mac,4,Times Negrita
+NameArray:0,Mac,4,Times Fed
+NameArray:0,Mac,4,Times Carregado
+NameArray:0,Mac,4,Times Halvfet
+NameArray:0,Mac,4,Times lihava
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Times-BoldItalic
+FamilyName:Times
+StyleName:Bold Italic
+FullName:Times Bold Italic
+MenuName:Times
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+TTCOffset:1084
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:919104
+FileModTime:1786602101
+WeightClass:700
+WidthClass:5
+AngleClass:1
+NameArray:0,Mac,4,Times Bold Italic
+NameArray:0,Mac,4,Times Gras italique
+NameArray:0,Mac,4,Times Fett Kursiv
+NameArray:0,Mac,4,Times grassetto corsivo
+NameArray:0,Mac,4,Times vet-cursief
+NameArray:0,Mac,4,Times Fet Kursiv
+NameArray:0,Mac,4,Times Negrita Cursiva
+NameArray:0,Mac,4,Times Fed kursiv
+NameArray:0,Mac,4,Times Carregado It‡lico
+NameArray:0,Mac,4,Times Halvfet kursiv
+NameArray:0,Mac,4,Times lihava kursiivi
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Times-Italic
+FamilyName:Times
+StyleName:Italic
+FullName:Times Italic
+MenuName:Times
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+TTCOffset:736
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:919104
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:1
+NameArray:0,Mac,4,Times Italic
+NameArray:0,Mac,4,Times Italique
+NameArray:0,Mac,4,Times Kursiv
+NameArray:0,Mac,4,Times corsivo
+NameArray:0,Mac,4,Times cursief
+NameArray:0,Mac,4,Times Kursiv
+NameArray:0,Mac,4,Times Cursiva
+NameArray:0,Mac,4,Times kursiv
+NameArray:0,Mac,4,Times It‡lico
+NameArray:0,Mac,4,Times kursiv
+NameArray:0,Mac,4,Times kursiivi
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Times-Roman
+FamilyName:Times
+StyleName:Regular
+FullName:Times Roman
+MenuName:Times
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+TTCOffset:40
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:919104
+FileModTime:1786602101
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Times Roman
+%EndFont
+
