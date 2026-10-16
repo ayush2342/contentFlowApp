@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v45-paragraph-formats";
+    var VERSION = "cengage-v51-inline-json";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -206,6 +206,160 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
      * Do not touch fill/font here — nested styles (H1Number, LONUM) own those.
      * MUST copy paragraphShading — extract/quote styles (EXT1) use a green band.
      */
+    function docFromPara(para) {
+        try { return para.parentStory.parent; } catch (e0) {}
+        return null;
+    }
+
+    /**
+     * Spot / Pantone rule colors often export as nothing in browser PDF viewers.
+     * Keep process inks as-is; clone any other swatch into a process color.
+     */
+    function strokeProcessColor(docRef, swatch) {
+        var name;
+        var cv;
+        var space;
+        var sw;
+        if (!swatch) return null;
+        try { if (!swatch.isValid) return null; } catch (eV) { return null; }
+        try {
+            if (swatch.model === ColorModel.PROCESS) return swatch;
+        } catch (eM) {}
+        if (!docRef) return swatch;
+        try {
+            name = "CF_INK_" + String(swatch.name).replace(/[^A-Za-z0-9]+/g, "_").substring(0, 40);
+        } catch (eN) { name = "CF_INK_Rule"; }
+        try {
+            sw = docRef.colors.itemByName(name);
+            if (sw && sw.isValid) return sw;
+        } catch (eFind) {}
+        try { cv = swatch.colorValue; } catch (eCv) { cv = [0, 0, 0, 100]; }
+        try { space = swatch.space; } catch (eSp) { space = ColorSpace.CMYK; }
+        try {
+            if (space === ColorSpace.LAB) {
+                space = ColorSpace.CMYK;
+                cv = [0, 0, 0, 80];
+            }
+        } catch (eLab) {}
+        try {
+            sw = docRef.colors.add({
+                name: name,
+                model: ColorModel.PROCESS,
+                space: space,
+                colorValue: cv
+            });
+            if (sw && sw.isValid) return sw;
+        } catch (eAdd) {}
+        try {
+            sw = docRef.colors.itemByName("Black");
+            if (sw && sw.isValid) return sw;
+        } catch (eB) {}
+        return swatch;
+    }
+
+    function copyProp(dest, src, key) {
+        try { dest[key] = src[key]; } catch (e) {}
+    }
+
+    function styleHasRuleOrBorder(style) {
+        if (!style) return false;
+        try { if (style.ruleAbove) return true; } catch (e1) {}
+        try { if (style.ruleBelow) return true; } catch (e2) {}
+        try { if (style.paragraphBorderOn) return true; } catch (e3) {}
+        try { if (style.paragraphBorder) return true; } catch (e4) {}
+        return false;
+    }
+
+    /** Paragraph rules and borders from the template style, in an ink PDF viewers paint. */
+    function copyParagraphRules(para, style, docRef) {
+        var ink;
+        var tint;
+        var weight;
+        var above = false;
+        var below = false;
+        var border = false;
+        if (!para || !style) return;
+        if (!docRef) docRef = docFromPara(para);
+        try { above = !!style.ruleAbove; } catch (eA) {}
+        try { below = !!style.ruleBelow; } catch (eB) {}
+        try { if (style.paragraphBorderOn) border = true; } catch (eD0) {}
+        try { if (style.paragraphBorder) border = true; } catch (eD1) {}
+
+        try { para.ruleAbove = above; } catch (eOn) {}
+        if (above) {
+            copyProp(para, style, "ruleAboveOffset");
+            copyProp(para, style, "ruleAboveLeftIndent");
+            copyProp(para, style, "ruleAboveRightIndent");
+            copyProp(para, style, "ruleAboveType");
+            copyProp(para, style, "ruleAboveWidth");
+            copyProp(para, style, "ruleAboveGapColor");
+            copyProp(para, style, "ruleAboveGapTint");
+            try { para.ruleAboveOverprint = false; } catch (eOp) {}
+            try { para.ruleAboveGapOverprint = false; } catch (eGop) {}
+            try { weight = parseFloat(style.ruleAboveLineWeight); } catch (eWp) { weight = 0; }
+            if (!(weight > 0)) weight = 0.5;
+            try { para.ruleAboveLineWeight = weight; } catch (eW) {}
+            try { tint = parseFloat(style.ruleAboveTint); } catch (eTp) { tint = 100; }
+            if (!(tint > 0)) tint = 100;
+            try { para.ruleAboveTint = tint; } catch (eT) {}
+            try {
+                ink = strokeProcessColor(docRef, style.ruleAboveColor);
+                if (ink) para.ruleAboveColor = ink;
+            } catch (eC) {}
+        }
+
+        try { para.ruleBelow = below; } catch (eOn2) {}
+        if (below) {
+            copyProp(para, style, "ruleBelowOffset");
+            copyProp(para, style, "ruleBelowLeftIndent");
+            copyProp(para, style, "ruleBelowRightIndent");
+            copyProp(para, style, "ruleBelowType");
+            copyProp(para, style, "ruleBelowWidth");
+            copyProp(para, style, "ruleBelowGapColor");
+            copyProp(para, style, "ruleBelowGapTint");
+            try { para.ruleBelowOverprint = false; } catch (eOp2) {}
+            try { para.ruleBelowGapOverprint = false; } catch (eGop2) {}
+            try { weight = parseFloat(style.ruleBelowLineWeight); } catch (eWp2) { weight = 0; }
+            if (!(weight > 0)) weight = 0.5;
+            try { para.ruleBelowLineWeight = weight; } catch (eW2) {}
+            try { tint = parseFloat(style.ruleBelowTint); } catch (eTp2) { tint = 100; }
+            if (!(tint > 0)) tint = 100;
+            try { para.ruleBelowTint = tint; } catch (eT2) {}
+            try {
+                ink = strokeProcessColor(docRef, style.ruleBelowColor);
+                if (ink) para.ruleBelowColor = ink;
+            } catch (eC2) {}
+        }
+
+        try { if (border) para.paragraphBorderOn = true; } catch (eBOn) {}
+        try { if (border) para.paragraphBorder = true; } catch (eBOn2) {}
+        if (border) {
+            copyProp(para, style, "paragraphBorderType");
+            copyProp(para, style, "paragraphBorderWeight");
+            copyProp(para, style, "paragraphBorderTopLineWeight");
+            copyProp(para, style, "paragraphBorderBottomLineWeight");
+            copyProp(para, style, "paragraphBorderLeftLineWeight");
+            copyProp(para, style, "paragraphBorderRightLineWeight");
+            copyProp(para, style, "paragraphBorderTopOffset");
+            copyProp(para, style, "paragraphBorderBottomOffset");
+            copyProp(para, style, "paragraphBorderLeftOffset");
+            copyProp(para, style, "paragraphBorderRightOffset");
+            copyProp(para, style, "paragraphBorderWidth");
+            copyProp(para, style, "paragraphBorderTopOrigin");
+            copyProp(para, style, "paragraphBorderBottomOrigin");
+            copyProp(para, style, "paragraphBorderGapTint");
+            copyProp(para, style, "paragraphBorderGapColor");
+            try { para.paragraphBorderOverprint = false; } catch (eBop) {}
+            try { tint = parseFloat(style.paragraphBorderTint); } catch (eBtp) { tint = 100; }
+            if (!(tint > 0)) tint = 100;
+            try { para.paragraphBorderTint = tint; } catch (eBt) {}
+            try {
+                ink = strokeProcessColor(docRef, style.paragraphBorderColor);
+                if (ink) para.paragraphBorderColor = ink;
+            } catch (eBc) {}
+        }
+    }
+
     function syncParaMetricsFromStyle(para, style) {
         if (!para || !style) return;
         try { para.spaceBefore = style.spaceBefore; } catch (e1) {}
@@ -215,14 +369,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         try { para.leftIndent = style.leftIndent; } catch (e6) {}
         try { para.rightIndent = style.rightIndent; } catch (e7) {}
         try { para.justification = style.justification; } catch (e8) {}
-        try { para.ruleAbove = style.ruleAbove; } catch (e12) {}
-        try { para.ruleAboveOffset = style.ruleAboveOffset; } catch (e13) {}
-        try { para.ruleAboveLineWeight = style.ruleAboveLineWeight; } catch (e14) {}
-        try { if (style.ruleAbove && style.ruleAboveColor) para.ruleAboveColor = style.ruleAboveColor; } catch (e15) {}
-        try { para.ruleBelow = style.ruleBelow; } catch (e16) {}
-        try { para.ruleBelowOffset = style.ruleBelowOffset; } catch (e17) {}
-        try { para.ruleBelowLineWeight = style.ruleBelowLineWeight; } catch (e18) {}
-        try { if (style.ruleBelow && style.ruleBelowColor) para.ruleBelowColor = style.ruleBelowColor; } catch (e19) {}
+        copyParagraphRules(para, style, docFromPara(para));
         try { para.keepWithNext = style.keepWithNext; } catch (e20) {}
         try { para.hyphenation = style.hyphenation; } catch (e21) {}
         // Green extract/quote band (EXT1 etc.) — paragraph shading from template.
@@ -243,12 +390,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         try { para.paragraphShadingRightOffset = style.paragraphShadingRightOffset; } catch (eSh7) {}
         try { para.paragraphShadingTopOffset = style.paragraphShadingTopOffset; } catch (eSh8) {}
         try { para.paragraphShadingBottomOffset = style.paragraphShadingBottomOffset; } catch (eSh9) {}
-        try { para.paragraphBorder = style.paragraphBorder; } catch (eBr0) {}
-        try {
-            if (style.paragraphBorder && style.paragraphBorderColor) {
-                para.paragraphBorderColor = style.paragraphBorderColor;
-            }
-        } catch (eBr1) {}
     }
 
     function applyParaStyleClean(para, style, docRef) {
@@ -270,11 +411,23 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
         // Do NOT clearOverrides after apply for extract/quote styles — some ID
         // builds drop paragraphShading when overrides are wiped again.
-        if (!/^EXT/i.test(styleName) && !/QUOTE|PULL|BX/i.test(styleName)) {
+        // The same wipe drops paragraph rules/borders (glossary rules above GL).
+        if (!/^EXT/i.test(styleName) && !/QUOTE|PULL|BX/i.test(styleName) &&
+                !styleHasRuleOrBorder(style)) {
             try { para.clearOverrides(OverrideType.ALL); } catch (ov3) {}
         }
         // Re-assert template metrics (+ shading for EXT*) in case sticky overrides remain.
         syncParaMetricsFromStyle(para, style);
+        if (styleHasRuleOrBorder(style) && !applyParaStyleClean.ruleLogged) {
+            applyParaStyleClean.ruleLogged = true;
+            try {
+                log("Paragraph rule restored => " + styleName +
+                    " above=" + para.ruleAbove +
+                    " weight=" + para.ruleAboveLineWeight +
+                    " tint=" + para.ruleAboveTint +
+                    " color=" + (para.ruleAboveColor ? para.ruleAboveColor.name : "?"));
+            } catch (eRuleLog) {}
+        }
         if (/^EXT/i.test(styleName)) {
             try {
                 log("EXT style applied => " + styleName +
@@ -1051,6 +1204,58 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return removed;
     }
 
+    /**
+     * True when the page shows body copy or a figure. Footer frames (RH*) do
+     * not count — a folio on an otherwise blank page is still an empty page.
+     */
+    function pageHasVisibleBody(page) {
+        var j;
+        var item;
+        var lab;
+        var raw;
+        if (pageHasPlacedGraphics(page)) return true;
+        try {
+            for (j = 0; j < page.textFrames.length; j++) {
+                item = page.textFrames[j];
+                lab = itemLabel(item);
+                if (lab === "RH" || lab === "RH_VERSO" || lab === "RH_RECTO") continue;
+                try { if (item.visible === false) continue; } catch (eV) {}
+                raw = "";
+                try { raw = String(item.contents || ""); } catch (eC) { raw = ""; }
+                raw = trim(raw.replace(/[\uFEFF\u0008\u0018\uFFFC\r\n]/g, ""));
+                if (raw) return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
+    /**
+     * Drop interior pages whose body frames are empty after the final reflow.
+     * Space-before suppression can pull a short overflow back onto the previous
+     * page and leave the overflow page blank (footer only). Trailing-only
+     * removal keeps those pages because their empty frames are still threaded.
+     * Deleting an empty threaded frame rejoins the story; keep page 0.
+     */
+    function removeInteriorEmptyPages(docRef) {
+        var i;
+        var page;
+        var removed = 0;
+        for (i = docRef.pages.length - 1; i >= 1; i--) {
+            page = docRef.pages[i];
+            if (pageHasVisibleBody(page)) continue;
+            try {
+                log("Removing empty body page => index=" + i + " name=" + page.name);
+                page.remove();
+                removed += 1;
+            } catch (eR) {
+                warnings.push("Could not remove empty body page: " + eR.message);
+                log("Could not remove empty body page " + i + ": " + eR.message);
+            }
+        }
+        log("Removed empty body pages => " + removed + "; pages kept => " + docRef.pages.length);
+        return removed;
+    }
+
     /** Drop leftover template pages so overflow always adds clean TX pages. */
     function trimToMinimalStartPages(docRef, hasOpenerFlag) {
         var i;
@@ -1399,6 +1604,13 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 }
                 if (found.length >= 2) {
                     found.sort(function (a, b) { return a.left - b.left; });
+                    if (!getMasterT1ColumnsForSide.logged) {
+                        getMasterT1ColumnsForSide.logged = true;
+                        log("Master T1 columns from INDD => " +
+                            found[0].top + "," + found[0].left + "," + found[0].bottom + "," + found[0].right +
+                            " / " +
+                            found[1].top + "," + found[1].left + "," + found[1].bottom + "," + found[1].right);
+                    }
                     return found.slice(0, 2);
                 }
             }
@@ -1885,8 +2097,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 item = ms.allPageItems[j];
                 if (!(item instanceof TextFrame)) continue;
                 try { b = item.geometricBounds; } catch (eB) { continue; }
-                // Footer band near bottom (~726pt in projectX points).
-                if (b[0] < 710 || b[0] > 750) continue;
+                // Footer band near the bottom of the master page (CO-Verso ~726, TX-Text ~756).
+                if (b[0] < 700 || b[0] > 780) continue;
                 if ((b[3] - b[1]) < 200) continue;
                 // Verso/even = left of spread; recto/odd = right of spread.
                 if (b[1] < 400) {
@@ -2137,7 +2349,69 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     /**
-     * Page-local RH footer frame using CO/TX template verso band (726,36,738,540).
+     * Page-local footer band from the master the page uses.
+     * Body pages follow TX-Text (frame height and footer position both live there).
+     * The opener follows CO-Verso. Recto pages shift the verso band by 36pt.
+     */
+    function masterFooterLocal(docRef, masterNamePart) {
+        var key = masterNamePart || "TX-Text";
+        var i;
+        var j;
+        var ms;
+        var mp;
+        var item;
+        var g;
+        var pb;
+        var lab;
+        var local;
+        var best = null;
+        if (!masterFooterLocal.cache) masterFooterLocal.cache = {};
+        if (masterFooterLocal.cache[key]) return masterFooterLocal.cache[key];
+        try {
+            for (i = 0; i < docRef.masterSpreads.length; i++) {
+                ms = docRef.masterSpreads[i];
+                if (String(ms.name).indexOf(key) < 0) continue;
+                mp = ms.pages[0];
+                try { pb = mp.bounds; } catch (ePb) { pb = [0, 0, 783, 612]; }
+                for (j = 0; j < ms.allPageItems.length; j++) {
+                    item = ms.allPageItems[j];
+                    if (!(item instanceof TextFrame)) continue;
+                    try {
+                        if (item.parentPage && item.parentPage !== mp) continue;
+                    } catch (ePP) {}
+                    try { lab = itemLabel(item); } catch (eL) { lab = ""; }
+                    try { g = item.geometricBounds; } catch (eG) { continue; }
+                    if (lab !== "RH_VERSO" && lab !== "RH") {
+                        if ((g[2] - g[0]) > 24 || (g[3] - g[1]) < 200 || (g[0] - pb[0]) < 700) continue;
+                    }
+                    local = {
+                        top: g[0] - pb[0],
+                        left: g[1] - pb[1],
+                        bottom: g[2] - pb[0],
+                        right: g[3] - pb[1]
+                    };
+                    if (lab === "RH_VERSO" || lab === "RH") {
+                        best = local;
+                        break;
+                    }
+                    if (!best) best = local;
+                }
+                if (best) break;
+            }
+        } catch (e) {}
+        if (!best) {
+            best = { top: 726, left: 36, bottom: 738, right: 540 };
+            log("Footer local fallback for " + key);
+        } else {
+            log("Footer from INDD " + key + " => " +
+                best.top + "," + best.left + "," + best.bottom + "," + best.right);
+        }
+        masterFooterLocal.cache[key] = best;
+        return best;
+    }
+
+    /**
+     * Page-local RH footer frame taken from the applied master's verso band.
      * Critical when facingPages=false: RH_RECTO master items sit at x≈684–1188 and
      * land off-page on single-sided spreads, so footers never appear in the PDF.
      */
@@ -2149,11 +2423,47 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var i;
         var labels = ["RH", "RH_VERSO", "RH_RECTO"];
         var lab;
+        var rh;
+        var masterKey = "TX-Text";
         try { pr = pageRect(page, docRef); } catch (ePr) {
             pr = { top: 0, left: 0, bottom: 783, right: 612, w: 612, h: 783 };
         }
+        try {
+            if (page.appliedMaster && String(page.appliedMaster.name).indexOf("CO-") >= 0) {
+                masterKey = "CO-Verso";
+            }
+        } catch (eMk) {}
+        rh = masterFooterLocal(docRef, masterKey);
         var shift = isRightHandPage(page) ? RECTO_COLUMN_SHIFT : 0;
-        bounds = [pr.top + 726, pr.left + 36 + shift, pr.top + 738, pr.left + 540 + shift];
+        var span = null;
+        var si;
+        var sItem;
+        var sb;
+        try {
+            for (si = 0; si < page.textFrames.length; si++) {
+                sItem = page.textFrames[si];
+                if (itemLabel(sItem) !== "T1") continue;
+                try { if (sItem.parentPage !== page) continue; } catch (ePP) {}
+                try { sb = sItem.geometricBounds; } catch (eSb) { continue; }
+                if ((sb[2] - sb[0]) < 200 || (sb[3] - sb[1]) < 80) continue;
+                if (!span) span = { left: sb[1], right: sb[3] };
+                if (sb[1] < span.left) span.left = sb[1];
+                if (sb[3] > span.right) span.right = sb[3];
+            }
+        } catch (eSpan) { span = null; }
+        if (span) {
+            // Match the columns on this page. Page inserts/removals change
+            // even/odd after the columns were built, so a fresh 36pt shift
+            // lands the footer off the TX-Text edges.
+            bounds = [pr.top + rh.top, span.left, pr.top + rh.bottom, span.right];
+        } else {
+            bounds = [
+                pr.top + rh.top,
+                pr.left + rh.left + shift,
+                pr.top + rh.bottom,
+                pr.left + rh.right + shift
+            ];
+        }
 
         for (i = 0; i < labels.length; i++) {
             lab = labels[i];
@@ -2599,17 +2909,30 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             try { if (story) story.recompose(); } catch (r1) {}
             try { afterLen = frameVisibleTextLength(getStoryTailFrame(head)); } catch (eL1) { afterLen = 0; }
             try { pr = pageRect(nextPage, docRef); } catch (ePr) { pr = null; }
+            var afterVisible = storyVisibleCharCount(head);
             log("Added page for T1 overflow => " + nextPage.name +
                 " linked=" + linked +
                 " frames=" + frames.length +
                 " pageRect=" + (pr ? [pr.top, pr.left, pr.bottom, pr.right] : "?") +
                 " chars=" + beforeVisible + "/" + beforeTotal +
+                " afterVisible=" + afterVisible +
                 " tailChars=" + afterLen);
 
-            // If visible count did not increase, stop to avoid infinite empty pages.
-            if (storyVisibleCharCount(head) <= beforeVisible && safety > 1) {
-                warnings.push("Overflow add did not absorb characters; stopping");
-                log("Overflow add made no progress (visible still " + beforeVisible + ")");
+            // A new page that absorbs no characters is blank. Drop it immediately
+            // so a false overset (or a reflow that fits) cannot leave an empty page.
+            if (afterVisible <= beforeVisible) {
+                var ui;
+                for (ui = 0; ui < frames.length; ui++) {
+                    try { frames[ui].previousTextFrame = Nothing; } catch (eUn) {}
+                    try { frames[ui].nextTextFrame = Nothing; } catch (eUn2) {}
+                }
+                try {
+                    nextPage.remove();
+                    log("Removed overflow page that absorbed no text => visible still " + beforeVisible);
+                } catch (eDrop) {
+                    warnings.push("Could not drop empty overflow page: " + eDrop.message);
+                    log("Could not drop empty overflow page: " + eDrop.message);
+                }
                 break;
             }
         }
@@ -2713,6 +3036,17 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return size;
     }
 
+    function readTextDecoration(attrs) {
+        var match = /text-decoration(?:-line)?\s*:\s*([^;"']+)/i.exec(String(attrs || ""));
+        var value;
+        if (!match) return { underline: false, strike: false };
+        value = String(match[1] || "").toLowerCase();
+        return {
+            underline: value.indexOf("underline") >= 0,
+            strike: value.indexOf("line-through") >= 0
+        };
+    }
+
     function markdownToHtmlTheme(value) {
         var text = String(value || "");
         var safety;
@@ -2737,6 +3071,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
 
     function sameThemeRun(a, b) {
         return a.italic === b.italic && a.bold === b.bold && a.underline === b.underline &&
+            a.strike === b.strike &&
             a.superscript === b.superscript && a.subscript === b.subscript && a.highlight === b.highlight &&
             a.keyterm === b.keyterm && a.backgroundColor === b.backgroundColor &&
             a.fontSize === b.fontSize && a.color === b.color;
@@ -2780,6 +3115,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 italic: false,
                 bold: false,
                 underline: false,
+                strike: false,
                 superscript: false,
                 subscript: false,
                 highlight: false,
@@ -2793,6 +3129,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 if (run.italic) slice.italic = true;
                 if (run.bold) slice.bold = true;
                 if (run.underline) slice.underline = true;
+                if (run.strike) slice.strike = true;
                 if (run.superscript) slice.superscript = true;
                 if (run.subscript) slice.subscript = true;
                 if (run.highlight) slice.highlight = true;
@@ -2861,13 +3198,16 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 plain += "\r";
             } else if (!isClose && !isSelfClose) {
                 if (tag === "i" || tag === "em" || tag === "b" || tag === "strong" || tag === "u" ||
+                    tag === "s" || tag === "strike" || tag === "del" ||
                     tag === "span" || tag === "sup" || tag === "sub" || tag === "mark" || tag === "kt") {
+                    var deco = readTextDecoration(attrs);
                     stack.push({
                         tag: tag,
                         start: plain.length,
                         italic: tag === "i" || tag === "em",
                         bold: tag === "b" || tag === "strong",
-                        underline: tag === "u",
+                        underline: tag === "u" || deco.underline,
+                        strike: tag === "s" || tag === "strike" || tag === "del" || deco.strike,
                         superscript: tag === "sup",
                         subscript: tag === "sub",
                         highlight: tag === "mark",
@@ -2889,6 +3229,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                             italic: open.italic,
                             bold: open.bold,
                             underline: open.underline,
+                            strike: open.strike,
                             superscript: open.superscript,
                             subscript: open.subscript,
                             highlight: open.highlight,
@@ -2921,8 +3262,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             while (start < end && /\s/.test(plain.charAt(start))) start++;
             while (end > start && /\s/.test(plain.charAt(end - 1))) end--;
             if (end <= start) continue;
-            if (!kind && !slice.italic && !slice.underline && !slice.subscript && !slice.highlight &&
-                !color && !slice.backgroundColor && !slice.fontSize) {
+            if (!kind && !slice.italic && !slice.underline && !slice.strike && !slice.subscript &&
+                !slice.highlight && !color && !slice.backgroundColor && !slice.fontSize) {
                 continue;
             }
             out.push({
@@ -2931,6 +3272,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 kind: kind,
                 italic: kind === "bold" && slice.italic,
                 underline: slice.underline ? true : false,
+                strike: slice.strike ? true : false,
+                superscript: slice.superscript ? true : false,
                 subscript: slice.subscript && !slice.superscript,
                 color: color,
                 backgroundColor: slice.backgroundColor || "",
@@ -3028,14 +3371,16 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 matchParaSize: srcRun.kind === "kt" && /^GL/.test(String(styleName)),
                 italic: srcRun.italic ? true : false,
                 underline: srcRun.underline ? true : false,
+                strike: srcRun.strike ? true : false,
+                superscript: srcRun.superscript ? true : false,
                 subscript: srcRun.subscript ? true : false,
                 color: srcRun.color || "",
                 backgroundColor: srcRun.backgroundColor || "",
                 fontSize: srcRun.fontSize || 0,
                 highlight: srcRun.highlight ? true : false
             };
-            if (run.charStyle || run.italic || run.underline || run.subscript || run.color ||
-                run.backgroundColor || run.fontSize || run.highlight) {
+            if (run.charStyle || run.italic || run.underline || run.strike || run.superscript ||
+                run.subscript || run.color || run.backgroundColor || run.fontSize || run.highlight) {
                 applyInlineRun(docRef, run);
                 inlineRuns.push(run);
             }
@@ -3160,13 +3505,18 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 try { range.pointSize = run.fontSize; } catch (eFs) {}
             }
             if (run.color) applyFillHex(docRef, range, run.color);
-            if (run.subscript) {
+            if (run.superscript || run.charStyle === "FTN") {
+                try { range.position = Position.SUPERSCRIPT; } catch (eSup) {}
+            } else if (run.subscript) {
                 try { range.position = Position.SUBSCRIPT; } catch (eSub) {}
             }
             if (run.backgroundColor) applyHighlightBar(docRef, range, run.backgroundColor);
             else if (run.highlight) applyHighlightBar(docRef, range, "");
             else if (run.underline) {
                 try { range.underline = true; } catch (eU) {}
+            }
+            if (run.strike) {
+                try { range.strikeThru = true; } catch (eSt) {}
             }
             return true;
         } catch (e) {
@@ -3212,8 +3562,58 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return trim(s);
     }
 
+    /**
+     * Turn <ol>/<ul>/<li> into the same "1. " / "- " lines splitEmbeddedList
+     * already styles as NL_* / BL_*. Plain text without those tags is unchanged.
+     */
+    function normalizeHtmlLists(text) {
+        var s = String(text || "");
+        var re;
+        var m;
+        var out;
+        var last;
+        var tag;
+        var closing;
+        var inOl;
+        var n;
+        if (!/<\s*\/?\s*(?:ul|ol|li)\b/i.test(s)) return s;
+        re = /<\s*(\/?)\s*(ul|ol|li)\b[^>]*>/ig;
+        out = "";
+        last = 0;
+        inOl = false;
+        n = 0;
+        while ((m = re.exec(s)) !== null) {
+            out += s.substring(last, m.index);
+            closing = m[1] === "/";
+            tag = String(m[2] || "").toLowerCase();
+            if (tag === "ol") {
+                if (!closing) {
+                    inOl = true;
+                    n = 0;
+                } else {
+                    inOl = false;
+                }
+                out += "\n";
+            } else if (tag === "ul") {
+                if (!closing) inOl = false;
+                out += "\n";
+            } else if (!closing) {
+                if (inOl) {
+                    n += 1;
+                    out += "\n" + n + ". ";
+                } else {
+                    out += "\n- ";
+                }
+            } else {
+                out += "\n";
+            }
+            last = m.index + m[0].length;
+        }
+        return out + s.substring(last);
+    }
+
     function splitEmbeddedList(text) {
-        var lines = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split(/\n+/);
+        var lines = normalizeHtmlLists(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split(/\n+/);
         var out = [];
         var i;
         var seg;
@@ -3243,8 +3643,14 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     kind: "num",
                     number: parseInt(m[1], 10)
                 });
-            } else if (/^[-\u2022\u2013*]\s/.test(plain)) {
-                out.push({ text: stripOuterMarker(seg, /^[-\u2022\u2013*]\s+/), kind: "bullet" });
+            } else if ((m = plain.match(/^(\d+)\)\s/))) {
+                out.push({
+                    text: stripOuterMarker(seg, new RegExp("^" + m[1] + "\\)\\s+")),
+                    kind: "num",
+                    number: parseInt(m[1], 10)
+                });
+            } else if (/^[-\u2022\u2013*+]\s/.test(plain)) {
+                out.push({ text: stripOuterMarker(seg, /^[-\u2022\u2013*+]\s+/), kind: "bullet" });
             } else {
                 out.push({ text: seg, kind: "para" });
             }
@@ -3361,6 +3767,114 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return "NL_mid";
     }
 
+    function isGlossaryPlain(text) {
+        var marked = trim(String(text || ""));
+        var s = trim(stripMarkers(marked));
+        if (!s || s.length >= 280) return false;
+        if (/shutterstock\.com/i.test(s) || /^credit:/i.test(s)) return false;
+        // A margin glossary opens with a purple key term. A body sentence that
+        // only continues in lowercase is not a glossary and must not get the rule.
+        if (marked.charAt(0) !== MK_KT_ON) return false;
+        return /^[a-z]/.test(s);
+    }
+
+    function isGlossaryStyleName(name) {
+        return name === "GL" || name === "GLDEF" || name === "GLDEF_last";
+    }
+
+    function ensureDividerInk(docRef) {
+        var sw;
+        try {
+            sw = docRef.colors.itemByName("Black");
+            if (sw && sw.isValid && sw.model === ColorModel.PROCESS) return sw;
+        } catch (e0) {}
+        try {
+            sw = docRef.colors.itemByName("CF_DIVIDER");
+            if (sw && sw.isValid) return sw;
+        } catch (e1) {}
+        try {
+            sw = docRef.colors.add({
+                name: "CF_DIVIDER",
+                model: ColorModel.PROCESS,
+                space: ColorSpace.CMYK,
+                colorValue: [0, 0, 0, 55]
+            });
+            if (sw && sw.isValid) return sw;
+        } catch (e2) {}
+        try { return docRef.colors.itemByName("Black"); } catch (e3) {}
+        return null;
+    }
+
+    /**
+     * One column rule above each glossary group (marketing / exchange / …).
+     * GL itself has no rule; GLDEF may. Force a visible process stroke when
+     * the style rule is absent, and drop the rule on follow-on definitions
+     * so the group matches the template: a single line over the first term.
+     */
+    function applyGlossaryDividers(docRef) {
+        var si;
+        var pi;
+        var story;
+        var para;
+        var name;
+        var prev = false;
+        var first = false;
+        var on = 0;
+        var ink = ensureDividerInk(docRef);
+        var weight;
+        var above;
+        for (si = 0; si < docRef.stories.length; si++) {
+            try { story = docRef.stories[si]; } catch (eS) { continue; }
+            prev = false;
+            for (pi = 0; pi < story.paragraphs.length; pi++) {
+                para = story.paragraphs[pi];
+                try { if (trim(para.contents) === "") continue; } catch (eC) { continue; }
+                try { name = String(para.appliedParagraphStyle.name || ""); } catch (eN) { name = ""; }
+                if (!isGlossaryStyleName(name)) {
+                    prev = false;
+                    continue;
+                }
+                first = !prev;
+                prev = true;
+                if (!first) {
+                    try { para.ruleAbove = false; } catch (eOff) {}
+                    try { para.paragraphBorderTopLineWeight = 0; } catch (eTop) {}
+                    continue;
+                }
+                try { above = !!para.ruleAbove; } catch (eA) { above = false; }
+                try { weight = parseFloat(para.ruleAboveLineWeight); } catch (eW) { weight = 0; }
+                if (!above || !(weight > 0)) {
+                    try { para.ruleAbove = true; } catch (eOn) {}
+                    try { para.ruleAboveLineWeight = 0.6; } catch (eWt) {}
+                    try { para.ruleAboveTint = 100; } catch (eTi) {}
+                    try { para.ruleAboveOffset = 8; } catch (eOf) {}
+                    try { para.ruleAboveLeftIndent = 0; } catch (eL) {}
+                    try { para.ruleAboveRightIndent = 0; } catch (eR) {}
+                    if (ink) {
+                        try { para.ruleAboveColor = ink; } catch (eCol) {}
+                    }
+                } else {
+                    try { para.ruleAboveOverprint = false; } catch (eOp) {}
+                    try {
+                        if (para.ruleAboveColor) {
+                            para.ruleAboveColor = strokeProcessColor(docRef, para.ruleAboveColor);
+                        }
+                    } catch (eInk) {}
+                    try {
+                        if (!(parseFloat(para.ruleAboveLineWeight) > 0.3)) para.ruleAboveLineWeight = 0.6;
+                    } catch (eWt2) {}
+                }
+                try { para.ruleAboveWidth = RuleWidth.COLUMN_WIDTH; } catch (eWid) {}
+                try { para.ruleAboveOverprint = false; } catch (eOp2) {}
+                try {
+                    if (!(parseFloat(para.spaceBefore) > 6)) para.spaceBefore = 10;
+                } catch (eSb) {}
+                on += 1;
+            }
+        }
+        log("Glossary dividers => " + on);
+    }
+
     function styleForBody(type, text, rawText) {
         var t = trim(type);
         var s = trim(stripMarkers(text || ""));
@@ -3371,8 +3885,9 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
         if (t === "ParagraphText" || t === "Text") {
             if (/shutterstock\.com/i.test(s) || /^credit:/i.test(s)) return "PHCR";
-            // Glossary/key-term lines in this book start lowercase (GL style).
-            if (/^[a-z]/.test(s) && s.length < 220) return "GL";
+            // Glossary definitions start with a purple key term and keep the GL typeface.
+            // The divider is drawn later; GLDEF would replace this font.
+            if (isGlossaryPlain(text)) return "GL";
             bodyTxCount += 1;
             return bodyTxCount === 1 ? "TX1" : "TX2";
         }
@@ -4468,21 +4983,28 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             try { hero.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eHeroW) {}
             try { usedLocalAssets[String(heroFile.name)] = true; } catch (eUsed) {}
             log("Placed opener hero => " + heroFile.name);
-            // Hero graphic covers the Part chip unless chip is brought forward.
-            if (chpnBg) bringToFront(chpnBg);
-            if (chpnFrame) bringToFront(chpnFrame);
-            // Re-stamp Part chip after hero place (place/fit can wipe overlapping overrides).
-            if (trim(partText) && chpnFrame) {
-                try {
-                    chpnFrame.visible = true;
-                    chpnFrame.contents = trim(stripMarkers(partText));
-                    applyStyleToFrame(chpnFrame, "CHPN", doc);
-                    log("Reapplied CHPN after hero => \"" + String(chpnFrame.contents).substring(0, 40) + "\"");
-                } catch (eReChpn) {
-                    log("Reapply CHPN failed: " + eReChpn.message);
+            // Orange part chip sits above the hero only when JSON has a PartNumber.
+            if (trim(partText)) {
+                if (chpnBg) {
+                    try { chpnBg.visible = true; } catch (eBgOn) {}
+                    bringToFront(chpnBg);
                 }
+                if (chpnFrame) bringToFront(chpnFrame);
+                if (chpnFrame) {
+                    try {
+                        chpnFrame.visible = true;
+                        chpnFrame.contents = trim(stripMarkers(partText));
+                        applyStyleToFrame(chpnFrame, "CHPN", doc);
+                        log("Reapplied CHPN after hero => \"" + String(chpnFrame.contents).substring(0, 40) + "\"");
+                    } catch (eReChpn) {
+                        log("Reapply CHPN failed: " + eReChpn.message);
+                    }
+                }
+                log("Brought CHPN_BG + CHPN above hero");
+            } else {
+                hideItem(chpnFrame);
+                hideItem(chpnBg);
             }
-            log("Brought CHPN_BG + CHPN above hero");
         } else {
             warnings.push("Opener hero image missing or no HERO frame");
             log("HERO place skipped file=" + !!heroFile + " frame=" + !!hero);
@@ -4528,8 +5050,12 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             fr = (roles[ri] === "CHPN" && chpnFrame) ? chpnFrame : getOrOverrideRoleFrame(startPage, roles[ri]);
             try {
                 if (fr) {
-                    try { fr.visible = true; } catch (eV0) {}
-                    try { fr.bringToFront(); } catch (eB0) {}
+                    if (roles[ri] === "CHPN" && !trim(partText)) {
+                        hideItem(fr);
+                    } else {
+                        try { fr.visible = true; } catch (eV0) {}
+                        try { fr.bringToFront(); } catch (eB0) {}
+                    }
                 }
                 log("VERIFY " + roles[ri] + " => \"" +
                     String(fr ? fr.contents : "(null)").replace(/\r/g, "\\n").substring(0, 80) +
@@ -4539,11 +5065,13 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 log("VERIFY " + roles[ri] + " read failed");
             }
         }
-        if (chpnBg) {
+        if (trim(partText) && chpnBg) {
             try { chpnBg.visible = true; chpnBg.bringToFront(); } catch (eBg) {}
             if (chpnFrame) {
                 try { chpnFrame.bringToFront(); } catch (eCf) {}
             }
+        } else if (chpnBg) {
+            hideItem(chpnBg);
         }
     }());
 
@@ -4569,6 +5097,12 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             startPage = doc.pages[0];
             snapOpenerFramesToMaster(startPage, doc);
             fitOpenerCoobToContent(startPage, doc);
+            // Facing-off can rebuild the master chip as a visible override.
+            if (!trim(partText)) {
+                hideItem(findLabeledAnywhere(startPage, "CHPN_BG"));
+                hideItem(getOrOverrideRoleFrame(startPage, "CHPN"));
+                log("No PartNumber — kept CHPN_BG hidden after facing=false");
+            }
             log("Re-snapped opener after facing=false; bounds=" + startPage.bounds +
                 " side=" + (function () { try { return String(startPage.side); } catch (e) { return "?"; } }()));
         } catch (eFaceBody) {
@@ -4935,7 +5469,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }());
 
     try { doc.recompose(); } catch (eRf) {}
-    applyPerPageFootersFromJson(doc, pages);
 
     // Final pass: process sage on every EXT paragraph before PDF/INDD save.
     // (Do not mutate EXT styles on a live story — that can hang InDesign recomposing.)
@@ -4966,8 +5499,23 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     try { doc.recompose(); } catch (eRf2) {}
     suppressSpaceBeforeAtColumnTops(doc);
     try { doc.recompose(); } catch (eRf2b) {}
+    applyGlossaryDividers(doc);
+    try { doc.recompose(); } catch (eRf2c) {}
     clampAllFiguresInDoc(doc);
     try { doc.recompose(); } catch (eRf3) {}
+
+    // Space-before suppression can pull a short overflow back onto the previous
+    // page and leave the extra page blank (footer only). Drop those before
+    // footers are written, then add a page only if a story is still overset
+    // so the pulled-back reflow cannot clip the last lines.
+    removeInteriorEmptyPages(doc);
+    try { doc.recompose(); } catch (eRf4) {}
+    for (oi = 0; oi < storyHeads.length; oi++) {
+        ensureOverflowCapacity(storyHeads[oi], doc);
+    }
+    removeInteriorEmptyPages(doc);
+    try { doc.recompose(); } catch (eRf5) {}
+    applyPerPageFootersFromJson(doc, pages);
 
     try { if (pdfFile.exists) pdfFile.remove(); } catch (e) {}
     try {

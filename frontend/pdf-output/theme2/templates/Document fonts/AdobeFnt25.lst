@@ -11,7 +11,7 @@ FullName:Adobe Garamond Pro Italic
 MenuName:Adobe Garamond Pro
 StyleBits:1
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\AGaramondPro-Italic.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\AGaramondPro-Italic.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -19,7 +19,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:92132
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:1
@@ -38,7 +38,7 @@ FullName:Adobe Garamond Pro
 MenuName:Adobe Garamond Pro
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\AGaramondPro-Regular.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\AGaramondPro-Regular.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -46,7 +46,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:126904
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -65,7 +65,7 @@ FullName:Futura Std Bold
 MenuName:Futura Std Book
 StyleBits:2
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\FuturaStd-Bold.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\FuturaStd-Bold.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -73,7 +73,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:29120
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:0
@@ -93,7 +93,7 @@ FullName:Futura Std Book
 MenuName:Futura Std Book
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\FuturaStd-Book.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\FuturaStd-Book.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -101,7 +101,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:27972
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -121,7 +121,7 @@ FullName:Minion Pro
 MenuName:Minion Pro
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\MinionPro-Regular.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\MinionPro-Regular.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -129,7 +129,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:216876
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -148,7 +148,7 @@ FullName:New Caledonia LT Std Bold
 MenuName:New Caledonia LT Std
 StyleBits:2
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd-Bold.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NewCaledoniaLTStd-Bold.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -156,7 +156,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:52828
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:0
@@ -175,7 +175,7 @@ FullName:New Caledonia LT Std Italic
 MenuName:New Caledonia LT Std
 StyleBits:1
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd-It.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NewCaledoniaLTStd-It.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -183,7 +183,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:39796
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:1
@@ -203,7 +203,7 @@ FullName:New Caledonia LT Std
 MenuName:New Caledonia LT Std
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\NewCaledoniaLTStd.otf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NewCaledoniaLTStd.otf
 DataFormat:sfntData
 UsesStandardEncoding:yes
 isCFF:yes
@@ -211,7 +211,7 @@ hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:51840
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -230,13 +230,13 @@ FullName:Open Sans Bold
 MenuName:Open Sans
 StyleBits:2
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-Bold.ttf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\OpenSans-Bold.ttf
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:224592
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:0
@@ -254,13 +254,13 @@ FullName:Open Sans Bold Italic
 MenuName:Open Sans
 StyleBits:3
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-BoldItalic.ttf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\OpenSans-BoldItalic.ttf
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:213292
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:1
@@ -278,13 +278,13 @@ FullName:Open Sans
 MenuName:Open Sans
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\OpenSans-Regular.ttf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\OpenSans-Regular.ttf
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:217360
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -302,13 +302,13 @@ FullName:Times New Roman
 MenuName:Times New Roman
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times New Roman.ttf
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\Times New Roman.ttf
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:824920
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
@@ -326,14 +326,14 @@ FullName:Times Bold
 MenuName:Times
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\Times.ttc
 TTCOffset:388
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:919104
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:0
@@ -360,14 +360,14 @@ FullName:Times Bold Italic
 MenuName:Times
 StyleBits:1
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\Times.ttc
 TTCOffset:1084
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:919104
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:700
 WidthClass:5
 AngleClass:1
@@ -394,14 +394,14 @@ FullName:Times Italic
 MenuName:Times
 StyleBits:1
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\Times.ttc
 TTCOffset:736
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:919104
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:1
@@ -428,14 +428,14 @@ FullName:Times Roman
 MenuName:Times
 StyleBits:0
 WritingScript:Roman
-OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\clients\cengage\templates\Document fonts\Times.ttc
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\Times.ttc
 TTCOffset:40
 DataFormat:sfntData
 hasSVG:no
 hasCOLR:no
 VariableFontType:NonVariableFont
 FileLength:919104
-FileModTime:1786602101
+FileModTime:1792064314
 WeightClass:400
 WidthClass:5
 AngleClass:0
