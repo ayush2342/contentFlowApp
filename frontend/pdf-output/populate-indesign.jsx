@@ -28,6 +28,7 @@ var DYNAMIC_LAYOUT = {
     afterImageGap: 12,      // space below image/caption before the next block
     listTailGap: 8,         // space after the last bullet/numbered item
     listIndent: 14,         // left indent; keep marker and text on the same line
+    listLevelStep: 18,      // extra right shift for each nested list level
     listItemGap: 5,         // space between consecutive list items
     prototypeOffPageTop: -2000,
     minTextFrameHeight: 24,
@@ -3827,6 +3828,21 @@ function parseInlineStyleFontSize(attrs) {
     return size;
 }
 
+function parseInlineStyleDecoration(attrs) {
+    var match = /text-decoration(?:-line)?\s*:\s*([^;"']+)/i.exec(String(attrs || ""));
+    var value;
+
+    if (!match) {
+        return { underline: false, strike: false, strikeDouble: false };
+    }
+    value = String(match[1] || "").toLowerCase();
+    return {
+        underline: value.indexOf("underline") >= 0,
+        strike: value.indexOf("line-through") >= 0,
+        strikeDouble: value.indexOf("line-through") >= 0 && /text-decoration-style\s*:\s*double/i.test(String(attrs || ""))
+    };
+}
+
 function parseHrefAttr(attrs) {
     var match = /href\s*=\s*(["'])([^"']+)\1/i.exec(String(attrs || ""));
     if (match) {
@@ -3840,6 +3856,8 @@ function sameInlineRunStyle(a, b) {
     return a.italic === b.italic &&
         a.bold === b.bold &&
         a.underline === b.underline &&
+        a.strike === b.strike &&
+        a.strikeDouble === b.strikeDouble &&
         a.superscript === b.superscript &&
         a.subscript === b.subscript &&
         a.highlight === b.highlight &&
@@ -3906,6 +3924,8 @@ function mergeInlineRuns(runs) {
             italic: false,
             bold: false,
             underline: false,
+            strike: false,
+            strikeDouble: false,
             superscript: false,
             subscript: false,
             highlight: false,
@@ -3919,6 +3939,8 @@ function mergeInlineRuns(runs) {
             if (run.italic) slice.italic = true;
             if (run.bold) slice.bold = true;
             if (run.underline) slice.underline = true;
+            if (run.strike) slice.strike = true;
+            if (run.strikeDouble) slice.strikeDouble = true;
             if (run.superscript) slice.superscript = true;
             if (run.subscript) slice.subscript = true;
             if (run.highlight) slice.highlight = true;
@@ -3975,7 +3997,10 @@ function parseInlineMarkup(raw) {
     var runSuper;
     var runSub;
     var runUnderline;
+    var runStrike;
+    var runStrikeDouble;
     var runColor;
+    var decoration;
     var runHighlight;
     var runBackground;
     var runFontSize;
@@ -4014,18 +4039,24 @@ function parseInlineMarkup(raw) {
                 tag === "b" ||
                 tag === "strong" ||
                 tag === "u" ||
+                tag === "s" ||
+                tag === "strike" ||
+                tag === "del" ||
                 tag === "span" ||
                 tag === "sup" ||
                 tag === "sub" ||
                 tag === "a" ||
                 tag === "mark"
             ) {
+                decoration = parseInlineStyleDecoration(attrs);
                 stack.push({
                     tag: tag,
                     start: plain.length,
                     italic: tag === "i" || tag === "em",
                     bold: tag === "b" || tag === "strong",
-                    underline: tag === "u",
+                    underline: tag === "u" || decoration.underline,
+                    strike: tag === "s" || tag === "strike" || tag === "del" || decoration.strike,
+                    strikeDouble: decoration.strikeDouble || /data-strike\s*=\s*["']?double/i.test(attrs),
                     superscript: tag === "sup",
                     subscript: tag === "sub",
                     highlight: tag === "mark",
@@ -4044,6 +4075,8 @@ function parseInlineMarkup(raw) {
                     runItalic = open.italic;
                     runBold = open.bold;
                     runUnderline = open.underline;
+                    runStrike = open.strike;
+                    runStrikeDouble = open.strikeDouble;
                     runSuper = open.superscript;
                     runSub = open.subscript;
                     runColor = open.color;
@@ -4057,6 +4090,8 @@ function parseInlineMarkup(raw) {
                         if (stack[p].italic) runItalic = true;
                         if (stack[p].bold) runBold = true;
                         if (stack[p].underline) runUnderline = true;
+                        if (stack[p].strike) runStrike = true;
+                        if (stack[p].strikeDouble) runStrikeDouble = true;
                         if (stack[p].superscript) runSuper = true;
                         if (stack[p].subscript) runSub = true;
                         if (stack[p].highlight) runHighlight = true;
@@ -4067,7 +4102,7 @@ function parseInlineMarkup(raw) {
                     }
                     if (
                         plain.length > open.start &&
-                        (runItalic || runBold || runUnderline || runSuper || runSub ||
+                        (runItalic || runBold || runUnderline || runStrike || runSuper || runSub ||
                             runColor || runHighlight || runBackground || runFontSize || runHref)
                     ) {
                         runs.push({
@@ -4076,6 +4111,8 @@ function parseInlineMarkup(raw) {
                             italic: runItalic,
                             bold: runBold,
                             underline: runUnderline,
+                            strike: runStrike,
+                            strikeDouble: runStrikeDouble,
                             superscript: runSuper,
                             subscript: runSub,
                             highlight: runHighlight,
@@ -4175,6 +4212,16 @@ function applyInlineMarkupRuns(frame, runs, baseStyle) {
                 try {
                     range.underline = true;
                 } catch (underlineError) {}
+            }
+            if (run.strike) {
+                try {
+                    range.strikeThru = true;
+                    if (run.strikeDouble) {
+                        try {
+                            range.strikeThruWeight = Math.max(1.25, Number(range.pointSize) * 0.14);
+                        } catch (strikeWeightError) {}
+                    }
+                } catch (strikeError) {}
             }
             if (run.href && /^https?:\/\//i.test(run.href)) {
                 applyHyperlinkToRange(story, range, run.href);
@@ -4296,6 +4343,8 @@ function markdownInlineToHtml(value) {
             return "<a href=\"" + escapeMarkupAttr(href) + "\">" + label + "</a>";
         }
     );
+    text = text.replace(/~~~~([\s\S]+?)~~~~/g, "<s data-strike=\"double\">$1</s>");
+    text = text.replace(/~~([\s\S]+?)~~/g, "<s>$1</s>");
     text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, "<b><i>$1</i></b>");
     text = text.replace(/\*\*([^\n]+?)\*\*/g, "<b>$1</b>");
     text = text.replace(/__([^\n]+?)__/g, "<b>$1</b>");
@@ -4304,8 +4353,17 @@ function markdownInlineToHtml(value) {
     return text.replace(/\u0000/g, "*").replace(/\u0001/g, "_");
 }
 
+function markdownListLevel(rawLine) {
+    var indent = /^[ \t]*/.exec(String(rawLine || ""));
+    var width;
+    indent = indent ? indent[0] : "";
+    width = indent.replace(/\t/g, "  ").length;
+    return Math.floor(width / 2);
+}
+
 function classifyMarkdownLine(rawLine) {
     var line = String(rawLine || "").replace(/\s+$/, "");
+    var level = markdownListLevel(line);
     var trimmed = line.replace(/^\s+/, "");
     var match;
 
@@ -4315,25 +4373,25 @@ function classifyMarkdownLine(rawLine) {
 
     match = /^(#{1,6})\s+(.*)$/.exec(trimmed);
     if (match) {
-        return { kind: match[1].length === 1 ? "h1" : "h2", text: match[2] };
+        return { kind: match[1].length === 1 ? "h1" : "h2", text: match[2], level: 0 };
     }
 
     match = /^>\s?(.*)$/.exec(trimmed);
     if (match) {
-        return { kind: "quote", text: match[1] };
+        return { kind: "quote", text: match[1], level: 0 };
     }
 
     match = /^[-*+]\s+(.*)$/.exec(trimmed);
     if (match) {
-        return { kind: "bullet", text: match[1] };
+        return { kind: "bullet", text: match[1], level: level };
     }
 
     match = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);
     if (match) {
-        return { kind: "number", text: match[2] };
+        return { kind: "number", text: match[2], number: parseInt(match[1], 10), level: level };
     }
 
-    return { kind: "paragraph", text: trimmed };
+    return { kind: "paragraph", text: trimmed, level: 0 };
 }
 
 function looksLikeMarkdown(value) {
@@ -4356,6 +4414,9 @@ function looksLikeMarkdown(value) {
         /<span\b[^>]*font-size\s*:/i.test(text) ||
         /<span\b[^>]*background-color\s*:/i.test(text) ||
         /<span\b[^>]*(?:^|[^-a-zA-Z])color\s*:/i.test(text) ||
+        /text-decoration\s*:\s*[^;"']*underline/i.test(text) ||
+        /text-decoration\s*:\s*[^;"']*line-through/i.test(text) ||
+        /~~[\s\S]+?~~/.test(text) ||
         /\[[^\]\n]+\]\([^)\s]+\)/.test(text)
     );
 }
@@ -4364,7 +4425,6 @@ function parseMarkdownRichTextLocal(value) {
     var text = String(value || "");
     var out = [];
     var paragraphLines = [];
-    var numberCounter = 0;
     var lines;
     var i;
     var line;
@@ -4390,9 +4450,6 @@ function parseMarkdownRichTextLocal(value) {
         if (line.kind !== "paragraph") {
             flushParagraph();
         }
-        if (line.kind !== "number") {
-            numberCounter = 0;
-        }
 
         if (line.kind === "blank") {
             continue;
@@ -4402,11 +4459,19 @@ function parseMarkdownRichTextLocal(value) {
             continue;
         }
         if (line.kind === "number") {
-            numberCounter += 1;
             out.push({
                 kind: "number",
                 html: markdownInlineToHtml(line.text),
-                number: numberCounter
+                number: line.number,
+                level: line.level || 0
+            });
+            continue;
+        }
+        if (line.kind === "bullet") {
+            out.push({
+                kind: "bullet",
+                html: markdownInlineToHtml(line.text),
+                level: line.level || 0
             });
             continue;
         }
@@ -4576,7 +4641,7 @@ function applyMarkdownParagraphKinds(frame, entries, baseStyle) {
                 applyThemeFontAndEmphasis(paragraph, headingStyle);
             } else if (entry.kind === "bullet" || entry.kind === "number") {
                 try {
-                    paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent;
+                    paragraph.leftIndent = DYNAMIC_LAYOUT.listIndent + ((entry.level || 0) * DYNAMIC_LAYOUT.listLevelStep);
                     paragraph.firstLineIndent = k === 0 ? -DYNAMIC_LAYOUT.listHangingIndent : 0;
                     paragraph.autoLeading = DYNAMIC_LAYOUT.listAutoLeading;
                     paragraph.spaceAfter = k === span - 1 ? DYNAMIC_LAYOUT.listItemGap : 0;

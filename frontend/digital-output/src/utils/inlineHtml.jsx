@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'U', 'SPAN', 'SUP', 'SUB', 'A', 'BR', 'MARK']);
+const ALLOWED_TAGS = new Set(['I', 'EM', 'B', 'STRONG', 'U', 'S', 'STRIKE', 'DEL', 'SPAN', 'SUP', 'SUB', 'A', 'BR', 'MARK']);
 
 const getAttr = (el, name) => {
   try {
@@ -31,12 +31,14 @@ const getSpanStyle = (el, options) => {
   const color = readStyleValue(style, 'color');
   const fontSize = readStyleValue(style, 'font-size');
   const fontFamily = readStyleValue(style, 'font-family');
+  const decoration = readStyleValue(style, 'text-decoration') || readStyleValue(style, 'text-decoration-line');
   const next = {};
 
   if (color) next.color = color;
   if (backgroundColor) next.backgroundColor = backgroundColor;
   if (fontSize) next.fontSize = fontSize;
   if (fontFamily) next.fontFamily = /\s/.test(fontFamily) ? `'${fontFamily}'` : fontFamily;
+  if (decoration && /underline|line-through/i.test(decoration)) next.textDecoration = decoration;
 
   return Object.keys(next).length ? next : null;
 };
@@ -93,6 +95,16 @@ const walkNodes = (nodes, keyPrefix = 'n', options = {}) => {
 
     if (tag === 'U') {
       out.push(<u key={key}>{children}</u>);
+      return;
+    }
+
+    if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') {
+      const doubleStrike = /double/i.test(getAttr(node, 'data-strike'));
+      out.push(
+        <s key={key} style={doubleStrike ? { textDecorationStyle: 'double' } : undefined}>
+          {children}
+        </s>
+      );
       return;
     }
 

@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v51-inline-json";
+    var VERSION = "cengage-v53-nested-indent";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -3039,11 +3039,12 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     function readTextDecoration(attrs) {
         var match = /text-decoration(?:-line)?\s*:\s*([^;"']+)/i.exec(String(attrs || ""));
         var value;
-        if (!match) return { underline: false, strike: false };
+        if (!match) return { underline: false, strike: false, strikeDouble: false };
         value = String(match[1] || "").toLowerCase();
         return {
             underline: value.indexOf("underline") >= 0,
-            strike: value.indexOf("line-through") >= 0
+            strike: value.indexOf("line-through") >= 0,
+            strikeDouble: value.indexOf("line-through") >= 0 && /text-decoration-style\s*:\s*double/i.test(String(attrs || ""))
         };
     }
 
@@ -3053,6 +3054,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var mdMatch;
         var isKeyTerm;
         var mdBold;
+        text = text.replace(/~~~~([\s\S]+?)~~~~/g, "<s data-strike=\"double\">$1</s>");
+        text = text.replace(/~~([\s\S]+?)~~/g, "<s>$1</s>");
         text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, "<b><i>$1</i></b>");
         text = text.replace(/__([^\n]+?)__/g, "<b>$1</b>");
         mdBold = /\*\*([\s\S]*?)\*\*/;
@@ -3071,7 +3074,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
 
     function sameThemeRun(a, b) {
         return a.italic === b.italic && a.bold === b.bold && a.underline === b.underline &&
-            a.strike === b.strike &&
+            a.strike === b.strike && a.strikeDouble === b.strikeDouble &&
             a.superscript === b.superscript && a.subscript === b.subscript && a.highlight === b.highlight &&
             a.keyterm === b.keyterm && a.backgroundColor === b.backgroundColor &&
             a.fontSize === b.fontSize && a.color === b.color;
@@ -3116,6 +3119,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 bold: false,
                 underline: false,
                 strike: false,
+                strikeDouble: false,
                 superscript: false,
                 subscript: false,
                 highlight: false,
@@ -3130,6 +3134,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 if (run.bold) slice.bold = true;
                 if (run.underline) slice.underline = true;
                 if (run.strike) slice.strike = true;
+                if (run.strikeDouble) slice.strikeDouble = true;
                 if (run.superscript) slice.superscript = true;
                 if (run.subscript) slice.subscript = true;
                 if (run.highlight) slice.highlight = true;
@@ -3208,6 +3213,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                         bold: tag === "b" || tag === "strong",
                         underline: tag === "u" || deco.underline,
                         strike: tag === "s" || tag === "strike" || tag === "del" || deco.strike,
+                        strikeDouble: deco.strikeDouble || /data-strike\s*=\s*["']?double/i.test(attrs),
                         superscript: tag === "sup",
                         subscript: tag === "sub",
                         highlight: tag === "mark",
@@ -3230,6 +3236,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                             bold: open.bold,
                             underline: open.underline,
                             strike: open.strike,
+                            strikeDouble: open.strikeDouble,
                             superscript: open.superscript,
                             subscript: open.subscript,
                             highlight: open.highlight,
@@ -3273,6 +3280,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 italic: kind === "bold" && slice.italic,
                 underline: slice.underline ? true : false,
                 strike: slice.strike ? true : false,
+                strikeDouble: slice.strikeDouble ? true : false,
                 superscript: slice.superscript ? true : false,
                 subscript: slice.subscript && !slice.superscript,
                 color: color,
@@ -3372,6 +3380,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 italic: srcRun.italic ? true : false,
                 underline: srcRun.underline ? true : false,
                 strike: srcRun.strike ? true : false,
+                strikeDouble: srcRun.strikeDouble ? true : false,
                 superscript: srcRun.superscript ? true : false,
                 subscript: srcRun.subscript ? true : false,
                 color: srcRun.color || "",
@@ -3516,7 +3525,14 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 try { range.underline = true; } catch (eU) {}
             }
             if (run.strike) {
-                try { range.strikeThru = true; } catch (eSt) {}
+                try {
+                    range.strikeThru = true;
+                    if (run.strikeDouble) {
+                        try {
+                            range.strikeThruWeight = Math.max(1.25, Number(range.pointSize) * 0.14);
+                        } catch (eSw) {}
+                    }
+                } catch (eSt) {}
             }
             return true;
         } catch (e) {
@@ -3612,6 +3628,12 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return out + s.substring(last);
     }
 
+    function leadingListLevel(seg) {
+        var lead = /^[ \t]*/.exec(String(seg || ""));
+        var width = lead ? lead[0].replace(/\t/g, "  ").length : 0;
+        return Math.floor(width / 2);
+    }
+
     function splitEmbeddedList(text) {
         var lines = normalizeHtmlLists(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split(/\n+/);
         var out = [];
@@ -3620,8 +3642,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var plain;
         var m;
         var hashes;
+        var level;
         for (i = 0; i < lines.length; i++) {
             seg = lines[i];
+            level = leadingListLevel(seg);
             plain = trim(stripMarkers(stripHtml(seg)));
             if (!plain) continue;
             hashes = plain.match(/^(#{1,6})\s+/);
@@ -3641,16 +3665,18 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 out.push({
                     text: stripOuterMarker(seg, new RegExp("^" + m[1] + "\\.\\s+(?:" + m[1] + "\\.\\s*)?")),
                     kind: "num",
-                    number: parseInt(m[1], 10)
+                    number: parseInt(m[1], 10),
+                    level: level
                 });
             } else if ((m = plain.match(/^(\d+)\)\s/))) {
                 out.push({
                     text: stripOuterMarker(seg, new RegExp("^" + m[1] + "\\)\\s+")),
                     kind: "num",
-                    number: parseInt(m[1], 10)
+                    number: parseInt(m[1], 10),
+                    level: level
                 });
             } else if (/^[-\u2022\u2013*+]\s/.test(plain)) {
-                out.push({ text: stripOuterMarker(seg, /^[-\u2022\u2013*+]\s+/), kind: "bullet" });
+                out.push({ text: stripOuterMarker(seg, /^[-\u2022\u2013*+]\s+/), kind: "bullet", level: level });
             } else {
                 out.push({ text: seg, kind: "para" });
             }
@@ -3659,9 +3685,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     var listStarts = [];
+    var listLevels = [];
     var markerColorRuns = [];
 
-    /** Pin auto-numbering start on the first item of a numbered run. */
+    /** Pin each numbered item to the number written in the text. */
     function applyListStart(docRef, rec) {
         var story, contents, pos, para;
         try {
@@ -3689,6 +3716,36 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             if (applyListStart(docRef, listStarts[i])) ok++;
         }
         log("Numbered list starts => " + ok + "/" + listStarts.length);
+    }
+
+    function applyListLevel(docRef, rec) {
+        var story, contents, pos, para, base;
+        try {
+            story = docRef.stories.itemByID(rec.storyId);
+            contents = String(story.contents);
+            pos = rec.charIndex;
+            if (contents.substr(pos, rec.probe.length) !== rec.probe) {
+                pos = contents.indexOf(rec.probe, Math.max(0, rec.charIndex - 8));
+                if (pos < 0) return false;
+                rec.charIndex = pos;
+            }
+            para = story.characters[pos].paragraphs[0];
+            base = 0;
+            try { base = Number(para.appliedParagraphStyle.leftIndent) || 0; } catch (eBase) {}
+            para.leftIndent = base + (rec.level * 18);
+            return true;
+        } catch (e) {
+            log("list level failed: " + e.message);
+            return false;
+        }
+    }
+
+    function reapplyListLevels(docRef) {
+        var i, ok = 0;
+        for (i = 0; i < listLevels.length; i++) {
+            if (applyListLevel(docRef, listLevels[i])) ok++;
+        }
+        if (listLevels.length) log("Nested list indents => " + ok + "/" + listLevels.length);
     }
 
     function ensureMarkerCharStyle(docRef, hex) {
@@ -5246,7 +5303,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     }
                     try { segBase = pageStory.contents ? pageStory.characters.length : 0; } catch (eSb) {}
                     placedProbe = appendParagraph(pageStory, segs[si].text, segStyle, doc);
-                    if (sk === "num" && (si === 0 || segs[si - 1].kind !== "num")) {
+                    if (sk === "num" && segs[si].number) {
                         var segRec = {
                             storyId: pageStory.id,
                             charIndex: segBase,
@@ -5254,6 +5311,15 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                             number: segs[si].number
                         };
                         if (applyListStart(doc, segRec)) listStarts.push(segRec);
+                    }
+                    if ((sk === "num" || sk === "bullet") && segs[si].level > 0) {
+                        var levelRec = {
+                            storyId: pageStory.id,
+                            charIndex: segBase,
+                            probe: placedProbe,
+                            level: segs[si].level
+                        };
+                        if (applyListLevel(doc, levelRec)) listLevels.push(levelRec);
                     }
                     if ((sk === "num" || sk === "bullet") && markerColor) {
                         queueMarkerColor(doc, pageStory, segBase, placedProbe, markerColor);
@@ -5312,6 +5378,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }(storyHeads, doc));
     reapplyInlineRuns(doc);
     reapplyListStarts(doc);
+    reapplyListLevels(doc);
     reapplyMarkerColors(doc);
 
     for (oi = 0; oi < storyHeads.length; oi++) {

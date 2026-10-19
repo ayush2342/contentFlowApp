@@ -33,6 +33,9 @@ const MARKDOWN_SIGNALS = [
   /<span\b[^>]*font-size\s*:/i,
   /<span\b[^>]*background-color\s*:/i,
   /<span\b[^>]*(?:^|[^-a-zA-Z])color\s*:/i,
+  /text-decoration\s*:\s*[^;"']*underline/i,
+  /text-decoration\s*:\s*[^;"']*line-through/i,
+  /~~[\s\S]+?~~/,
   /\[[^\]\n]+\]\([^)\s]+\)/, // [text](url)
 ];
 
@@ -67,6 +70,8 @@ export const markdownInlineToHtml = (value) => {
     (match, label, href) => `<a href="${escapeAttribute(href)}">${label}</a>`
   );
 
+  text = text.replace(/~~~~([\s\S]+?)~~~~/g, '<s data-strike="double">$1</s>');
+  text = text.replace(/~~([\s\S]+?)~~/g, '<s>$1</s>');
   text = text.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<b><i>$1</i></b>');
   text = text.replace(/\*\*([^\n]+?)\*\*/g, '<b>$1</b>');
   text = text.replace(/__([^\n]+?)__/g, '<b>$1</b>');
@@ -81,33 +86,41 @@ export const markdownInlineToHtml = (value) => {
   );
 };
 
+const listLevel = (rawLine) => {
+  const indent = /^[ \t]*/.exec(String(rawLine ?? ''))?.[0] || '';
+  // One tab, or two spaces, is one nesting level. A single space stays the main list.
+  const width = indent.replace(/\t/g, '  ').length;
+  return Math.floor(width / 2);
+};
+
 const classifyLine = (rawLine) => {
   const line = String(rawLine ?? '').replace(/\s+$/, '');
+  const level = listLevel(line);
   const trimmed = line.replace(/^\s+/, '');
 
   if (!trimmed) return { kind: 'blank', text: '' };
 
   let match = /^(#{1,6})\s+(.*)$/.exec(trimmed);
   if (match) {
-    return { kind: match[1].length === 1 ? 'h1' : 'h2', text: match[2] };
+    return { kind: match[1].length === 1 ? 'h1' : 'h2', text: match[2], level: 0 };
   }
 
   match = /^>\s?(.*)$/.exec(trimmed);
-  if (match) return { kind: 'quote', text: match[1] };
+  if (match) return { kind: 'quote', text: match[1], level: 0 };
 
   match = /^[-*+]\s+(.*)$/.exec(trimmed);
-  if (match) return { kind: 'bullet', text: match[1] };
+  if (match) return { kind: 'bullet', text: match[1], level };
 
   match = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);
-  if (match) return { kind: 'number', text: match[2] };
+  if (match) return { kind: 'number', text: match[2], number: Number(match[1]), level };
 
-  return { kind: 'paragraph', text: trimmed };
+  return { kind: 'paragraph', text: trimmed, level: 0 };
 };
 
 /**
  * Parse a Markdown snippet into the flat block list renderers consume.
  * Consecutive plain lines stay one paragraph, joined with `<br>`. A blank line
- * starts the next block. Numbered items are renumbered sequentially per run.
+ * starts the next block. A numbered line keeps the number written in the text.
  */
 export const parseMarkdownRichText = (value) => {
   const text = String(value ?? '');
@@ -115,7 +128,6 @@ export const parseMarkdownRichText = (value) => {
 
   const out = [];
   let paragraphLines = [];
-  let numberCounter = 0;
 
   const flushParagraph = () => {
     if (!paragraphLines.length) return;
@@ -128,7 +140,6 @@ export const parseMarkdownRichText = (value) => {
     const line = classifyLine(rawLine);
 
     if (line.kind !== 'paragraph') flushParagraph();
-    if (line.kind !== 'number') numberCounter = 0;
 
     switch (line.kind) {
       case 'blank':
@@ -137,11 +148,18 @@ export const parseMarkdownRichText = (value) => {
         paragraphLines.push(line.text);
         break;
       case 'number':
-        numberCounter += 1;
         out.push({
           kind: 'number',
           html: markdownInlineToHtml(line.text),
-          number: numberCounter,
+          number: line.number,
+          level: line.level || 0,
+        });
+        break;
+      case 'bullet':
+        out.push({
+          kind: 'bullet',
+          html: markdownInlineToHtml(line.text),
+          level: line.level || 0,
         });
         break;
       default:

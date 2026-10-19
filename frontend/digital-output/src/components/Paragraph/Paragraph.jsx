@@ -69,7 +69,13 @@ const RichTextBlock = ({ richText }) => {
               style={markerColor ? { '--md-marker-color': markerColor } : undefined}
             >
               {entry.items.map((item, itemIndex) => (
-                <li key={`md-li-${itemIndex}`}>{renderInlineHtml(item.html)}</li>
+                <li
+                  key={`md-li-${itemIndex}`}
+                  value={isNumbered ? item.number : undefined}
+                  style={item.level ? { marginLeft: `${item.level * 1.25}rem` } : undefined}
+                >
+                  {renderInlineHtml(item.html)}
+                </li>
               ))}
             </ListTag>
           );
