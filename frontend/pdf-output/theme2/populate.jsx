@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v53-nested-indent";
+    var VERSION = "cengage-v54-trim-pages";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -2831,112 +2831,20 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     /**
-     * Extend the T1 thread until the story no longer overflows.
-     * Always append a fresh TX-Text page with two master-geometry columns
-     * (left→right). Insert AFTER the current tail page so later JSON pages
-     * shift forward (never backfill).
+     * One JSON page is one PDF page. Text that does not fit stays overset and
+     * is left out of the export. Do not add a continuation page.
      */
     function ensureOverflowCapacity(head, docRef) {
-        var story = head ? head.parentStory : null;
-        var tail = getStoryTailFrame(head);
-        var safety = 0;
-        var nextPage;
-        var frames;
-        var masterCols = getMasterT1Columns(docRef);
-        var txMaster = null;
-        var afterLen = 0;
-        var linked = false;
-        var pr;
-        var beforeTotal = 0;
-        var beforeVisible = 0;
-
-        try {
-            txMaster = docRef.masterSpreads.itemByName("TX-Text");
-        } catch (eM) {}
-
-        while (true) {
-            try { if (story) story.recompose(); } catch (r0) {}
-            tail = getStoryTailFrame(head);
-            if (!tail || !storyHasOverset(head)) break;
-            if (safety >= 80) {
-                warnings.push("T1 still overset after adding " + safety + " pages");
-                log("T1 still overset after " + safety + " overflow pages");
-                break;
-            }
-            safety += 1;
-            try { beforeTotal = story.characters.length; } catch (eT) { beforeTotal = 0; }
-            beforeVisible = storyVisibleCharCount(head);
-
-            nextPage = null;
-            try {
-                nextPage = safeAddPage(docRef, tail.parentPage || null);
-            } catch (eAdd2) {
-                warnings.push("Could not add overflow page: " + eAdd2.message);
-                log("Could not add overflow page => " + eAdd2.message);
-                break;
-            }
-            try {
-                if (txMaster && txMaster.isValid) nextPage.appliedMaster = txMaster;
-            } catch (mErr) {}
-            try { docRef.recompose(); } catch (eRc) {}
-
-            frames = restoreFullColumnT1OnPage(nextPage, columnsForPage(docRef, nextPage));
-            if (frames.length >= 2) {
-                try { frames[1].previousTextFrame = frames[0]; } catch (eTh) {
-                    try { frames[0].nextTextFrame = frames[1]; } catch (eTh2) {}
-                }
-            }
-            if (!frames.length) {
-                warnings.push("Overflow page has no T1 frames");
-                log("Overflow page missing T1 frames => " + nextPage.name);
-                break;
-            }
-
-            linked = false;
-            try {
-                frames[0].previousTextFrame = tail;
-                linked = true;
-            } catch (ePrev) {
-                try {
-                    tail.nextTextFrame = frames[0];
-                    linked = true;
-                } catch (linkErr) {
-                    warnings.push("T1 thread failed: " + linkErr.message);
-                    log("T1 thread failed => " + linkErr.message);
-                }
-            }
-
-            try { if (story) story.recompose(); } catch (r1) {}
-            try { afterLen = frameVisibleTextLength(getStoryTailFrame(head)); } catch (eL1) { afterLen = 0; }
-            try { pr = pageRect(nextPage, docRef); } catch (ePr) { pr = null; }
-            var afterVisible = storyVisibleCharCount(head);
-            log("Added page for T1 overflow => " + nextPage.name +
-                " linked=" + linked +
-                " frames=" + frames.length +
-                " pageRect=" + (pr ? [pr.top, pr.left, pr.bottom, pr.right] : "?") +
-                " chars=" + beforeVisible + "/" + beforeTotal +
-                " afterVisible=" + afterVisible +
-                " tailChars=" + afterLen);
-
-            // A new page that absorbs no characters is blank. Drop it immediately
-            // so a false overset (or a reflow that fits) cannot leave an empty page.
-            if (afterVisible <= beforeVisible) {
-                var ui;
-                for (ui = 0; ui < frames.length; ui++) {
-                    try { frames[ui].previousTextFrame = Nothing; } catch (eUn) {}
-                    try { frames[ui].nextTextFrame = Nothing; } catch (eUn2) {}
-                }
-                try {
-                    nextPage.remove();
-                    log("Removed overflow page that absorbed no text => visible still " + beforeVisible);
-                } catch (eDrop) {
-                    warnings.push("Could not drop empty overflow page: " + eDrop.message);
-                    log("Could not drop empty overflow page: " + eDrop.message);
-                }
-                break;
-            }
+        var overset = false;
+        var tail = null;
+        try { if (head && head.parentStory) head.parentStory.recompose(); } catch (e0) {}
+        try { overset = storyHasOverset(head); } catch (e1) { overset = false; }
+        if (overset) {
+            try { tail = getStoryTailFrame(head); } catch (eT) { tail = null; }
+            log("Trimmed overflow; left overset on page " +
+                (tail && tail.parentPage ? tail.parentPage.name : "?"));
         }
-        return getStoryTailFrame(head);
+        return tail || getStoryTailFrame(head);
     }
 
     function logStoryOverset(head, docRef, label) {
@@ -5172,8 +5080,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     clearAllMasterFooters(doc);
 
     // ---- Body by JSON page_no (no backfill) ----
-    // Facing/units already applied before opener so CO-Verso is never wiped.
-    // Each JSON page gets its own T1 story; overflow only goes forward.
+    // Each JSON page owns exactly one PDF page. Overflow is left overset.
     var bodyStartIndex = hasOpener ? 1 : 0;
     var nextDocIndex = bodyStartIndex;
     var storyHeads = [];
@@ -5336,15 +5243,11 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         // Re-pin geometry after paste (auto-size / compose can widen frames).
         try { refitStoryT1Frames(pageHead, doc); } catch (eRf0) {}
         ensureOverflowCapacity(pageHead, doc);
-        offs = storyPageOffsets(pageHead, doc);
-        if (!offs.length) offs = [nextDocIndex];
-        for (oi = 0; oi < offs.length; oi++) {
-            pageOwners[offs[oi]] = jsonPageNo;
-        }
-        log("JSON page_no=" + jsonPageNo + " occupies docIndexes=" + offs.join(",") +
-            " (forward-only; no backfill)");
+        pageOwners[nextDocIndex] = jsonPageNo;
+        log("JSON page_no=" + jsonPageNo + " kept on docIndex=" + nextDocIndex +
+            " (overflow trimmed)");
         storyHeads.push(pageHead);
-        nextDocIndex = offs[offs.length - 1] + 1;
+        nextDocIndex = nextDocIndex + 1;
     }
 
     var head = storyHeads.length ? storyHeads[0] : null;
@@ -5571,10 +5474,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     clampAllFiguresInDoc(doc);
     try { doc.recompose(); } catch (eRf3) {}
 
-    // Space-before suppression can pull a short overflow back onto the previous
-    // page and leave the extra page blank (footer only). Drop those before
-    // footers are written, then add a page only if a story is still overset
-    // so the pulled-back reflow cannot clip the last lines.
+    // Drop blank pages left by reflow, then keep the PDF at one page per JSON page.
+    // Overflow stays overset on its own page and is not given a new page.
     removeInteriorEmptyPages(doc);
     try { doc.recompose(); } catch (eRf4) {}
     for (oi = 0; oi < storyHeads.length; oi++) {
@@ -5582,6 +5483,25 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
     removeInteriorEmptyPages(doc);
     try { doc.recompose(); } catch (eRf5) {}
+    (function lockPageCountToJson(docRef, expected) {
+        var removed = 0;
+        var page;
+        if (expected < 1) expected = 1;
+        while (docRef.pages.length > expected) {
+            if (docRef.pages.length <= 1) break;
+            try {
+                page = docRef.pages[docRef.pages.length - 1];
+                log("Trimming extra page past JSON count => name=" + page.name);
+                page.remove();
+                removed += 1;
+            } catch (eLock) {
+                log("Could not trim extra page: " + eLock.message);
+                break;
+            }
+        }
+        log("Page count locked => " + docRef.pages.length + " expected=" + expected +
+            " trimmed=" + removed);
+    }(doc, bodyStartIndex + storyHeads.length));
     applyPerPageFootersFromJson(doc, pages);
 
     try { if (pdfFile.exists) pdfFile.remove(); } catch (e) {}

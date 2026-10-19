@@ -39,7 +39,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v27-scale-percent-always-honor-json";
+var POPULATE_SCRIPT_VERSION = "dynamic-v28-trim-pages";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
@@ -5480,9 +5480,15 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
     available = getAvailableColumnHeight(layoutState);
 
     if (available < DYNAMIC_LAYOUT.minTextFrameHeight) {
-        addLayoutPage(layoutState);
-        layoutBounds = getPageLayoutBounds(layoutState.page);
-        available = getAvailableColumnHeight(layoutState);
+        if (TRIM_JSON_PAGE_OVERFLOW) {
+            appendRenderLog(
+                "Trimmed overflow; no room left on page " + layoutState.page.name
+            );
+        } else {
+            addLayoutPage(layoutState);
+            layoutBounds = getPageLayoutBounds(layoutState.page);
+            available = getAvailableColumnHeight(layoutState);
+        }
     }
 
     frameHeight = Math.min(available, Math.max(initialHeight, minHeight));
@@ -5560,6 +5566,12 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
                 "Switching to column 2 on page " +
                 layoutState.page.name
             );
+        } else if (TRIM_JSON_PAGE_OVERFLOW) {
+            appendRenderLog(
+                "Trimmed overflow on page " + layoutState.page.name +
+                "; extra text left overset"
+            );
+            break;
         } else {
             addLayoutPage(layoutState);
 
@@ -5613,6 +5625,13 @@ function flowDynamicText(layoutState, cleanText, style, minHeight, seedHeight) {
 
     while (textFrameOverflows(chainEnd) && safety < maxOverflowPages) {
         safety += 1;
+        if (TRIM_JSON_PAGE_OVERFLOW) {
+            appendRenderLog(
+                "Trimmed overflow on page " + layoutState.page.name +
+                "; extra text left overset"
+            );
+            break;
+        }
         addLayoutPage(layoutState);
         layoutBounds = getPageLayoutBounds(layoutState.page);
         frameHeight = layoutBounds.bottom - layoutBounds.top;
@@ -6290,7 +6309,13 @@ function ensureLayoutSpace(layoutState, requiredHeight) {
             return getPageLayoutBounds(layoutState.page);
         }
 
-        // second column also full -> next page
+        // second column also full. A new page is only for the next JSON page.
+        if (TRIM_JSON_PAGE_OVERFLOW) {
+            appendRenderLog(
+                "Trimmed overflow; staying on page " + layoutState.page.name
+            );
+            return bounds;
+        }
         addLayoutPage(layoutState);
         layoutState.currentColumn = 0;
         bounds = getPageLayoutBounds(layoutState.page);
@@ -7619,6 +7644,12 @@ function populateDynamicQuotationBlock(layoutState, document, registryEntry, dat
                 layoutBounds = ensureLayoutSpace(layoutState, frameHeight + 28);
                 frameHeight += 28;
                 if (frameHeight > getAvailableColumnHeight(layoutState) + 2) {
+                    if (TRIM_JSON_PAGE_OVERFLOW) {
+                        appendRenderLog(
+                            "Trimmed quote overflow on page " + layoutState.page.name
+                        );
+                        break;
+                    }
                     // Move to next column/page and recreate if still overflowing hard.
                     addLayoutPage(layoutState);
                     layoutBounds = getPageLayoutBounds(layoutState.page);
@@ -9045,6 +9076,27 @@ function main() {
         }
 
         removeAllEmptyPages(doc);
+        (function lockPageCountToJson(document, expected) {
+            var removed = 0;
+            var i;
+            if (expected < 1) {
+                expected = 1;
+            }
+            for (i = document.pages.length - 1; i >= expected; i--) {
+                if (document.pages.length <= 1) {
+                    break;
+                }
+                try {
+                    document.pages[i].remove();
+                    removed += 1;
+                } catch (lockError) {}
+            }
+            appendRenderLog(
+                "Page count locked => " + document.pages.length +
+                " expected=" + expected +
+                " trimmed=" + removed
+            );
+        }(doc, pages.length));
         appendRenderLog("Pages in document before PDF export: " + doc.pages.length);
         flushRenderLog("populated");
         pdfFile = exportActiveDocumentToPdf(doc, scriptFolderPath);
