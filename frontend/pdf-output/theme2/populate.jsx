@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v54-trim-pages";
+    var VERSION = "cengage-v56-image-order";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -3918,6 +3918,257 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
+    function themeTableCellText(cell) {
+        if (cell === null || cell === undefined) return "";
+        if (typeof cell === "object") {
+            return cell.text === null || cell.text === undefined ? "" : String(cell.text);
+        }
+        return String(cell);
+    }
+
+    function themeTableMatrix(data) {
+        var tableData = (data && data.table && typeof data.table === "object") ? data.table : (data || {});
+        var cols = tableData.cols || data.cols || data.headers || [];
+        var rows = tableData.rows || data.rows || [];
+        var headerCount;
+        var headerRows = [];
+        var bodyRows = [];
+        var widths = tableData.column_widths_pt || data.columnWidths || [];
+        var i;
+        var j;
+        var cells;
+        var outRow;
+        var colCount = 0;
+        if (!rows || rows.length === undefined) rows = [];
+        if (!cols || cols.length === undefined) cols = [];
+        headerCount = Number(tableData.header_row_count);
+        if (isNaN(headerCount)) headerCount = Number(data.headerRowCount);
+        if (isNaN(headerCount)) headerCount = cols.length ? 1 : 0;
+        if (headerCount < 0) headerCount = 0;
+        if (rows.length && rows[0] && typeof rows[0][0] === "object") {
+            if (headerCount > rows.length) headerCount = rows.length;
+            for (i = 0; i < rows.length; i++) {
+                cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+                if (cells.length > colCount) colCount = cells.length;
+                outRow = [];
+                for (j = 0; j < cells.length; j++) outRow.push(themeTableCellText(cells[j]));
+                if (i < headerCount) headerRows.push(outRow);
+                else bodyRows.push(outRow);
+            }
+        } else {
+            colCount = cols.length;
+            for (i = 0; i < rows.length; i++) {
+                cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+                if (cells.length > colCount) colCount = cells.length;
+            }
+            if (cols.length) {
+                outRow = [];
+                for (i = 0; i < colCount; i++) outRow.push(themeTableCellText(cols[i]));
+                headerRows.push(outRow);
+            }
+            for (i = 0; i < rows.length; i++) {
+                cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
+                outRow = [];
+                for (j = 0; j < colCount; j++) outRow.push(themeTableCellText(cells[j]));
+                bodyRows.push(outRow);
+            }
+        }
+        if (!colCount && data && data.text) {
+            colCount = 1;
+            bodyRows.push([String(data.text)]);
+        }
+        return {
+            title: trim(String((data && data.title) || tableData.title || "")),
+            headerRows: headerRows,
+            bodyRows: bodyRows,
+            widths: widths,
+            columnCount: colCount,
+            span: String((data && (data.span || data.column_span)) || "full").toLowerCase()
+        };
+    }
+
+    function storyContentBottom(head) {
+        var cur = head;
+        var safety = 0;
+        var bottom = null;
+        var gb;
+        while (cur && safety < 30) {
+            safety += 1;
+            try {
+                if (cur.lines && cur.lines.length) {
+                    gb = cur.lines[cur.lines.length - 1].geometricBounds;
+                    if (bottom === null || gb[2] > bottom) bottom = gb[2];
+                }
+            } catch (eL) {}
+            try { cur = cur.nextTextFrame; } catch (eN) { break; }
+            if (!cur) break;
+        }
+        return bottom;
+    }
+
+    function tableAccentColor(docRef) {
+        var h2 = findParaStyle(docRef, "H2");
+        try {
+            if (h2 && h2.fillColor && h2.fillColor.isValid) return h2.fillColor;
+        } catch (e0) {}
+        return ensureRgbSwatch(docRef, "CF_TABLE_GREEN", [46, 125, 70]);
+    }
+
+    function fillThemeTableCell(cell, html, docRef, header) {
+        var parsed = parseThemeInline(String(html || "").replace(/\\n/g, "\n"));
+        var plain = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\n/g, "\r");
+        var tx = findParaStyle(docRef, "TX2") || findParaStyle(docRef, "TX1");
+        var boldStyle = findCharStyle(docRef, "BCPN Bold");
+        var pi;
+        var ri;
+        var run;
+        var start;
+        var end;
+        if (!plain) plain = " ";
+        try { cell.contents = plain; } catch (eC) { return; }
+        try {
+            for (pi = 0; pi < cell.paragraphs.length; pi++) {
+                if (tx) cell.paragraphs[pi].appliedParagraphStyle = tx;
+                cell.paragraphs[pi].spaceBefore = pi === 0 ? 0 : 4;
+                cell.paragraphs[pi].spaceAfter = 2;
+            }
+        } catch (eP) {}
+        if (header && boldStyle) {
+            try { cell.texts[0].appliedCharacterStyle = boldStyle; } catch (eH) {}
+        }
+        for (ri = 0; parsed.runs && ri < parsed.runs.length; ri++) {
+            run = parsed.runs[ri];
+            if (run.kind !== "bold" && run.kind !== "kt") continue;
+            start = run.start;
+            end = run.end - 1;
+            if (end < start || !boldStyle) continue;
+            try {
+                cell.characters.itemByRange(start, end).appliedCharacterStyle = boldStyle;
+            } catch (eB) {}
+        }
+    }
+
+    /**
+     * Theme 2 table is the green boxed callout, sized to the column pair.
+     * span "column" keeps it in the first column. Anything else spans both
+     * columns' live width, not the paper edge. Text that does not fit is overset.
+     */
+    function placeThemeTable(docRef, page, storyHead, data) {
+        var matrix = themeTableMatrix(data || {});
+        var cols;
+        var leftBox;
+        var rightBox;
+        var left;
+        var right;
+        var colTop;
+        var colBottom;
+        var top;
+        var frame;
+        var accent;
+        var rowCount;
+        var table;
+        var allRows;
+        var r;
+        var c;
+        var width;
+        var shares;
+        var sum;
+        var i;
+        var gb;
+        if (!matrix.columnCount) {
+            log("Table skipped — no rows");
+            return;
+        }
+        cols = columnsForPage(docRef, page);
+        if (!cols.length) return;
+        leftBox = t1BoundsOnPage(page, cols[0], docRef);
+        rightBox = t1BoundsOnPage(page, cols[cols.length - 1], docRef);
+        left = leftBox[1];
+        right = rightBox[3];
+        colTop = leftBox[0];
+        colBottom = leftBox[2];
+        if (matrix.span === "column" || matrix.span === "1") right = leftBox[3];
+        top = storyContentBottom(storyHead);
+        if (top === null || top < colTop) top = colTop;
+        else top += 8;
+        if (top > colBottom - 36) {
+            log("Table trimmed — no room left on page " + page.name);
+            return;
+        }
+        try {
+            frame = page.textFrames.add({
+                geometricBounds: [top, left, Math.min(top + 120, colBottom), right]
+            });
+        } catch (eAdd) {
+            log("Table frame failed: " + eAdd.message);
+            return;
+        }
+        try { frame.label = "CF_TABLE"; } catch (eLab) {}
+        accent = tableAccentColor(docRef);
+        try { frame.strokeWeight = 1.25; } catch (eSw) {}
+        try { if (accent) frame.strokeColor = accent; } catch (eSc) {}
+        try { frame.fillColor = docRef.swatches.itemByName("Paper"); } catch (eFill) {}
+        try { frame.textFramePreferences.insetSpacing = [8, 10, 8, 10]; } catch (eIn) {}
+        if (matrix.title) {
+            appendParagraph(frame.parentStory, matrix.title, "H2", docRef);
+        }
+        allRows = matrix.headerRows.concat(matrix.bodyRows);
+        rowCount = allRows.length;
+        try {
+            table = frame.parentStory.insertionPoints[-1].tables.add({
+                columnCount: matrix.columnCount,
+                bodyRowCount: rowCount
+            });
+        } catch (eTab) {
+            log("Table object failed: " + eTab.message);
+            return;
+        }
+        try { table.strokeWeight = 0; } catch (eTs) {}
+        width = Math.max(40, (right - left) - 22);
+        shares = [];
+        sum = 0;
+        if (matrix.widths && matrix.widths.length === matrix.columnCount) {
+            for (i = 0; i < matrix.columnCount; i++) {
+                shares.push(Number(matrix.widths[i]) || 0);
+                sum += shares[i];
+            }
+        }
+        for (c = 0; c < matrix.columnCount; c++) {
+            try {
+                table.columns[c].width = (sum > 0 ? (shares[c] / sum) : (1 / matrix.columnCount)) * width;
+            } catch (eW) {}
+        }
+        for (r = 0; r < rowCount; r++) {
+            for (c = 0; c < matrix.columnCount; c++) {
+                try {
+                    fillThemeTableCell(
+                        table.rows[r].cells[c],
+                        (allRows[r] && allRows[r][c]) || "",
+                        docRef,
+                        r < matrix.headerRows.length
+                    );
+                } catch (eCell) {
+                    log("Table cell " + r + "," + c + " failed: " + eCell.message);
+                }
+            }
+        }
+        try { frame.fit(FitOptions.FRAME_TO_CONTENT); } catch (eFit) {}
+        try {
+            gb = frame.geometricBounds;
+            if (gb[2] > colBottom) {
+                frame.geometricBounds = [gb[0], gb[1], colBottom, gb[3]];
+                log("Table height trimmed to column bottom on " + page.name);
+            }
+        } catch (eClamp) {}
+        forceJumpWrap(frame);
+        try { frame.textWrapPreferences.textWrapOffset = [8, 6, 10, 6]; } catch (eOff) {}
+        try { docRef.recompose(); } catch (eRc) {}
+        log("Placed theme2 table span=" + matrix.span +
+            " cols=" + matrix.columnCount +
+            " rows=" + rowCount +
+            " bounds=" + frame.geometricBounds);
+    }
+
     /**
      * Bake green extract shading into EXT1/EXT2 *styles* so the saved .indd
      * keeps it, and PDF browsers see process color (not Pantone spot tint).
@@ -4288,133 +4539,104 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     /**
-     * Place body figure like the client interior: at the live TOP of a text
-     * column (same Y as heading), usually the right column — not mid-column
-     * under the insertion baseline (that ran out of room and dropped page-1 images).
+     * Place the figure where the story has been filled so far, in that column.
+     * An Image block that is last in the JSON stays after that text. The caption
+     * is appended next and wraps underneath.
      */
     function placeAnchoredImage(story, file, docRef, scalePercent, preferPage) {
+        var anchor;
         var page;
-        var pr;
-        var cols;
-        var col;
         var colW;
         var figH;
         var maxH;
         var top;
         var left;
         var right;
+        var bottom;
         var rect;
         var scale;
-        var i;
-        var ci;
-        var order;
-        var candidates;
         var noneSw;
         var b;
         var nh;
-        var tryPage;
-        var pi;
         if (!story || !file) return false;
         try {
-            page = preferPage || null;
-            if (!page) {
-                try { page = story.insertionPoints.item(-1).parentTextFrames[0].parentPage; } catch (e0) {}
-            }
-            if (!page) {
-                try { page = story.textContainers[0].parentPage; } catch (e1) {}
-            }
+            anchor = null;
+            try {
+                var ip = story.insertionPoints.item(-1);
+                var tf = ip.parentTextFrames[0];
+                var gb = tf.geometricBounds;
+                var text = "";
+                top = gb[0];
+                try { text = String(story.contents || ""); } catch (eT) {}
+                if (trim(text) && tf.lines.length > 0) {
+                    try { top = Number(tf.lines.item(-1).baseline) + 8; } catch (eB) {}
+                }
+                if (top < gb[0]) top = gb[0];
+                if (top > gb[2] - 48) top = Math.max(gb[0], gb[2] - 48);
+                anchor = {
+                    page: tf.parentPage,
+                    top: top,
+                    left: gb[1],
+                    right: gb[3],
+                    bottom: gb[2]
+                };
+            } catch (eA) {}
+            page = (anchor && anchor.page) || preferPage || null;
             if (!page) return false;
+            if (!anchor) {
+                anchor = { page: page, top: 36, left: 36, right: 279, bottom: 720 };
+            }
 
             scale = parseFloat(scalePercent);
             if (isNaN(scale) || scale <= 0) scale = 100;
 
-            candidates = [];
-            try { candidates.push(page); } catch (e2) {}
-            // Also allow the page where the story currently ends.
-            try {
-                tryPage = story.textContainers[story.textContainers.length - 1].parentPage;
-                if (tryPage && tryPage !== page) candidates.push(tryPage);
-            } catch (e3) {}
-            // And the next page if needed.
-            try {
-                pi = page.documentOffset;
-                if (pi + 1 < docRef.pages.length) candidates.push(docRef.pages[pi + 1]);
-            } catch (e4) {}
-
-            for (i = 0; i < candidates.length; i++) {
-                tryPage = candidates[i];
-                if (!tryPage) continue;
-                try { pr = pageRect(tryPage, docRef); } catch (ePr) { continue; }
-                cols = columnsForPage(docRef, tryPage) || [];
-                if (!cols.length) continue;
-                // Client floats figures into the right column first.
-                order = cols.length > 1 ? [1, 0] : [0];
-                for (ci = 0; ci < order.length; ci++) {
-                    col = cols[order[ci]];
-                    if (!col) continue;
-                    left = pr.left + col.left;
-                    right = pr.left + col.right;
-                    colW = Math.max(80, right - left);
-                    // Same top edge as body text / heading (client live top).
-                    top = pr.top + col.top;
-                    if (columnTopHasFigure(tryPage, left, right, top, 90)) continue;
-                    maxH = (pr.top + col.bottom - 8) - top;
-                    if (maxH < 64) continue;
-                    figH = Math.min(maxH, Math.max(100, colW * 0.70));
-                    if (scale > 100 && scale < 140) {
-                        figH = Math.min(maxH, figH * (scale / 100));
-                    }
-                    rect = tryPage.rectangles.add({
-                        geometricBounds: [top, left, top + figH, right]
-                    });
-                    try { rect.label = "FIGORTABLE"; } catch (eL) {}
-                    try { rect.visible = true; } catch (eV) {}
-                    try {
-                        noneSw = docRef.swatches.itemByName("None");
-                        if (noneSw && noneSw.isValid) rect.fillColor = noneSw;
-                    } catch (eFill) {}
-                    try { rect.strokeWeight = 0; } catch (eSt) {}
-                    rect.place(file, false);
-                    try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
-                    try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
-                    try {
-                        rect.fit(FitOptions.FRAME_TO_CONTENT);
-                        b = rect.geometricBounds;
-                        nh = b[2] - b[0];
-                        if (nh < 48) nh = Math.min(maxH, 100);
-                        if (nh > maxH) nh = maxH;
-                        // Keep top pinned to live edge; only shrink height to content.
-                        rect.geometricBounds = [top, left, top + nh, right];
-                        rect.fit(FitOptions.PROPORTIONALLY);
-                        rect.fit(FitOptions.CENTER_CONTENT);
-                    } catch (eFit) {}
-                    forceJumpWrap(rect);
-                    try { rect.textWrapPreferences.textWrapOffset = [4, 0, 6, 0]; } catch (eOff) {}
-                    clampFigureToLiveArea(rect, docRef);
-                    // Re-assert top after clamp — must stay at column live top.
-                    try {
-                        b = rect.geometricBounds;
-                        nh = b[2] - b[0];
-                        rect.geometricBounds = [
-                            pr.top + col.top,
-                            left,
-                            pr.top + col.top + nh,
-                            right
-                        ];
-                        rect.fit(FitOptions.PROPORTIONALLY);
-                        rect.fit(FitOptions.CENTER_CONTENT);
-                    } catch (ePin) {}
-                    populated += 1;
-                    log("Placed JSON Image => " + file.name +
-                        " scale=" + scale +
-                        " bounds=" + rect.geometricBounds +
-                        " on p" + tryPage.name +
-                        " colTop=" + col.top);
-                    return true;
-                }
+            top = anchor.top;
+            left = anchor.left;
+            right = anchor.right;
+            bottom = anchor.bottom;
+            colW = Math.max(80, right - left);
+            maxH = bottom - 8 - top;
+            if (maxH < 48) {
+                log("placeImage: no room after text for " + file.name);
+                return false;
             }
-            log("placeImage: no free column-top slot for " + file.name);
-            return false;
+            figH = Math.min(maxH, Math.max(72, colW * 0.70));
+            if (scale > 100 && scale < 140) {
+                figH = Math.min(maxH, figH * (scale / 100));
+            }
+            rect = page.rectangles.add({
+                geometricBounds: [top, left, top + figH, right]
+            });
+            try { rect.label = "FIGORTABLE"; } catch (eL) {}
+            try { rect.visible = true; } catch (eV) {}
+            try {
+                noneSw = docRef.swatches.itemByName("None");
+                if (noneSw && noneSw.isValid) rect.fillColor = noneSw;
+            } catch (eFill) {}
+            try { rect.strokeWeight = 0; } catch (eSt) {}
+            rect.place(file, false);
+            try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
+            try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
+            try {
+                rect.fit(FitOptions.FRAME_TO_CONTENT);
+                b = rect.geometricBounds;
+                nh = b[2] - b[0];
+                if (nh < 48) nh = Math.min(maxH, 100);
+                if (nh > maxH) nh = maxH;
+                rect.geometricBounds = [top, left, top + nh, right];
+                rect.fit(FitOptions.PROPORTIONALLY);
+                rect.fit(FitOptions.CENTER_CONTENT);
+            } catch (eFit) {}
+            forceJumpWrap(rect);
+            try { rect.textWrapPreferences.textWrapOffset = [4, 0, 6, 0]; } catch (eOff) {}
+            clampFigureToLiveArea(rect, docRef);
+            populated += 1;
+            log("Placed JSON Image in flow => " + file.name +
+                " scale=" + scale +
+                " bounds=" + rect.geometricBounds +
+                " on p" + page.name +
+                " afterTextTop=" + top);
+            return true;
         } catch (e) {
             warnings.push("image place failed: " + e.message);
             log("image place failed: " + e.message);
@@ -4489,11 +4711,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         if (h < 40) return;
         top = b[0];
         if (top < topMin) top = topMin;
-        if (top + h > botMax) top = botMax - h;
-        if (top < topMin) {
-            top = topMin;
-            h = botMax - topMin;
-        }
+        if (top + h > botMax) h = botMax - top;
+        if (h < 40) return;
         try {
             frame.geometricBounds = [top, left, top + h, right];
             try { frame.fit(FitOptions.PROPORTIONALLY); } catch (e1) {}
@@ -5123,6 +5342,13 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 continue;
             }
 
+            if (type === "Table" || type === "TableBlock") {
+                placeThemeTable(doc, startPage, pageHead, data);
+                try { doc.recompose(); } catch (eTabRc) {}
+                pageStory = pageHead.parentStory;
+                continue;
+            }
+
             if (type === "Image") {
                 if (!trim(String(data.url || ""))) {
                     log("Image block with empty url — skipped");
@@ -5135,7 +5361,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                         String(data.url || "").substring(0, 80));
                     continue;
                 }
-                // Float on this JSON page's start page at column live top (client layout).
+                // Place at the current end of this page's text, in JSON order.
                 if (placeAnchoredImage(pageStory, imgFile, doc, data.scale_percent, startPage)) {
                     try { doc.recompose(); } catch (eRc) {}
                     ensureOverflowCapacity(pageHead, doc);
