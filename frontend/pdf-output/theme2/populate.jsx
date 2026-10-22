@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v60-json-order";
+    var VERSION = "cengage-v61-last-used-column";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4556,6 +4556,41 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     /**
+     * Return the rightmost T1 frame on this page that currently contains text
+     * from this story. Body pages compose left-to-right, so this is the column
+     * the JSON flow has actually reached. Do not trust insertion point
+     * parentTextFrames[0]: InDesign can return the first frame in the thread.
+     */
+    function lastUsedStoryColumn(page, story) {
+        var frames;
+        var i;
+        var frame;
+        var bounds;
+        var best = null;
+        var bestLeft = -1e9;
+        var sameStory;
+        if (!page || !story) return null;
+        try { frames = collectByLabel(page, "T1"); } catch (e0) { frames = []; }
+        for (i = 0; i < frames.length; i++) {
+            frame = frames[i];
+            sameStory = false;
+            try { sameStory = frame.parentStory.id === story.id; } catch (eS) {}
+            if (!sameStory) continue;
+            try {
+                if (!frame.lines || frame.lines.length < 1) continue;
+                bounds = frame.geometricBounds;
+            } catch (eF) {
+                continue;
+            }
+            if (bounds[1] > bestLeft) {
+                bestLeft = bounds[1];
+                best = frame;
+            }
+        }
+        return best;
+    }
+
+    /**
      * Column rectangle in pasteboard coordinates, extended down to the footer.
      * The text frame often ends with the type, while the page still has the
      * column gap under both columns. That gap is where the figure belongs.
@@ -4632,13 +4667,13 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         try {
             anchor = null;
             try {
-                var tf = null;
+                var tf = lastUsedStoryColumn(preferPage, story);
                 var gb;
                 var live;
                 try { story.recompose(); } catch (eRc0) {}
-                try {
+                if (!tf) try {
                     var ip = story.insertionPoints.item(-1);
-                    tf = ip.parentTextFrames[0];
+                    tf = ip.parentTextFrames.item(-1);
                 } catch (eIp) {}
                 if (!tf) tf = storyEndFrame(story);
                 if (!tf) throw new Error("no text frame for image");
