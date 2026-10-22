@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v69-callout-frames";
+    var VERSION = "cengage-v70-table-rows";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4311,20 +4311,28 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
 
     function calloutFrameBottom(frame, floorBottom, ceiling) {
         var gb;
-        var bottom;
+        var bottom = floorBottom;
+        var gi;
         try {
             if (frame.overflows) return ceiling;
         } catch (eOv) {}
         try {
             if (frame.lines && frame.lines.length) {
                 gb = frame.lines[frame.lines.length - 1].geometricBounds;
-                bottom = gb[2] + 10;
-                if (bottom < floorBottom) bottom = floorBottom;
-                if (bottom > ceiling) bottom = ceiling;
-                return bottom;
+                if (gb[2] + 10 > bottom) bottom = gb[2] + 10;
             }
         } catch (eLn) {}
-        return floorBottom;
+        try {
+            if (frame.allGraphics) {
+                for (gi = 0; gi < frame.allGraphics.length; gi++) {
+                    gb = frame.allGraphics[gi].geometricBounds;
+                    if (gb[2] + 8 > bottom) bottom = gb[2] + 8;
+                }
+            }
+        } catch (eGr) {}
+        if (bottom > ceiling) bottom = ceiling;
+        if (bottom < floorBottom) bottom = floorBottom;
+        return bottom;
     }
 
     function calloutColumnSources(matrix) {
@@ -4424,7 +4432,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
      * A callout is not a grid. Each JSON column is its own text frame so a long
      * unbreakable link cannot push the right column outside the live width.
      */
-    function placeThemeCalloutColumns(docRef, page, left, right, bodyTop, colBottom, matrix, bodyColor, ruleColor) {
+    function placeThemeCalloutColumns(docRef, page, left, right, bandTop, bodyTop, colBottom, matrix, bodyColor, ruleColor) {
         var sources = calloutColumnSources(matrix);
         var count = sources.length;
         var usable;
@@ -4439,6 +4447,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var bottom;
         var tallest;
         var floorBottom;
+        var jsonHeight = 0;
         var bg;
         var none;
         var gb;
@@ -4456,8 +4465,11 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 sum += shares[i];
             }
         }
+        if (matrix.heights && matrix.heights.length && Number(matrix.heights[0]) > 0) {
+            jsonHeight = Number(matrix.heights[0]);
+        }
         x = left;
-        floorBottom = Math.min(bodyTop + 48, colBottom);
+        floorBottom = Math.min(bodyTop + (jsonHeight || 220), colBottom);
         for (c = 0; c < count; c++) {
             colW = (sum > 0 ? (shares[c] / sum) : (1 / count)) * usable;
             if (c === count - 1) colW = right - x;
@@ -4476,6 +4488,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             frames.push(frame);
             x += colW;
         }
+        try { docRef.recompose(); } catch (eRc0) {}
         tallest = floorBottom;
         for (i = 0; i < frames.length; i++) {
             bottom = calloutFrameBottom(frames[i], floorBottom, colBottom);
@@ -4493,7 +4506,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
         try {
             bg = page.rectangles.add({
-                geometricBounds: [bodyTop, left, tallest, right]
+                geometricBounds: [bandTop, left, tallest, right]
             });
             bg.label = "CF_TABLE_BODY";
             bg.strokeWeight = 0;
@@ -4502,7 +4515,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 if (none && none.isValid) bg.strokeColor = none;
             } catch (eNs) {}
             if (bodyColor) bg.fillColor = bodyColor;
-            try { bg.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eWr) {}
+            forceJumpWrap(bg);
+            try { bg.textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eWr) {}
             try { bg.sendToBack(); } catch (eBack) {}
         } catch (eBg) {
             log("Callout background failed: " + eBg.message);
@@ -4521,6 +4535,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
         try { docRef.recompose(); } catch (eRc) {}
         log("Placed theme2 callout frames cols=" + frames.length +
+            " widths=" + shares.join(",") +
+            " rowHeight=" + jsonHeight +
             " textLens=" + lens.join(",") +
             " bottom=" + tallest);
     }
@@ -4576,14 +4592,14 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         right = rightBox[3];
         colTop = leftBox[0];
         colBottom = leftBox[2];
-        // The master-column lookup can return only one side on single-page
-        // spreads. The live T1 story frames are the source of truth.
+        // Full-span callouts keep both master columns. Live frames may widen
+        // that union, but the first column must not replace it.
         cur = storyHead;
         while (cur && frameCount < 4) {
             try {
                 if (!cur.parentPage || cur.parentPage.id !== page.id) break;
                 frameBounds = cur.geometricBounds;
-                if (frameCount === 0) {
+                if (frameCount === 0 && (matrix.span === "column" || matrix.span === "1")) {
                     left = frameBounds[1];
                     right = frameBounds[3];
                     colTop = frameBounds[0];
@@ -4661,6 +4677,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 page,
                 left,
                 right,
+                top,
                 top + titleHeight,
                 colBottom,
                 matrix,
