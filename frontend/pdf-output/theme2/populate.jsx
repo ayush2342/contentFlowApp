@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v68-two-column-callout";
+    var VERSION = "cengage-v69-callout-frames";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4244,6 +4244,287 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         placeThemeTableCellImage(cell, source, columnWidth - matrix.marginLeft - matrix.marginRight);
     }
 
+    function softenCalloutPlain(plain, runs) {
+        var i;
+        var ch;
+        var token = 0;
+        var extra = 0;
+        var before = [];
+        var out = "";
+        before[0] = 0;
+        for (i = 0; i < plain.length; i++) {
+            ch = plain.charAt(i);
+            if (ch === " " || ch === "\r" || ch === "\n" || ch === "\t") token = 0;
+            else token += 1;
+            out += ch;
+            if (token >= 24 && "/?&=-.".indexOf(ch) >= 0) {
+                out += "\u200b";
+                extra += 1;
+                token = 0;
+            }
+            before[i + 1] = extra;
+        }
+        if (runs) {
+            for (i = 0; i < runs.length; i++) {
+                runs[i].start += before[runs[i].start] || 0;
+                runs[i].end += before[runs[i].end] || 0;
+            }
+        }
+        return out;
+    }
+
+    function applyThemeInlineRuns(story, runs, docRef, boldStyle) {
+        var ri;
+        var run;
+        var start;
+        var end;
+        var range;
+        var sw;
+        if (!story || !runs) return;
+        for (ri = 0; ri < runs.length; ri++) {
+            run = runs[ri];
+            start = run.start;
+            end = run.end - 1;
+            if (end < start) continue;
+            try {
+                range = story.characters.itemByRange(start, end);
+                if ((run.kind === "bold" || run.kind === "kt") && boldStyle) {
+                    range.appliedCharacterStyle = boldStyle;
+                }
+                if (run.fontSize) range.pointSize = run.fontSize;
+                if (run.italic) range.fontStyle = "Italic";
+                if (run.underline) range.underline = true;
+                if (run.strike) range.strikeThru = true;
+                if (run.superscript) range.position = Position.SUPERSCRIPT;
+                else if (run.subscript) range.position = Position.SUBSCRIPT;
+                if (run.color) {
+                    sw = ensureRgbSwatch(
+                        docRef,
+                        "CF_TABLE_TEXT_" + String(run.color).replace(/^#/, ""),
+                        hexToRgbList(run.color)
+                    );
+                    if (sw) range.fillColor = sw;
+                }
+            } catch (eRun) {}
+        }
+    }
+
+    function calloutFrameBottom(frame, floorBottom, ceiling) {
+        var gb;
+        var bottom;
+        try {
+            if (frame.overflows) return ceiling;
+        } catch (eOv) {}
+        try {
+            if (frame.lines && frame.lines.length) {
+                gb = frame.lines[frame.lines.length - 1].geometricBounds;
+                bottom = gb[2] + 10;
+                if (bottom < floorBottom) bottom = floorBottom;
+                if (bottom > ceiling) bottom = ceiling;
+                return bottom;
+            }
+        } catch (eLn) {}
+        return floorBottom;
+    }
+
+    function calloutColumnSources(matrix) {
+        var all = (matrix.headerRows || []).concat(matrix.bodyRows || []);
+        var count = matrix.columnCount || 0;
+        var cols = [];
+        var r;
+        var c;
+        var cell;
+        var piece;
+        for (c = 0; c < count; c++) cols.push({ text: "" });
+        for (r = 0; r < all.length; r++) {
+            for (c = 0; c < count; c++) {
+                cell = (all[r] && all[r][c]) || "";
+                if (cell && typeof cell === "object") {
+                    if (cell.image_url && !cols[c].image_url) {
+                        cols[c].image_url = cell.image_url;
+                        cols[c].image_aspect_ratio = cell.image_aspect_ratio;
+                    }
+                    piece = themeTableCellText(cell);
+                    if (piece) cols[c].text += (cols[c].text ? "\n" : "") + piece;
+                    if (!cols[c].font_size_pt && cell.font_size_pt) cols[c].font_size_pt = cell.font_size_pt;
+                    if (!cols[c].text_color && cell.text_color) cols[c].text_color = cell.text_color;
+                    if (!cols[c].horizontal_alignment && cell.horizontal_alignment) {
+                        cols[c].horizontal_alignment = cell.horizontal_alignment;
+                    }
+                } else if (cell) {
+                    cols[c].text += (cols[c].text ? "\n" : "") + String(cell);
+                }
+            }
+        }
+        return cols;
+    }
+
+    function fillThemeCalloutFrame(frame, cellData, docRef, matrix, columnWidth) {
+        var source = (cellData && typeof cellData === "object") ? cellData : { text: cellData };
+        var raw = themeTableCellText(source).replace(/\\n/g, "\n");
+        var parsed;
+        var plain;
+        var tx;
+        var boldStyle;
+        var align;
+        var size;
+        var textColor;
+        var sw;
+        var pi;
+        var none;
+        if (raw) raw = raw.replace(/\n[ \t]*\n+/g, "\n");
+        parsed = parseThemeInline(raw);
+        plain = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\n/g, "\r");
+        plain = softenCalloutPlain(plain, parsed.runs);
+        tx = findParaStyle(docRef, "TX2") || findParaStyle(docRef, "TX1");
+        boldStyle = findCharStyle(docRef, "BCPN Bold");
+        align = String(source.horizontal_alignment || "left").toLowerCase();
+        size = Number(source.font_size_pt || 9);
+        textColor = String(source.text_color || "").replace(/^#/, "");
+        try { frame.textFramePreferences.ignoreWrap = true; } catch (eIg) {}
+        try { frame.textFramePreferences.verticalJustification = VerticalJustification.TOP_ALIGN; } catch (eVj) {}
+        try { frame.strokeWeight = 0; } catch (eSt) {}
+        try {
+            none = docRef.swatches.itemByName("None");
+            if (none && none.isValid) {
+                frame.strokeColor = none;
+                frame.fillColor = none;
+            }
+        } catch (eNone) {}
+        try {
+            frame.textFramePreferences.insetSpacing = [
+                matrix.marginTop,
+                matrix.marginLeft,
+                matrix.marginBottom,
+                matrix.marginRight
+            ];
+        } catch (eIn) {}
+        try { frame.contents = plain || " "; } catch (eC) { return; }
+        try {
+            for (pi = 0; pi < frame.paragraphs.length; pi++) {
+                if (tx) frame.paragraphs[pi].appliedParagraphStyle = tx;
+                frame.paragraphs[pi].spaceBefore = 0;
+                frame.paragraphs[pi].spaceAfter = 2;
+                if (size > 0) frame.paragraphs[pi].pointSize = size;
+                try { frame.paragraphs[pi].leading = Math.max(9, (size || 9) * 1.15); } catch (eLead) {}
+                if (align === "center") frame.paragraphs[pi].justification = Justification.CENTER_ALIGN;
+                else if (align === "right") frame.paragraphs[pi].justification = Justification.RIGHT_ALIGN;
+                else frame.paragraphs[pi].justification = Justification.LEFT_ALIGN;
+            }
+        } catch (eP) {}
+        if (/^[0-9a-fA-F]{6}$/.test(textColor)) {
+            sw = ensureRgbSwatch(docRef, "CF_TABLE_TEXT_" + textColor, hexToRgbList("#" + textColor));
+            try { if (sw) frame.texts[0].fillColor = sw; } catch (eTc) {}
+        }
+        applyThemeInlineRuns(frame.parentStory, parsed.runs, docRef, boldStyle);
+        placeThemeTableCellImage(frame, source, columnWidth - matrix.marginLeft - matrix.marginRight);
+    }
+
+    /**
+     * A callout is not a grid. Each JSON column is its own text frame so a long
+     * unbreakable link cannot push the right column outside the live width.
+     */
+    function placeThemeCalloutColumns(docRef, page, left, right, bodyTop, colBottom, matrix, bodyColor, ruleColor) {
+        var sources = calloutColumnSources(matrix);
+        var count = sources.length;
+        var usable;
+        var shares = [];
+        var sum = 0;
+        var i;
+        var c;
+        var frames = [];
+        var frame;
+        var x;
+        var colW;
+        var bottom;
+        var tallest;
+        var floorBottom;
+        var bg;
+        var none;
+        var gb;
+        var bottomRule;
+        var lens = [];
+        if (!count) return;
+        if (bodyTop > colBottom - 36) {
+            log("Callout trimmed — no room left on page " + page.name);
+            return;
+        }
+        usable = Math.max(40, right - left);
+        if (matrix.widths && matrix.widths.length === count) {
+            for (i = 0; i < count; i++) {
+                shares.push(Number(matrix.widths[i]) || 0);
+                sum += shares[i];
+            }
+        }
+        x = left;
+        floorBottom = Math.min(bodyTop + 48, colBottom);
+        for (c = 0; c < count; c++) {
+            colW = (sum > 0 ? (shares[c] / sum) : (1 / count)) * usable;
+            if (c === count - 1) colW = right - x;
+            try {
+                frame = page.textFrames.add({
+                    geometricBounds: [bodyTop, x, colBottom, x + colW]
+                });
+            } catch (eAdd) {
+                log("Callout column " + c + " failed: " + eAdd.message);
+                x += colW;
+                continue;
+            }
+            try { frame.label = "CF_TABLE_COL_" + c; } catch (eLab) {}
+            fillThemeCalloutFrame(frame, sources[c], docRef, matrix, colW);
+            try { lens.push(String(frame.parentStory.contents || "").length); } catch (eLen) { lens.push(0); }
+            frames.push(frame);
+            x += colW;
+        }
+        tallest = floorBottom;
+        for (i = 0; i < frames.length; i++) {
+            bottom = calloutFrameBottom(frames[i], floorBottom, colBottom);
+            if (bottom > tallest) tallest = bottom;
+        }
+        if (tallest > colBottom) tallest = colBottom;
+        for (i = 0; i < frames.length; i++) {
+            try {
+                gb = frames[i].geometricBounds;
+                frames[i].geometricBounds = [gb[0], gb[1], tallest, gb[3]];
+            } catch (eFit) {}
+            forceJumpWrap(frames[i]);
+            try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eOff) {}
+            try { frames[i].textFramePreferences.ignoreWrap = true; } catch (eIg2) {}
+        }
+        try {
+            bg = page.rectangles.add({
+                geometricBounds: [bodyTop, left, tallest, right]
+            });
+            bg.label = "CF_TABLE_BODY";
+            bg.strokeWeight = 0;
+            try {
+                none = docRef.swatches.itemByName("None");
+                if (none && none.isValid) bg.strokeColor = none;
+            } catch (eNs) {}
+            if (bodyColor) bg.fillColor = bodyColor;
+            try { bg.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eWr) {}
+            try { bg.sendToBack(); } catch (eBack) {}
+        } catch (eBg) {
+            log("Callout background failed: " + eBg.message);
+        }
+        for (i = 0; i < frames.length; i++) {
+            try { frames[i].bringToFront(); } catch (eFront) {}
+        }
+        try {
+            bottomRule = page.graphicLines.add();
+            bottomRule.label = "CF_TABLE_BOTTOM_RULE";
+            bottomRule.geometricBounds = [tallest, left, tallest, right];
+            bottomRule.strokeWeight = matrix.bottomRuleWidth;
+            if (ruleColor) bottomRule.strokeColor = ruleColor;
+        } catch (eRule) {
+            log("Table bottom rule failed: " + eRule.message);
+        }
+        try { docRef.recompose(); } catch (eRc) {}
+        log("Placed theme2 callout frames cols=" + frames.length +
+            " textLens=" + lens.join(",") +
+            " bottom=" + tallest);
+    }
+
     /**
      * Theme 2 supports the same rows/cell contract as the generic renderer.
      * variant="callout" adds the client green title band and borderless body.
@@ -4360,14 +4641,33 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 if (callout) {
                     try { if (accent) titleFrame.fillColor = accent; } catch (eTitleFill) {}
                     try { titleFrame.strokeWeight = 0; } catch (eTitleStroke) {}
+                    try {
+                        var titleNone = docRef.swatches.itemByName("None");
+                        if (titleNone && titleNone.isValid) titleFrame.strokeColor = titleNone;
+                    } catch (eTitleNone) {}
                 }
                 forceJumpWrap(titleFrame);
                 try { titleFrame.textWrapPreferences.textWrapOffset = [0, 0, 0, 0]; } catch (eTitleWrap) {}
+                try { titleFrame.textFramePreferences.ignoreWrap = true; } catch (eTitleIgnore) {}
             } catch (eTitle) {
                 log("Table title failed: " + eTitle.message);
                 titleFrame = null;
                 titleHeight = 0;
             }
+        }
+        if (callout) {
+            placeThemeCalloutColumns(
+                docRef,
+                page,
+                left,
+                right,
+                top + titleHeight,
+                colBottom,
+                matrix,
+                bodyColor,
+                ruleColor
+            );
+            return;
         }
         try {
             frame = page.textFrames.add({
