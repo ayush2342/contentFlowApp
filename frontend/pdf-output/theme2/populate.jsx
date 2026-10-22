@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v71-callout-band";
+    var VERSION = "cengage-v72-title-span";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4309,6 +4309,19 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
+    function bothColumnSpan(docRef, page) {
+        var cols = columnsForPage(docRef, page);
+        var a;
+        var b;
+        var span = { left: 0, right: 0 };
+        if (!cols || !cols.length) return span;
+        a = t1BoundsOnPage(page, cols[0], docRef);
+        b = t1BoundsOnPage(page, cols[cols.length - 1], docRef);
+        span.left = Math.min(a[1], b[1]);
+        span.right = Math.max(a[3], b[3]);
+        return span;
+    }
+
     function clearFrameChrome(item, docRef) {
         var noneStyle;
         var none;
@@ -4516,41 +4529,29 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 frames[i].geometricBounds = [gb[0], gb[1], tallest, gb[3]];
             } catch (eFit) {}
             forceJumpWrap(frames[i]);
-            try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 0, 0]; } catch (eOff) {}
+            try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eOff) {}
             try { frames[i].textFramePreferences.ignoreWrap = true; } catch (eIg2) {}
-            clearFrameChrome(frames[i], docRef);
+            try { frames[i].strokeWeight = 0; } catch (eSt) {}
         }
         try {
-            bg = page.rectangles.add({
-                geometricBounds: [bodyTop, left, tallest, right]
+            var span = bothColumnSpan(docRef, page);
+            var titleLeft = (span.right > span.left + 40) ? span.left : left;
+            var titleRight = (span.right > span.left + 40) ? span.right : right;
+            var headerBand = page.rectangles.add({
+                geometricBounds: [bandTop, titleLeft, bodyTop, titleRight]
             });
-            bg.label = "CF_TABLE_BODY";
-            clearFrameChrome(bg, docRef);
-            if (bodyColor) bg.fillColor = bodyColor;
-            try { bg.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eWr) {}
-            try { bg.sendToBack(); } catch (eBack) {}
-        } catch (eBg) {
-            log("Callout background failed: " + eBg.message);
-        }
-        try {
-            if (bodyTop > bandTop + 2) {
-                var headerBand = page.rectangles.add({
-                    geometricBounds: [bandTop, left, bodyTop, right]
-                });
-                headerBand.label = "CF_TABLE_HEADER";
-                clearFrameChrome(headerBand, docRef);
-                headerBand.fillColor = themeTableColor(
-                    docRef, "TBL_Green", matrix.headerBackground, "91BA9D"
-                );
-                try { headerBand.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eHw) {}
-            }
-        } catch (eHead) {
-            log("Callout header band failed: " + eHead.message);
-        }
-        try {
             var titleItem = null;
             var ti;
-            var tpi;
+            headerBand.label = "CF_TABLE_HEADER";
+            headerBand.strokeWeight = 0;
+            try {
+                none = docRef.swatches.itemByName("None");
+                if (none && none.isValid) headerBand.strokeColor = none;
+            } catch (eHs) {}
+            headerBand.fillColor = themeTableColor(
+                docRef, "TBL_Green", matrix.headerBackground, "91BA9D"
+            );
+            try { headerBand.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eHw) {}
             for (ti = 0; ti < page.textFrames.length; ti++) {
                 if (itemLabel(page.textFrames[ti]) === "CF_TABLE_TITLE") {
                     titleItem = page.textFrames[ti];
@@ -4558,32 +4559,34 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 }
             }
             if (titleItem) {
-                titleItem.geometricBounds = [bandTop, left, bodyTop, right];
-                clearFrameChrome(titleItem, docRef);
-                none = docRef.swatches.itemByName("None");
-                if (none && none.isValid) titleItem.fillColor = none;
+                try { titleItem.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF; } catch (eAs) {}
+                titleItem.geometricBounds = [bandTop, titleLeft, bodyTop, titleRight];
+                try { titleItem.strokeWeight = 0; } catch (eTs) {}
+                try {
+                    if (none && none.isValid) titleItem.fillColor = none;
+                } catch (eTf) {}
                 try { titleItem.textFramePreferences.ignoreWrap = true; } catch (eTig) {}
-                for (tpi = 0; tpi < titleItem.paragraphs.length; tpi++) {
-                    setShadingOn(titleItem.paragraphs[tpi], false);
-                }
-                try { titleItem.bringToFront(); } catch (eTf) {}
+                try { titleItem.bringToFront(); } catch (eFrontT) {}
+                log("Callout title span left=" + titleLeft + " right=" + titleRight);
             }
-        } catch (eTitleFit) {
-            log("Callout title width failed: " + eTitleFit.message);
+        } catch (eHead) {
+            log("Callout title span failed: " + eHead.message);
         }
         try {
-            var wrapRect = page.rectangles.add({
-                geometricBounds: [bandTop, left, tallest, right]
+            bg = page.rectangles.add({
+                geometricBounds: [bodyTop, left, tallest, right]
             });
-            wrapRect.label = "CF_TABLE_WRAP";
-            clearFrameChrome(wrapRect, docRef);
-            none = docRef.swatches.itemByName("None");
-            if (none && none.isValid) wrapRect.fillColor = none;
-            forceJumpWrap(wrapRect);
-            try { wrapRect.textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eWro) {}
-            try { wrapRect.sendToBack(); } catch (eWb) {}
-        } catch (eWrap) {
-            log("Callout wrap failed: " + eWrap.message);
+            bg.label = "CF_TABLE_BODY";
+            bg.strokeWeight = 0;
+            try {
+                none = docRef.swatches.itemByName("None");
+                if (none && none.isValid) bg.strokeColor = none;
+            } catch (eNs) {}
+            if (bodyColor) bg.fillColor = bodyColor;
+            try { bg.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eWr) {}
+            try { bg.sendToBack(); } catch (eBack) {}
+        } catch (eBg) {
+            log("Callout background failed: " + eBg.message);
         }
         for (i = 0; i < frames.length; i++) {
             try { frames[i].bringToFront(); } catch (eFront) {}
@@ -4702,6 +4705,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 titleFrame = page.textFrames.add({
                     geometricBounds: [top, left, top + titleHeight, right]
                 });
+                try { titleFrame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF; } catch (eTitleAuto) {}
+                try { titleFrame.textFramePreferences.ignoreWrap = true; } catch (eTitleIgnoreEarly) {}
                 titleFrame.contents = matrix.title;
                 titleFrame.label = "CF_TABLE_TITLE";
                 titleStyle = findParaStyle(docRef, "TBL_Title") ||
