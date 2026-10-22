@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v70-table-rows";
+    var VERSION = "cengage-v71-callout-band";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4309,6 +4309,21 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
+    function clearFrameChrome(item, docRef) {
+        var noneStyle;
+        var none;
+        if (!item) return;
+        try {
+            noneStyle = docRef.objectStyles.itemByName("[None]");
+            if (noneStyle && noneStyle.isValid) item.appliedObjectStyle = noneStyle;
+        } catch (eOs) {}
+        try { item.strokeWeight = 0; } catch (eSw) {}
+        try {
+            none = docRef.swatches.itemByName("None");
+            if (none && none.isValid) item.strokeColor = none;
+        } catch (eSc) {}
+    }
+
     function calloutFrameBottom(frame, floorBottom, ceiling) {
         var gb;
         var bottom = floorBottom;
@@ -4501,25 +4516,74 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 frames[i].geometricBounds = [gb[0], gb[1], tallest, gb[3]];
             } catch (eFit) {}
             forceJumpWrap(frames[i]);
-            try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eOff) {}
+            try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 0, 0]; } catch (eOff) {}
             try { frames[i].textFramePreferences.ignoreWrap = true; } catch (eIg2) {}
+            clearFrameChrome(frames[i], docRef);
         }
         try {
             bg = page.rectangles.add({
-                geometricBounds: [bandTop, left, tallest, right]
+                geometricBounds: [bodyTop, left, tallest, right]
             });
             bg.label = "CF_TABLE_BODY";
-            bg.strokeWeight = 0;
-            try {
-                none = docRef.swatches.itemByName("None");
-                if (none && none.isValid) bg.strokeColor = none;
-            } catch (eNs) {}
+            clearFrameChrome(bg, docRef);
             if (bodyColor) bg.fillColor = bodyColor;
-            forceJumpWrap(bg);
-            try { bg.textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eWr) {}
+            try { bg.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eWr) {}
             try { bg.sendToBack(); } catch (eBack) {}
         } catch (eBg) {
             log("Callout background failed: " + eBg.message);
+        }
+        try {
+            if (bodyTop > bandTop + 2) {
+                var headerBand = page.rectangles.add({
+                    geometricBounds: [bandTop, left, bodyTop, right]
+                });
+                headerBand.label = "CF_TABLE_HEADER";
+                clearFrameChrome(headerBand, docRef);
+                headerBand.fillColor = themeTableColor(
+                    docRef, "TBL_Green", matrix.headerBackground, "91BA9D"
+                );
+                try { headerBand.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eHw) {}
+            }
+        } catch (eHead) {
+            log("Callout header band failed: " + eHead.message);
+        }
+        try {
+            var titleItem = null;
+            var ti;
+            var tpi;
+            for (ti = 0; ti < page.textFrames.length; ti++) {
+                if (itemLabel(page.textFrames[ti]) === "CF_TABLE_TITLE") {
+                    titleItem = page.textFrames[ti];
+                    break;
+                }
+            }
+            if (titleItem) {
+                titleItem.geometricBounds = [bandTop, left, bodyTop, right];
+                clearFrameChrome(titleItem, docRef);
+                none = docRef.swatches.itemByName("None");
+                if (none && none.isValid) titleItem.fillColor = none;
+                try { titleItem.textFramePreferences.ignoreWrap = true; } catch (eTig) {}
+                for (tpi = 0; tpi < titleItem.paragraphs.length; tpi++) {
+                    setShadingOn(titleItem.paragraphs[tpi], false);
+                }
+                try { titleItem.bringToFront(); } catch (eTf) {}
+            }
+        } catch (eTitleFit) {
+            log("Callout title width failed: " + eTitleFit.message);
+        }
+        try {
+            var wrapRect = page.rectangles.add({
+                geometricBounds: [bandTop, left, tallest, right]
+            });
+            wrapRect.label = "CF_TABLE_WRAP";
+            clearFrameChrome(wrapRect, docRef);
+            none = docRef.swatches.itemByName("None");
+            if (none && none.isValid) wrapRect.fillColor = none;
+            forceJumpWrap(wrapRect);
+            try { wrapRect.textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eWro) {}
+            try { wrapRect.sendToBack(); } catch (eWb) {}
+        } catch (eWrap) {
+            log("Callout wrap failed: " + eWrap.message);
         }
         for (i = 0; i < frames.length; i++) {
             try { frames[i].bringToFront(); } catch (eFront) {}
