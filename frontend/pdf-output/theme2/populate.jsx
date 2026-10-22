@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v63-theme-table-styles";
+    var VERSION = "cengage-v64-preserve-story-data";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4800,7 +4800,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
      * Room is the column under the last line, down to the footer — not the
      * text frame's own bottom, which can stop where the type stops.
      */
-    function placeAnchoredImage(story, file, docRef, scalePercent, preferPage, captionText) {
+    function placeAnchoredImage(story, file, docRef, scalePercent, preferPage) {
         var anchor;
         var page;
         var colW;
@@ -4817,10 +4817,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var nh;
         var naturalH;
         var cropped;
-        var captionReserve;
-        var captionTop;
-        var captionFrame;
-        var captionBounds;
         if (!story || !file) return false;
         try {
             anchor = null;
@@ -4865,12 +4861,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             right = anchor.right;
             bottom = anchor.bottom;
             colW = Math.max(80, right - left);
-            captionReserve = trim(String(captionText || "")) ? 54 : 0;
-            maxH = bottom - 8 - top - captionReserve;
-            if (maxH < 24) {
-                captionReserve = 0;
-                maxH = bottom - 8 - top;
-            }
+            maxH = bottom - 8 - top;
             naturalH = Math.max(72, colW * 0.70);
             if (scale > 100 && scale < 140) naturalH = naturalH * (scale / 100);
             figH = Math.min(maxH, naturalH);
@@ -4909,33 +4900,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             forceJumpWrap(rect);
             try { rect.textWrapPreferences.textWrapOffset = [4, 0, 6, 0]; } catch (eOff) {}
             clampFigureToLiveArea(rect, docRef);
-            if (captionReserve > 0) {
-                captionTop = rect.geometricBounds[2] + 4;
-                captionFrame = page.textFrames.add({
-                    geometricBounds: [
-                        captionTop,
-                        left,
-                        Math.min(bottom - 2, captionTop + captionReserve),
-                        right
-                    ]
-                });
-                try { captionFrame.label = "PHCAP_RUNTIME"; } catch (eCapLabel) {}
-                appendParagraph(captionFrame.parentStory, String(captionText), "PHCAP", docRef);
-                try { captionFrame.fit(FitOptions.FRAME_TO_CONTENT); } catch (eCapFit) {}
-                try {
-                    captionBounds = captionFrame.geometricBounds;
-                    captionFrame.geometricBounds = [
-                        captionTop,
-                        left,
-                        Math.min(bottom - 2, captionBounds[2]),
-                        right
-                    ];
-                } catch (eCapBounds) {}
-                forceJumpWrap(captionFrame);
-                try {
-                    captionFrame.textWrapPreferences.textWrapOffset = [0, 0, 6, 0];
-                } catch (eCapWrap) {}
-            }
             populated += 1;
             log("Placed JSON Image in flow => " + file.name +
                 " scale=" + scale +
@@ -5669,17 +5633,15 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     continue;
                 }
                 // Place at the current end of this page's text, in JSON order.
-                if (placeAnchoredImage(
-                    pageStory,
-                    imgFile,
-                    doc,
-                    data.scale_percent,
-                    startPage,
-                    data.caption || ""
-                )) {
+                if (placeAnchoredImage(pageStory, imgFile, doc, data.scale_percent, startPage)) {
                     try { doc.recompose(); } catch (eRc) {}
                     ensureOverflowCapacity(pageHead, doc);
                     pageStory = pageHead.parentStory;
+                    if (data.caption) {
+                        appendParagraph(pageStory, data.caption, "PHCAP", doc);
+                        ensureOverflowCapacity(pageHead, doc);
+                        pageStory = pageHead.parentStory;
+                    }
                 } else {
                     warnings.push("Body image place failed: " + (data.url || ""));
                     log("Body image place failed url=" + String(data.url || "").substring(0, 80));
