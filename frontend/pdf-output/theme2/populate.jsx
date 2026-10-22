@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v56-image-order";
+    var VERSION = "cengage-v58-column-gap";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4538,10 +4538,78 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
+    /** Last threaded frame that actually holds lines. */
+    function storyEndFrame(story) {
+        var cur = null;
+        var last = null;
+        var safety = 0;
+        try { cur = story.textFrames[0]; } catch (e0) { cur = null; }
+        while (cur && safety < 30) {
+            safety += 1;
+            try {
+                if (cur.lines && cur.lines.length > 0) last = cur;
+            } catch (eL) {}
+            try { cur = cur.nextTextFrame; } catch (eN) { break; }
+            if (!cur || cur === last) break;
+        }
+        return last;
+    }
+
+    /**
+     * Column rectangle in pasteboard coordinates, extended down to the footer.
+     * The text frame often ends with the type, while the page still has the
+     * column gap under both columns. That gap is where the figure belongs.
+     */
+    function columnLiveBox(page, docRef, frameBounds) {
+        var pr;
+        var cols;
+        var i;
+        var box;
+        var best;
+        var bestDist;
+        var dist;
+        var mid;
+        var footerTop;
+        var items;
+        var lab;
+        var b;
+        var bottom;
+        pr = pageRect(page, docRef);
+        mid = frameBounds ? (frameBounds[1] + frameBounds[3]) / 2 : (pr.left + pr.right) / 2;
+        cols = columnsForPage(docRef, page) || [];
+        best = null;
+        bestDist = 1e9;
+        for (i = 0; i < cols.length; i++) {
+            box = t1BoundsOnPage(page, cols[i], docRef);
+            dist = Math.abs(((box[1] + box[3]) / 2) - mid);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = box;
+            }
+        }
+        if (!best) best = [pr.top + 36, pr.left + 36, pr.bottom - 36, pr.left + 279];
+        footerTop = pr.bottom - 28;
+        try {
+            items = page.allPageItems;
+            for (i = 0; i < items.length; i++) {
+                lab = itemLabel(items[i]);
+                if (lab !== "RH" && lab !== "RH_VERSO" && lab !== "RH_RECTO") continue;
+                b = items[i].geometricBounds;
+                if (b[0] > pr.top + 200 && b[0] < footerTop) footerTop = b[0] - 8;
+            }
+        } catch (eF) {}
+        bottom = best[2];
+        if (footerTop > bottom) bottom = footerTop;
+        if (bottom > pr.bottom - 16) bottom = pr.bottom - 16;
+        return { top: best[0], left: best[1], bottom: bottom, right: best[3] };
+    }
+
     /**
      * Place the figure where the story has been filled so far, in that column.
      * An Image block that is last in the JSON stays after that text. The caption
      * is appended next and wraps underneath.
+     * Room is the column under the last line, down to the footer — not the
+     * text frame's own bottom, which can stop where the type stops.
      */
     function placeAnchoredImage(story, file, docRef, scalePercent, preferPage) {
         var anchor;
@@ -4558,28 +4626,39 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var noneSw;
         var b;
         var nh;
+        var naturalH;
+        var cropped;
         if (!story || !file) return false;
         try {
             anchor = null;
             try {
-                var ip = story.insertionPoints.item(-1);
-                var tf = ip.parentTextFrames[0];
-                var gb = tf.geometricBounds;
+                var tf = storyEndFrame(story);
+                var gb;
+                var live;
                 var text = "";
-                top = gb[0];
+                if (!tf) {
+                    var ip = story.insertionPoints.item(-1);
+                    tf = ip.parentTextFrames[0];
+                }
+                gb = tf.geometricBounds;
+                live = columnLiveBox(tf.parentPage, docRef, gb);
+                top = live.top;
                 try { text = String(story.contents || ""); } catch (eT) {}
                 if (trim(text) && tf.lines.length > 0) {
                     try { top = Number(tf.lines.item(-1).baseline) + 8; } catch (eB) {}
                 }
-                if (top < gb[0]) top = gb[0];
-                if (top > gb[2] - 48) top = Math.max(gb[0], gb[2] - 48);
+                if (top < live.top) top = live.top;
                 anchor = {
                     page: tf.parentPage,
                     top: top,
-                    left: gb[1],
-                    right: gb[3],
-                    bottom: gb[2]
+                    left: live.left,
+                    right: live.right,
+                    bottom: live.bottom
                 };
+                log("Image gap => lineTop=" + top +
+                    " frameBottom=" + gb[2] +
+                    " columnBottom=" + live.bottom +
+                    " L=" + live.left + " R=" + live.right);
             } catch (eA) {}
             page = (anchor && anchor.page) || preferPage || null;
             if (!page) return false;
@@ -4596,14 +4675,19 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             bottom = anchor.bottom;
             colW = Math.max(80, right - left);
             maxH = bottom - 8 - top;
-            if (maxH < 48) {
-                log("placeImage: no room after text for " + file.name);
-                return false;
+            naturalH = Math.max(72, colW * 0.70);
+            if (scale > 100 && scale < 140) naturalH = naturalH * (scale / 100);
+            // Keep a visible strip when the column is full, and cut the picture to it.
+            if (maxH < 36) {
+                top = Math.max(bottom - 44, anchor.top);
+                maxH = bottom - 4 - top;
             }
-            figH = Math.min(maxH, Math.max(72, colW * 0.70));
-            if (scale > 100 && scale < 140) {
-                figH = Math.min(maxH, figH * (scale / 100));
+            if (maxH < 24) {
+                top = Math.max(bottom - 28, anchor.top);
+                maxH = Math.max(24, bottom - 4 - top);
             }
+            figH = Math.min(maxH, naturalH);
+            cropped = figH < naturalH - 1;
             rect = page.rectangles.add({
                 geometricBounds: [top, left, top + figH, right]
             });
@@ -4615,24 +4699,32 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             } catch (eFill) {}
             try { rect.strokeWeight = 0; } catch (eSt) {}
             rect.place(file, false);
-            try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
-            try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
-            try {
-                rect.fit(FitOptions.FRAME_TO_CONTENT);
-                b = rect.geometricBounds;
-                nh = b[2] - b[0];
-                if (nh < 48) nh = Math.min(maxH, 100);
-                if (nh > maxH) nh = maxH;
-                rect.geometricBounds = [top, left, top + nh, right];
-                rect.fit(FitOptions.PROPORTIONALLY);
-                rect.fit(FitOptions.CENTER_CONTENT);
-            } catch (eFit) {}
+            if (cropped) {
+                try { rect.fit(FitOptions.FILL_PROPORTIONALLY); } catch (eFillFit) {
+                    try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
+                }
+                try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
+                try { rect.geometricBounds = [top, left, top + figH, right]; } catch (eCrop) {}
+            } else {
+                try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
+                try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
+                try {
+                    rect.fit(FitOptions.FRAME_TO_CONTENT);
+                    b = rect.geometricBounds;
+                    nh = b[2] - b[0];
+                    if (nh > maxH) nh = maxH;
+                    rect.geometricBounds = [top, left, top + nh, right];
+                    rect.fit(FitOptions.PROPORTIONALLY);
+                    rect.fit(FitOptions.CENTER_CONTENT);
+                } catch (eFit) {}
+            }
             forceJumpWrap(rect);
             try { rect.textWrapPreferences.textWrapOffset = [4, 0, 6, 0]; } catch (eOff) {}
             clampFigureToLiveArea(rect, docRef);
             populated += 1;
             log("Placed JSON Image in flow => " + file.name +
                 " scale=" + scale +
+                " cropped=" + cropped +
                 " bounds=" + rect.geometricBounds +
                 " on p" + page.name +
                 " afterTextTop=" + top);
