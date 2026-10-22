@@ -39,7 +39,7 @@ var layoutState = null;
 var contentLayer = null;
 
 var PROTOTYPE_TEXT_FALLBACK = "proto:text";
-var POPULATE_SCRIPT_VERSION = "dynamic-v29-crop-image";
+var POPULATE_SCRIPT_VERSION = "dynamic-v28-trim-pages";
 var prototypeMetrics = {};
 var scriptLogFolderPath = "";
 var CURRENT_PAGE_TYPE = "opener";
@@ -2116,8 +2116,6 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
     var fittedBounds;
     var fittedWidth;
     var resizeFactor;
-    var savedHeight;
-    var cropped;
 
     try {
         graphic = frame.graphics[0];
@@ -2155,38 +2153,11 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
         scale = normalizeScalePercent(scalePercent);
 
         // 2-column: fill the column frame (savedBounds). Do not use JSON % or page width.
-        // If the leftover gap is shorter than the picture, keep that short frame and crop.
         if (scale >= 99.5 && savedBounds && savedBounds.length === 4) {
             targetLeft = savedBounds[1];
             targetTop = savedBounds[0];
             targetWidth = savedBounds[3] - savedBounds[1];
             targetHeight = targetWidth * ratio;
-            savedHeight = savedBounds[2] - savedBounds[0];
-            cropped = false;
-            if (savedHeight > 24 && savedHeight < targetHeight - 1) {
-                targetHeight = savedHeight;
-                cropped = true;
-            }
-            try {
-                pageBounds = getFullPageMarginBounds(frame.parentPage);
-            } catch (pageBottomError) {
-                pageBounds = null;
-            }
-            if (pageBounds && targetTop + targetHeight > pageBounds.bottom) {
-                availableHeight = pageBounds.bottom - targetTop;
-                if (availableHeight < 36) {
-                    targetTop = Math.max(pageBounds.top, pageBounds.bottom - Math.min(44, targetHeight));
-                    availableHeight = pageBounds.bottom - targetTop;
-                }
-                if (availableHeight < 24) {
-                    targetTop = Math.max(pageBounds.top, pageBounds.bottom - 28);
-                    availableHeight = Math.max(24, pageBounds.bottom - targetTop);
-                }
-                if (availableHeight < targetHeight) {
-                    targetHeight = availableHeight;
-                    cropped = true;
-                }
-            }
             frame.geometricBounds = [
                 targetTop,
                 targetLeft,
@@ -2194,29 +2165,16 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
                 targetLeft + targetWidth
             ];
             try {
-                frame.fit(cropped ? FitOptions.FILL_PROPORTIONALLY : FitOptions.PROPORTIONALLY);
-            } catch (columnFitError) {
-                try {
-                    frame.fit(FitOptions.PROPORTIONALLY);
-                } catch (columnFitFallbackError) {}
-            }
+                frame.fit(FitOptions.PROPORTIONALLY);
+            } catch (columnFitError) {}
             try {
                 frame.fit(FitOptions.CENTER_CONTENT);
             } catch (columnCenterError) {}
-            try {
-                frame.geometricBounds = [
-                    targetTop,
-                    targetLeft,
-                    targetTop + targetHeight,
-                    targetLeft + targetWidth
-                ];
-            } catch (resetBoundsError) {}
             appendRenderLog(
                 "Dynamic image resize => scale=100% of column width=" +
                 targetWidth +
                 " height=" +
-                targetHeight +
-                " cropped=" + cropped
+                targetHeight
             );
             return "dynamic-image-sizing";
         }
@@ -2256,21 +2214,8 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
         targetTop = frame.geometricBounds[0];
 
         maxBottom = pageBounds.bottom;
-        cropped = false;
         if (targetTop + targetHeight > maxBottom) {
-            availableHeight = maxBottom - targetTop;
-            if (availableHeight < 36) {
-                targetTop = Math.max(pageBounds.top, maxBottom - Math.min(44, targetHeight));
-                availableHeight = maxBottom - targetTop;
-            }
-            if (availableHeight < 24) {
-                targetTop = Math.max(pageBounds.top, maxBottom - 28);
-                availableHeight = Math.max(24, maxBottom - targetTop);
-            }
-            if (availableHeight < targetHeight) {
-                targetHeight = availableHeight;
-                cropped = true;
-            }
+            targetTop = Math.max(pageBounds.top, maxBottom - targetHeight);
         }
 
         frame.geometricBounds = [
@@ -2299,14 +2244,6 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
         try {
             frame.fit(FitOptions.CENTER_CONTENT);
         } catch (centerError) {}
-        try {
-            frame.geometricBounds = [
-                targetTop,
-                targetLeft,
-                targetTop + targetHeight,
-                targetLeft + targetWidth
-            ];
-        } catch (resetScaleBoundsError) {}
 
         fittedBounds = graphic.geometricBounds;
         fittedWidth = fittedBounds[3] - fittedBounds[1];
@@ -2318,8 +2255,7 @@ function fitPlacedImageInFrame(frame, savedBounds, scalePercent, imageFile) {
             " baseWidth=" + baseWidth +
             " baseHeight=" + baseHeight +
             " targetWidth=" + targetWidth +
-            " targetHeight=" + targetHeight +
-            " cropped=" + cropped
+            " targetHeight=" + targetHeight
         );
         appendRenderLog(
             "Dynamic image scale source => " +
@@ -5116,35 +5052,6 @@ function createGraphicFrameOnPage(page, layoutBounds, top, height) {
     return frame;
 }
 
-function cropImageTopToRemainingSpace(layoutState, layoutBounds, desiredHeight) {
-    var available;
-    var height;
-
-    available = layoutBounds.bottom - layoutState.cursorY;
-    height = desiredHeight;
-    if (!(available < desiredHeight)) {
-        return desiredHeight;
-    }
-
-    if (available < 36) {
-        layoutState.cursorY = Math.max(layoutBounds.top, layoutBounds.bottom - Math.min(44, desiredHeight));
-        available = layoutBounds.bottom - layoutState.cursorY;
-    }
-    height = available;
-    if (height < 24) {
-        layoutState.cursorY = Math.max(layoutBounds.top, layoutBounds.bottom - 28);
-        height = Math.max(24, layoutBounds.bottom - layoutState.cursorY);
-    }
-    if (height > desiredHeight) {
-        height = desiredHeight;
-    }
-    appendRenderLog(
-        "Image cropped to remaining space height=" + height +
-        " desired=" + desiredHeight
-    );
-    return height;
-}
-
 /** Remove the default InDesign text-frame stroke (shows as a box in PDF). */
 function clearFrameStroke(frame) {
     if (!frame) {
@@ -6099,12 +6006,7 @@ function constrainImageFrameHeight(frame, maxBottom, boundsLeft, boundsRight) {
     width = bounds[3] - bounds[1];
     available = maxBottom - bounds[0];
 
-    if (available < 24) {
-        bounds[0] = maxBottom - 28;
-        available = maxBottom - bounds[0];
-    }
-
-    if (height <= available + 1) {
+    if (available < 48 || height <= available) {
         return;
     }
 
@@ -7196,7 +7098,6 @@ function populateDynamicImageBlock(layoutState, document, registryEntry, data, b
         );
     }
     appendRenderLog("Image block cursor trace [after ensureLayoutSpace]: cursorY=" + layoutState.cursorY);
-    protoHeight = cropImageTopToRemainingSpace(layoutState, layoutBounds, protoHeight);
 
     appendRenderLog("Image block cursor trace [before createGraphicFrameOnPage]: cursorY=" + layoutState.cursorY);
     try {

@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v58-column-gap";
+    var VERSION = "cengage-v60-json-order";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -4632,19 +4632,20 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         try {
             anchor = null;
             try {
-                var tf = storyEndFrame(story);
+                var tf = null;
                 var gb;
                 var live;
-                var text = "";
-                if (!tf) {
+                try { story.recompose(); } catch (eRc0) {}
+                try {
                     var ip = story.insertionPoints.item(-1);
                     tf = ip.parentTextFrames[0];
-                }
+                } catch (eIp) {}
+                if (!tf) tf = storyEndFrame(story);
+                if (!tf) throw new Error("no text frame for image");
                 gb = tf.geometricBounds;
                 live = columnLiveBox(tf.parentPage, docRef, gb);
                 top = live.top;
-                try { text = String(story.contents || ""); } catch (eT) {}
-                if (trim(text) && tf.lines.length > 0) {
+                if (tf.lines && tf.lines.length > 0) {
                     try { top = Number(tf.lines.item(-1).baseline) + 8; } catch (eB) {}
                 }
                 if (top < live.top) top = live.top;
@@ -4655,16 +4656,13 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     right: live.right,
                     bottom: live.bottom
                 };
-                log("Image gap => lineTop=" + top +
+                log("Image in flow => lineTop=" + top +
                     " frameBottom=" + gb[2] +
                     " columnBottom=" + live.bottom +
                     " L=" + live.left + " R=" + live.right);
             } catch (eA) {}
             page = (anchor && anchor.page) || preferPage || null;
-            if (!page) return false;
-            if (!anchor) {
-                anchor = { page: page, top: 36, left: 36, right: 279, bottom: 720 };
-            }
+            if (!page || !anchor) return false;
 
             scale = parseFloat(scalePercent);
             if (isNaN(scale) || scale <= 0) scale = 100;
@@ -4677,16 +4675,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             maxH = bottom - 8 - top;
             naturalH = Math.max(72, colW * 0.70);
             if (scale > 100 && scale < 140) naturalH = naturalH * (scale / 100);
-            // Keep a visible strip when the column is full, and cut the picture to it.
-            if (maxH < 36) {
-                top = Math.max(bottom - 44, anchor.top);
-                maxH = bottom - 4 - top;
-            }
-            if (maxH < 24) {
-                top = Math.max(bottom - 28, anchor.top);
-                maxH = Math.max(24, bottom - 4 - top);
-            }
             figH = Math.min(maxH, naturalH);
+            if (figH < 24) figH = Math.min(naturalH, Math.max(maxH, 24));
             cropped = figH < naturalH - 1;
             rect = page.rectangles.add({
                 geometricBounds: [top, left, top + figH, right]
