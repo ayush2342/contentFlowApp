@@ -9,7 +9,7 @@
 /* global app, File, Folder, ExportFormat, SaveOptions, UserInteractionLevels,
    FitOptions, MeasurementUnits, LocationOptions, Nothing, AutoSizingTypeEnum,
    CoordinateSpaces, AnchorPoint, ResizeMethods, ScriptLanguage,
-   ParagraphShadingWidthOptions, Justification, TextWrapModes, SpecialCharacters,
+   ParagraphShadingWidthOptions, Justification, VerticalJustification, TextWrapModes, SpecialCharacters,
    OverrideType, PageSideOptions, ColorModel, ColorSpace, AnchorPosition, Position */
 
 app.scriptPreferences.userInteractionLevel = UserInteractionLevels.NEVER_INTERACT;
@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v62-caption-order";
+    var VERSION = "cengage-v63-theme-table-styles";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -2997,6 +2997,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var run;
         var start;
         var end;
+        var range;
         var slice;
         var covering;
         if (!runs || runs.length < 2) return runs || [];
@@ -3933,7 +3934,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var headerCount;
         var headerRows = [];
         var bodyRows = [];
-        var widths = tableData.column_widths_pt || data.columnWidths || [];
+        var widths = tableData.column_widths_pt || data.column_widths_pt || data.columnWidths || [];
+        var heights = tableData.row_heights_pt || data.row_heights_pt || [];
         var i;
         var j;
         var cells;
@@ -3951,7 +3953,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
                 if (cells.length > colCount) colCount = cells.length;
                 outRow = [];
-                for (j = 0; j < cells.length; j++) outRow.push(themeTableCellText(cells[j]));
+                for (j = 0; j < cells.length; j++) outRow.push(cells[j]);
                 if (i < headerCount) headerRows.push(outRow);
                 else bodyRows.push(outRow);
             }
@@ -3963,27 +3965,33 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             }
             if (cols.length) {
                 outRow = [];
-                for (i = 0; i < colCount; i++) outRow.push(themeTableCellText(cols[i]));
+                for (i = 0; i < colCount; i++) outRow.push(cols[i]);
                 headerRows.push(outRow);
             }
             for (i = 0; i < rows.length; i++) {
                 cells = rows[i] && rows[i].length !== undefined ? rows[i] : [rows[i]];
                 outRow = [];
-                for (j = 0; j < colCount; j++) outRow.push(themeTableCellText(cells[j]));
+                for (j = 0; j < colCount; j++) outRow.push(cells[j]);
                 bodyRows.push(outRow);
             }
         }
         if (!colCount && data && data.text) {
             colCount = 1;
-            bodyRows.push([String(data.text)]);
+            bodyRows.push([{ text: String(data.text) }]);
         }
         return {
             title: trim(String((data && data.title) || tableData.title || "")),
             headerRows: headerRows,
             bodyRows: bodyRows,
             widths: widths,
+            heights: heights,
             columnCount: colCount,
-            span: String((data && (data.span || data.column_span)) || "full").toLowerCase()
+            span: String((data && (data.span || data.column_span)) || "full").toLowerCase(),
+            variant: String((data && data.variant) || tableData.variant || "grid").toLowerCase(),
+            borderColor: String(tableData.border_color || data.border_color || "000000"),
+            borderWidth: Number(tableData.border_width_pt || data.border_width_pt || 0.25),
+            marginLeft: Number(tableData.cell_margin_left_pt || data.cell_margin_left_pt || 6.4),
+            marginRight: Number(tableData.cell_margin_right_pt || data.cell_margin_right_pt || 6.4)
         };
     }
 
@@ -4007,18 +4015,46 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     function tableAccentColor(docRef) {
-        var h2 = findParaStyle(docRef, "H2");
+        var sw;
         try {
-            if (h2 && h2.fillColor && h2.fillColor.isValid) return h2.fillColor;
+            sw = docRef.colors.itemByName("TBL_Green");
+            if (sw && sw.isValid) return sw;
         } catch (e0) {}
-        return ensureRgbSwatch(docRef, "CF_TABLE_GREEN", [46, 125, 70]);
+        // Theme 2 callout green. A master swatch named TBL_Green overrides this.
+        return ensureRgbSwatch(docRef, "CF_TABLE_GREEN", [145, 186, 157]);
     }
 
-    function fillThemeTableCell(cell, html, docRef, header) {
-        var parsed = parseThemeInline(String(html || "").replace(/\\n/g, "\n"));
+    function clearThemeTableCellEdges(cell) {
+        var names = ["top", "bottom", "left", "right"];
+        var i;
+        for (i = 0; i < names.length; i++) {
+            try { cell[names[i] + "EdgeStrokeWeight"] = 0; } catch (eW) {}
+            try { cell[names[i] + "EdgeStrokeTint"] = 0; } catch (eT) {}
+        }
+    }
+
+    function setThemeTableCellEdges(cell, color, weight) {
+        var names = ["top", "bottom", "left", "right"];
+        var i;
+        for (i = 0; i < names.length; i++) {
+            try { cell[names[i] + "EdgeStrokeWeight"] = weight; } catch (eW) {}
+            try { cell[names[i] + "EdgeStrokeTint"] = 100; } catch (eT) {}
+            try { if (color) cell[names[i] + "EdgeStrokeColor"] = color; } catch (eC) {}
+        }
+    }
+
+    function fillThemeTableCell(cell, cellData, docRef, header, callout, matrix) {
+        var source = (cellData && typeof cellData === "object") ? cellData : { text: cellData };
+        var parsed = parseThemeInline(themeTableCellText(source).replace(/\\n/g, "\n"));
         var plain = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\n/g, "\r");
         var tx = findParaStyle(docRef, "TX2") || findParaStyle(docRef, "TX1");
         var boldStyle = findCharStyle(docRef, "BCPN Bold");
+        var align = String(source.horizontal_alignment || (header ? "center" : "left")).toLowerCase();
+        var vertical = String(source.vertical_alignment || "center").toLowerCase();
+        var size = Number(source.font_size_pt || 0);
+        var textColor = String(source.text_color || "").replace(/^#/, "");
+        var bgColor = String(source.background_color || "").replace(/^#/, "");
+        var sw;
         var pi;
         var ri;
         var run;
@@ -4031,30 +4067,76 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 if (tx) cell.paragraphs[pi].appliedParagraphStyle = tx;
                 cell.paragraphs[pi].spaceBefore = pi === 0 ? 0 : 4;
                 cell.paragraphs[pi].spaceAfter = 2;
+                if (size > 0) cell.paragraphs[pi].pointSize = size;
+                if (align === "center") cell.paragraphs[pi].justification = Justification.CENTER_ALIGN;
+                else if (align === "right") cell.paragraphs[pi].justification = Justification.RIGHT_ALIGN;
+                else cell.paragraphs[pi].justification = Justification.LEFT_ALIGN;
             }
         } catch (eP) {}
-        if (header && boldStyle) {
+        if ((header || source.bold) && boldStyle) {
             try { cell.texts[0].appliedCharacterStyle = boldStyle; } catch (eH) {}
         }
+        if (source.italic) {
+            try { cell.texts[0].fontStyle = "Italic"; } catch (eIt) {}
+        }
+        if (source.underline) {
+            try { cell.texts[0].underline = true; } catch (eUn) {}
+        }
+        if (/^[0-9a-fA-F]{6}$/.test(textColor)) {
+            sw = ensureRgbSwatch(docRef, "CF_TABLE_TEXT_" + textColor, hexToRgbList("#" + textColor));
+            try { if (sw) cell.texts[0].fillColor = sw; } catch (eTc) {}
+        }
+        if (/^[0-9a-fA-F]{6}$/.test(bgColor)) {
+            sw = ensureRgbSwatch(docRef, "CF_TABLE_FILL_" + bgColor, hexToRgbList("#" + bgColor));
+            try { if (sw) cell.fillColor = sw; } catch (eBg) {}
+        } else {
+            try { cell.fillColor = docRef.swatches.itemByName("Paper"); } catch (ePaper) {}
+        }
+        try {
+            if (vertical === "top") cell.verticalJustification = VerticalJustification.TOP_ALIGN;
+            else if (vertical === "bottom") cell.verticalJustification = VerticalJustification.BOTTOM_ALIGN;
+            else cell.verticalJustification = VerticalJustification.CENTER_ALIGN;
+        } catch (eV) {}
+        try { cell.leftInset = matrix.marginLeft; } catch (eLi) {}
+        try { cell.rightInset = matrix.marginRight; } catch (eRi) {}
+        try { cell.topInset = callout ? 5 : 3; } catch (eTi) {}
+        try { cell.bottomInset = callout ? 5 : 3; } catch (eBi) {}
+        if (callout) clearThemeTableCellEdges(cell);
         for (ri = 0; parsed.runs && ri < parsed.runs.length; ri++) {
             run = parsed.runs[ri];
-            if (run.kind !== "bold" && run.kind !== "kt") continue;
             start = run.start;
             end = run.end - 1;
-            if (end < start || !boldStyle) continue;
+            if (end < start) continue;
             try {
-                cell.characters.itemByRange(start, end).appliedCharacterStyle = boldStyle;
-            } catch (eB) {}
+                range = cell.characters.itemByRange(start, end);
+                if ((run.kind === "bold" || run.kind === "kt") && boldStyle) {
+                    range.appliedCharacterStyle = boldStyle;
+                }
+                if (run.fontSize) range.pointSize = run.fontSize;
+                if (run.italic) range.fontStyle = "Italic";
+                if (run.underline) range.underline = true;
+                if (run.strike) range.strikeThru = true;
+                if (run.superscript) range.position = Position.SUPERSCRIPT;
+                else if (run.subscript) range.position = Position.SUBSCRIPT;
+                if (run.color) {
+                    sw = ensureRgbSwatch(
+                        docRef,
+                        "CF_TABLE_TEXT_" + String(run.color).replace(/^#/, ""),
+                        hexToRgbList(run.color)
+                    );
+                    if (sw) range.fillColor = sw;
+                }
+            } catch (eRun) {}
         }
     }
 
     /**
-     * Theme 2 table is the green boxed callout, sized to the column pair.
-     * span "column" keeps it in the first column. Anything else spans both
-     * columns' live width, not the paper edge. Text that does not fit is overset.
+     * Theme 2 supports the same rows/cell contract as the generic renderer.
+     * variant="callout" adds the client green title band and borderless body.
      */
     function placeThemeTable(docRef, page, storyHead, data) {
         var matrix = themeTableMatrix(data || {});
+        var callout = matrix.variant === "callout";
         var cols;
         var leftBox;
         var rightBox;
@@ -4064,7 +4146,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var colBottom;
         var top;
         var frame;
+        var titleFrame = null;
+        var titleHeight = matrix.title ? 22 : 0;
         var accent;
+        var ruleColor;
         var rowCount;
         var table;
         var allRows;
@@ -4075,6 +4160,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var sum;
         var i;
         var gb;
+        var cell;
+        var titleStyle;
+        var titleBold;
+        var bottomRule;
         if (!matrix.columnCount) {
             log("Table skipped — no rows");
             return;
@@ -4095,23 +4184,58 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             log("Table trimmed — no room left on page " + page.name);
             return;
         }
+        accent = tableAccentColor(docRef);
+        ruleColor = accent;
+
+        if (matrix.title) {
+            try {
+                titleFrame = page.textFrames.add({
+                    geometricBounds: [top, left, top + titleHeight, right]
+                });
+                titleFrame.contents = matrix.title;
+                titleFrame.label = "CF_TABLE_TITLE";
+                titleStyle = findParaStyle(docRef, "TBL_Title") ||
+                    findParaStyle(docRef, "TX2") || findParaStyle(docRef, "TX1");
+                try {
+                    if (titleStyle) titleFrame.parentStory.appliedParagraphStyle = titleStyle;
+                } catch (eTitleStyle) {}
+                try { titleFrame.parentStory.pointSize = 10; } catch (eTitleSize) {}
+                try { titleFrame.parentStory.justification = Justification.LEFT_ALIGN; } catch (eTitleJust) {}
+                titleBold = findCharStyle(docRef, "BCPN Bold");
+                try {
+                    if (titleBold) titleFrame.parentStory.appliedCharacterStyle = titleBold;
+                    else titleFrame.parentStory.fontStyle = "Bold";
+                } catch (eTitleBold) {}
+                try { titleFrame.textFramePreferences.insetSpacing = [5, 8, 3, 8]; } catch (eTitleInset) {}
+                if (callout) {
+                    try { if (accent) titleFrame.fillColor = accent; } catch (eTitleFill) {}
+                    try { titleFrame.strokeWeight = 0; } catch (eTitleStroke) {}
+                }
+                forceJumpWrap(titleFrame);
+                try { titleFrame.textWrapPreferences.textWrapOffset = [0, 0, 0, 0]; } catch (eTitleWrap) {}
+            } catch (eTitle) {
+                log("Table title failed: " + eTitle.message);
+                titleFrame = null;
+                titleHeight = 0;
+            }
+        }
         try {
             frame = page.textFrames.add({
-                geometricBounds: [top, left, Math.min(top + 120, colBottom), right]
+                geometricBounds: [
+                    top + titleHeight,
+                    left,
+                    Math.min(top + titleHeight + 120, colBottom),
+                    right
+                ]
             });
         } catch (eAdd) {
             log("Table frame failed: " + eAdd.message);
             return;
         }
         try { frame.label = "CF_TABLE"; } catch (eLab) {}
-        accent = tableAccentColor(docRef);
-        try { frame.strokeWeight = 1.25; } catch (eSw) {}
-        try { if (accent) frame.strokeColor = accent; } catch (eSc) {}
+        try { frame.strokeWeight = 0; } catch (eSw) {}
         try { frame.fillColor = docRef.swatches.itemByName("Paper"); } catch (eFill) {}
-        try { frame.textFramePreferences.insetSpacing = [8, 10, 8, 10]; } catch (eIn) {}
-        if (matrix.title) {
-            appendParagraph(frame.parentStory, matrix.title, "H2", docRef);
-        }
+        try { frame.textFramePreferences.insetSpacing = [0, 0, 0, 0]; } catch (eIn) {}
         allRows = matrix.headerRows.concat(matrix.bodyRows);
         rowCount = allRows.length;
         try {
@@ -4141,15 +4265,32 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         for (r = 0; r < rowCount; r++) {
             for (c = 0; c < matrix.columnCount; c++) {
                 try {
+                    cell = table.rows[r].cells[c];
                     fillThemeTableCell(
-                        table.rows[r].cells[c],
+                        cell,
                         (allRows[r] && allRows[r][c]) || "",
                         docRef,
-                        r < matrix.headerRows.length
+                        r < matrix.headerRows.length,
+                        callout,
+                        matrix
                     );
+                    if (!callout) {
+                        setThemeTableCellEdges(
+                            cell,
+                            ensureRgbSwatch(
+                                docRef,
+                                "CF_TABLE_RULE_" + matrix.borderColor.replace(/^#/, ""),
+                                hexToRgbList("#" + matrix.borderColor.replace(/^#/, ""))
+                            ),
+                            isNaN(matrix.borderWidth) ? 0.25 : matrix.borderWidth
+                        );
+                    }
                 } catch (eCell) {
                     log("Table cell " + r + "," + c + " failed: " + eCell.message);
                 }
+            }
+            if (matrix.heights && matrix.heights.length > r && Number(matrix.heights[r]) > 0) {
+                try { table.rows[r].height = Number(matrix.heights[r]); } catch (eRh) {}
             }
         }
         try { frame.fit(FitOptions.FRAME_TO_CONTENT); } catch (eFit) {}
@@ -4161,9 +4302,22 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             }
         } catch (eClamp) {}
         forceJumpWrap(frame);
-        try { frame.textWrapPreferences.textWrapOffset = [8, 6, 10, 6]; } catch (eOff) {}
+        try { frame.textWrapPreferences.textWrapOffset = [0, 0, 10, 0]; } catch (eOff) {}
+        if (callout) {
+            try {
+                gb = frame.geometricBounds;
+                bottomRule = page.graphicLines.add();
+                bottomRule.label = "CF_TABLE_BOTTOM_RULE";
+                bottomRule.geometricBounds = [gb[2], gb[1], gb[2], gb[3]];
+                bottomRule.strokeWeight = 1.5;
+                if (ruleColor) bottomRule.strokeColor = ruleColor;
+            } catch (eRule) {
+                log("Table bottom rule failed: " + eRule.message);
+            }
+        }
         try { docRef.recompose(); } catch (eRc) {}
-        log("Placed theme2 table span=" + matrix.span +
+        log("Placed theme2 table variant=" + matrix.variant +
+            " span=" + matrix.span +
             " cols=" + matrix.columnCount +
             " rows=" + rowCount +
             " bounds=" + frame.geometricBounds);
