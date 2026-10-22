@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v64-preserve-story-data";
+    var VERSION = "cengage-v68-two-column-callout";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -2998,6 +2998,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var start;
         var end;
         var range;
+        var range;
         var slice;
         var covering;
         if (!runs || runs.length < 2) return runs || [];
@@ -3927,10 +3928,46 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return String(cell);
     }
 
+    function calloutCellFromColumn(column) {
+        var content = (column && (column.content || column.blocks)) || [];
+        var pieces = [];
+        var cell = {
+            text: "",
+            font_family: (column && column.font_family) || "Neue Kabel Book",
+            font_size_pt: Number((column && column.font_size_pt) || 9),
+            text_color: (column && column.text_color) || "231F20",
+            horizontal_alignment: (column && column.horizontal_alignment) || "left",
+            vertical_alignment: (column && column.vertical_alignment) || "top"
+        };
+        var i;
+        var block;
+        var type;
+        var data;
+        for (i = 0; i < content.length; i++) {
+            block = content[i] || {};
+            type = String(block.type || "");
+            data = block.data || {};
+            if (type === "Image") {
+                if (!cell.image_url && data.url) {
+                    cell.image_url = data.url;
+                    cell.image_aspect_ratio = data.aspect_ratio;
+                }
+                if (data.caption) pieces.push(String(data.caption));
+            } else if (data.text) {
+                pieces.push(String(data.text));
+            }
+        }
+        cell.text = pieces.join("\n\n");
+        return cell;
+    }
+
     function themeTableMatrix(data) {
         var tableData = (data && data.table && typeof data.table === "object") ? data.table : (data || {});
+        var visual = (data && data.style && typeof data.style === "object") ? data.style :
+            ((tableData.style && typeof tableData.style === "object") ? tableData.style : {});
         var cols = tableData.cols || data.cols || data.headers || [];
         var rows = tableData.rows || data.rows || [];
+        var componentColumns = data.columns || tableData.columns || [];
         var headerCount;
         var headerRows = [];
         var bodyRows = [];
@@ -3941,6 +3978,12 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var cells;
         var outRow;
         var colCount = 0;
+        if ((!rows || !rows.length) && componentColumns && componentColumns.length) {
+            rows = [[]];
+            for (i = 0; i < componentColumns.length; i++) {
+                rows[0].push(calloutCellFromColumn(componentColumns[i]));
+            }
+        }
         if (!rows || rows.length === undefined) rows = [];
         if (!cols || cols.length === undefined) cols = [];
         headerCount = Number(tableData.header_row_count);
@@ -3987,11 +4030,21 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             heights: heights,
             columnCount: colCount,
             span: String((data && (data.span || data.column_span)) || "full").toLowerCase(),
-            variant: String((data && data.variant) || tableData.variant || "grid").toLowerCase(),
+            variant: String((data && data.variant) || tableData.variant ||
+                (componentColumns.length ? "callout" : "grid")).toLowerCase(),
             borderColor: String(tableData.border_color || data.border_color || "000000"),
             borderWidth: Number(tableData.border_width_pt || data.border_width_pt || 0.25),
             marginLeft: Number(tableData.cell_margin_left_pt || data.cell_margin_left_pt || 6.4),
-            marginRight: Number(tableData.cell_margin_right_pt || data.cell_margin_right_pt || 6.4)
+            marginRight: Number(tableData.cell_margin_right_pt || data.cell_margin_right_pt || 6.4),
+            marginTop: Number(visual.cell_margin_top_pt || data.cell_margin_top_pt || 5),
+            marginBottom: Number(visual.cell_margin_bottom_pt || data.cell_margin_bottom_pt || 5),
+            headerBackground: String(visual.header_background_color || "91BA9D"),
+            bodyBackground: String(visual.body_background_color || "FFFFFF"),
+            titleTextColor: String(visual.title_text_color || "231F20"),
+            bottomRuleColor: String(visual.bottom_rule_color || visual.header_background_color || "00854A"),
+            bottomRuleWidth: Number(visual.bottom_rule_width_pt || 1.5),
+            headerHeight: Number(visual.header_height_pt || 22),
+            titleFontSize: Number(visual.title_font_size_pt || 10)
         };
     }
 
@@ -4014,14 +4067,15 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return bottom;
     }
 
-    function tableAccentColor(docRef) {
+    function themeTableColor(docRef, name, value, fallback) {
         var sw;
+        var hex = String(value || fallback || "").replace(/^#/, "");
         try {
-            sw = docRef.colors.itemByName("TBL_Green");
+            sw = docRef.colors.itemByName(name);
             if (sw && sw.isValid) return sw;
         } catch (e0) {}
-        // Theme 2 callout green. A master swatch named TBL_Green overrides this.
-        return ensureRgbSwatch(docRef, "CF_TABLE_GREEN", [145, 186, 157]);
+        if (!/^[0-9a-fA-F]{6}$/.test(hex)) hex = String(fallback || "91BA9D").replace(/^#/, "");
+        return ensureRgbSwatch(docRef, "CF_" + name, hexToRgbList("#" + hex));
     }
 
     function clearThemeTableCellEdges(cell) {
@@ -4043,9 +4097,62 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
-    function fillThemeTableCell(cell, cellData, docRef, header, callout, matrix) {
+    function placeThemeTableCellImage(cell, source, columnWidth) {
+        var url = String(source.image_url || (source.image && source.image.url) || "");
+        var file;
+        var placed;
+        var graphic;
+        var container;
+        var aspect = Number(source.image_aspect_ratio ||
+            (source.image && source.image.aspect_ratio) || 0);
+        var availableWidth = Math.max(24, Number(columnWidth || 0) -
+            Number(source.image_margin_left_pt || 0) -
+            Number(source.image_margin_right_pt || 0));
+        var height;
+        if (!url) return;
+        file = resolveImage(url);
+        if (!file) {
+            log("Table cell image missing: " + url);
+            return;
+        }
+        try {
+            placed = cell.insertionPoints.item(0).place(file);
+            graphic = placed && placed.length ? placed[0] : null;
+            container = graphic ? graphic.parent : null;
+            if (!container) return;
+            if (!(aspect > 0)) {
+                try {
+                    var ib = graphic.geometricBounds;
+                    aspect = (ib[3] - ib[1]) / Math.max(1, ib[2] - ib[0]);
+                } catch (eAspect) { aspect = 1.5; }
+            }
+            height = availableWidth / Math.max(0.1, aspect);
+            try {
+                container.resize(
+                    CoordinateSpaces.INNER_COORDINATES,
+                    AnchorPoint.TOP_LEFT_ANCHOR,
+                    ResizeMethods.REPLACING_CURRENT_DIMENSIONS_WITH,
+                    [availableWidth, height]
+                );
+            } catch (eResize) {
+                try { container.geometricBounds = [0, 0, height, availableWidth]; } catch (eBounds) {}
+            }
+            try { container.fit(FitOptions.PROPORTIONALLY); } catch (eFit1) {}
+            try { container.fit(FitOptions.CENTER_CONTENT); } catch (eFit2) {}
+            try { cell.insertionPoints.item(1).contents = "\r"; } catch (eBreak) {}
+            log("Placed table cell image => " + file.name +
+                " width=" + availableWidth + " height=" + height);
+        } catch (ePlace) {
+            log("Table cell image failed: " + ePlace.message);
+        }
+    }
+
+    function fillThemeTableCell(cell, cellData, docRef, header, callout, matrix, columnWidth) {
         var source = (cellData && typeof cellData === "object") ? cellData : { text: cellData };
-        var parsed = parseThemeInline(themeTableCellText(source).replace(/\\n/g, "\n"));
+        var raw = themeTableCellText(source).replace(/\\n/g, "\n");
+        var parsed;
+        if (callout) raw = raw.replace(/\n[ \t]*\n+/g, "\n");
+        parsed = parseThemeInline(raw);
         var plain = String(parsed.text || "").replace(/\r\n/g, "\n").replace(/\n/g, "\r");
         var tx = findParaStyle(docRef, "TX2") || findParaStyle(docRef, "TX1");
         var boldStyle = findCharStyle(docRef, "BCPN Bold");
@@ -4065,9 +4172,14 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         try {
             for (pi = 0; pi < cell.paragraphs.length; pi++) {
                 if (tx) cell.paragraphs[pi].appliedParagraphStyle = tx;
-                cell.paragraphs[pi].spaceBefore = pi === 0 ? 0 : 4;
-                cell.paragraphs[pi].spaceAfter = 2;
+                cell.paragraphs[pi].spaceBefore = 0;
+                cell.paragraphs[pi].spaceAfter = callout ? 1 : 2;
                 if (size > 0) cell.paragraphs[pi].pointSize = size;
+                if (callout) {
+                    try {
+                        cell.paragraphs[pi].leading = Math.max(8, (size || 8) * 1.12);
+                    } catch (eLead) {}
+                }
                 if (align === "center") cell.paragraphs[pi].justification = Justification.CENTER_ALIGN;
                 else if (align === "right") cell.paragraphs[pi].justification = Justification.RIGHT_ALIGN;
                 else cell.paragraphs[pi].justification = Justification.LEFT_ALIGN;
@@ -4090,7 +4202,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             sw = ensureRgbSwatch(docRef, "CF_TABLE_FILL_" + bgColor, hexToRgbList("#" + bgColor));
             try { if (sw) cell.fillColor = sw; } catch (eBg) {}
         } else {
-            try { cell.fillColor = docRef.swatches.itemByName("Paper"); } catch (ePaper) {}
+            sw = themeTableColor(docRef, "TBL_Body", matrix.bodyBackground, "FFFFFF");
+            try { if (sw) cell.fillColor = sw; } catch (ePaper) {}
         }
         try {
             if (vertical === "top") cell.verticalJustification = VerticalJustification.TOP_ALIGN;
@@ -4099,8 +4212,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         } catch (eV) {}
         try { cell.leftInset = matrix.marginLeft; } catch (eLi) {}
         try { cell.rightInset = matrix.marginRight; } catch (eRi) {}
-        try { cell.topInset = callout ? 5 : 3; } catch (eTi) {}
-        try { cell.bottomInset = callout ? 5 : 3; } catch (eBi) {}
+        try { cell.topInset = callout ? matrix.marginTop : 3; } catch (eTi) {}
+        try { cell.bottomInset = callout ? matrix.marginBottom : 3; } catch (eBi) {}
         if (callout) clearThemeTableCellEdges(cell);
         for (ri = 0; parsed.runs && ri < parsed.runs.length; ri++) {
             run = parsed.runs[ri];
@@ -4128,6 +4241,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 }
             } catch (eRun) {}
         }
+        placeThemeTableCellImage(cell, source, columnWidth - matrix.marginLeft - matrix.marginRight);
     }
 
     /**
@@ -4147,9 +4261,11 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var top;
         var frame;
         var titleFrame = null;
-        var titleHeight = matrix.title ? 22 : 0;
+        var titleHeight = matrix.title ? matrix.headerHeight : 0;
         var accent;
         var ruleColor;
+        var titleTextColor;
+        var bodyColor;
         var rowCount;
         var table;
         var allRows;
@@ -4164,6 +4280,9 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var titleStyle;
         var titleBold;
         var bottomRule;
+        var cur;
+        var frameBounds;
+        var frameCount = 0;
         if (!matrix.columnCount) {
             log("Table skipped — no rows");
             return;
@@ -4176,7 +4295,35 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         right = rightBox[3];
         colTop = leftBox[0];
         colBottom = leftBox[2];
-        if (matrix.span === "column" || matrix.span === "1") right = leftBox[3];
+        // The master-column lookup can return only one side on single-page
+        // spreads. The live T1 story frames are the source of truth.
+        cur = storyHead;
+        while (cur && frameCount < 4) {
+            try {
+                if (!cur.parentPage || cur.parentPage.id !== page.id) break;
+                frameBounds = cur.geometricBounds;
+                if (frameCount === 0) {
+                    left = frameBounds[1];
+                    right = frameBounds[3];
+                    colTop = frameBounds[0];
+                    colBottom = frameBounds[2];
+                } else if (matrix.span !== "column" && matrix.span !== "1") {
+                    if (frameBounds[1] < left) left = frameBounds[1];
+                    if (frameBounds[3] > right) right = frameBounds[3];
+                    if (frameBounds[0] < colTop) colTop = frameBounds[0];
+                    if (frameBounds[2] > colBottom) colBottom = frameBounds[2];
+                }
+                frameCount += 1;
+                if (matrix.span === "column" || matrix.span === "1") break;
+                cur = cur.nextTextFrame;
+            } catch (eLiveFrame) {
+                break;
+            }
+        }
+        if (matrix.span === "column" || matrix.span === "1") right = Math.min(right, leftBox[3]);
+        log("Table live bounds from T1 frames=" + frameCount +
+            " left=" + left + " right=" + right +
+            " top=" + colTop + " bottom=" + colBottom);
         top = storyContentBottom(storyHead);
         if (top === null || top < colTop) top = colTop;
         else top += 8;
@@ -4184,8 +4331,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             log("Table trimmed — no room left on page " + page.name);
             return;
         }
-        accent = tableAccentColor(docRef);
-        ruleColor = accent;
+        accent = themeTableColor(docRef, "TBL_Green", matrix.headerBackground, "91BA9D");
+        ruleColor = themeTableColor(docRef, "TBL_Bottom_Rule", matrix.bottomRuleColor, "00854A");
+        titleTextColor = themeTableColor(docRef, "TBL_Title_Text", matrix.titleTextColor, "231F20");
+        bodyColor = themeTableColor(docRef, "TBL_Body", matrix.bodyBackground, "FFFFFF");
 
         if (matrix.title) {
             try {
@@ -4199,7 +4348,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 try {
                     if (titleStyle) titleFrame.parentStory.appliedParagraphStyle = titleStyle;
                 } catch (eTitleStyle) {}
-                try { titleFrame.parentStory.pointSize = 10; } catch (eTitleSize) {}
+                try { titleFrame.parentStory.pointSize = matrix.titleFontSize; } catch (eTitleSize) {}
+                try { if (titleTextColor) titleFrame.parentStory.fillColor = titleTextColor; } catch (eTitleColor) {}
                 try { titleFrame.parentStory.justification = Justification.LEFT_ALIGN; } catch (eTitleJust) {}
                 titleBold = findCharStyle(docRef, "BCPN Bold");
                 try {
@@ -4234,7 +4384,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
         try { frame.label = "CF_TABLE"; } catch (eLab) {}
         try { frame.strokeWeight = 0; } catch (eSw) {}
-        try { frame.fillColor = docRef.swatches.itemByName("Paper"); } catch (eFill) {}
+        try { if (bodyColor) frame.fillColor = bodyColor; } catch (eFill) {}
         try { frame.textFramePreferences.insetSpacing = [0, 0, 0, 0]; } catch (eIn) {}
         allRows = matrix.headerRows.concat(matrix.bodyRows);
         rowCount = allRows.length;
@@ -4272,7 +4422,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                         docRef,
                         r < matrix.headerRows.length,
                         callout,
-                        matrix
+                        matrix,
+                        table.columns[c].width
                     );
                     if (!callout) {
                         setThemeTableCellEdges(
@@ -4309,7 +4460,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 bottomRule = page.graphicLines.add();
                 bottomRule.label = "CF_TABLE_BOTTOM_RULE";
                 bottomRule.geometricBounds = [gb[2], gb[1], gb[2], gb[3]];
-                bottomRule.strokeWeight = 1.5;
+                bottomRule.strokeWeight = matrix.bottomRuleWidth;
                 if (ruleColor) bottomRule.strokeColor = ruleColor;
             } catch (eRule) {
                 log("Table bottom rule failed: " + eRule.message);
@@ -5613,7 +5764,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 continue;
             }
 
-            if (type === "Table" || type === "TableBlock") {
+            if (type === "Table" || type === "TableBlock" ||
+                type === "TwoColumnCallout" || type === "ThemeCallout") {
                 placeThemeTable(doc, startPage, pageHead, data);
                 try { doc.recompose(); } catch (eTabRc) {}
                 pageStory = pageHead.parentStory;
