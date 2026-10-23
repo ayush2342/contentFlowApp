@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v76-opener-json-chips";
+    var VERSION = "cengage-v75-opener-chips";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -513,257 +513,104 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         }
     }
 
-    // A chip is only "Part N" / "Chapter N", including the same line twice
-    // ("Part 1" + master sample "Part 1" collapsed into one story).
+    // "Part 1" / "Chapter 1" and nothing else. Newlines become spaces first,
+    // so a story that already contains the line twice does not match.
     function openerChipKind(text) {
         var plain = String(text || "")
             .replace(/\uFEFF/g, "")
             .replace(/\u00A0/g, " ")
-            .replace(/[\r\n]+/g, "\n")
-            .replace(/[ \t]+/g, " ")
+            .replace(/[\r\n]+/g, " ")
+            .replace(/\s+/g, " ")
             .replace(/^\s+|\s+$/g, "");
-        var lines;
-        var parts;
-        var i;
-        var j;
-        var line;
-        var kind = "";
-        var lineKind;
-        var tokenKind;
-        if (!plain) return "";
-        lines = plain.split("\n");
-        for (i = 0; i < lines.length; i++) {
-            line = lines[i].replace(/^\s+|\s+$/g, "");
-            if (!line) continue;
-            lineKind = "";
-            if (/^part\s*\d+$/i.test(line)) lineKind = "part";
-            else if (/^chapter\s*\d+$/i.test(line)) lineKind = "chapter";
-            else {
-                parts = line.split(/\s+/);
-                if (parts.length < 2 || (parts.length % 2) !== 0) return "";
-                for (j = 0; j < parts.length; j += 2) {
-                    tokenKind = "";
-                    if (/^part$/i.test(parts[j]) && /^\d+$/.test(parts[j + 1])) tokenKind = "part";
-                    else if (/^chapter$/i.test(parts[j]) && /^\d+$/.test(parts[j + 1])) tokenKind = "chapter";
-                    else return "";
-                    if (!lineKind) lineKind = tokenKind;
-                    else if (lineKind !== tokenKind) return "";
-                }
-            }
-            if (!kind) kind = lineKind;
-            else if (kind !== lineKind) return "";
-        }
-        return kind;
-    }
-
-    function itemLivesOnMaster(item) {
-        try {
-            var off = item.parentPage.documentOffset;
-            return !(off === 0 || off > 0);
-        } catch (e) {
-            return true;
-        }
-    }
-
-    function samePageItem(a, b) {
-        if (!a || !b) return false;
-        if (a === b) return true;
-        try { return a.id === b.id; } catch (eId) { return false; }
-    }
-
-    function framesShareStory(a, b) {
-        try {
-            return !!(a && b && a.parentStory && b.parentStory && a.parentStory === b.parentStory);
-        } catch (eS) { return false; }
-    }
-
-    // CO-Verso ships with sample "Part 1" / "Chapter 1". override() often
-    // returns the page chip and leaves that master sample drawing above the
-    // JSON line (faint, slightly higher). Theme2 does not use the generic
-    // populate script, so the sample has to be removed here.
-    function frameChipRole(frame) {
-        var lab = "";
-        var k = "";
-        try { lab = itemLabel(frame); } catch (eL) { lab = ""; }
-        if (lab === "CHPN") return "part";
-        if (lab === "CHN") return "chapter";
-        // Running heads and other labeled roles can start with "Chapter N".
-        if (lab) return "";
-        try { k = openerChipKind(frame.contents); } catch (eK) { k = ""; }
-        if (k) return k;
-        try {
-            if (frame.paragraphs && frame.paragraphs.length) {
-                return openerChipKind(frame.paragraphs[0].contents);
-            }
-        } catch (eP) {}
+        if (/^part\s*\d+$/i.test(plain)) return "part";
+        if (/^chapter\s*\d+$/i.test(plain)) return "chapter";
         return "";
     }
 
-    function suppressOpenerChipFrame(frame, keepers) {
-        var shares = false;
-        var ki;
-        var b;
-        var kind;
-        if (!frame) return;
-        for (ki = 0; ki < keepers.length; ki++) {
-            if (samePageItem(frame, keepers[ki])) return;
-        }
-        kind = frameChipRole(frame);
-        if (!kind) return;
-        for (ki = 0; ki < keepers.length; ki++) {
-            if (framesShareStory(frame, keepers[ki])) shares = true;
-        }
-        try { frame.locked = false; } catch (eLk) {}
-        hideItem(frame);
-        try { frame.nonprinting = true; } catch (eNp) {}
-        // A shared story is the JSON line too — never clear it. Parking the
-        // master frame is what stops the faint sample from painting.
-        if (!shares) {
-            try { frame.parentStory.contents = ""; } catch (eClr) {
-                try { frame.contents = ""; } catch (eClr2) {}
-            }
-        }
-        try {
-            b = frame.geometricBounds;
-            frame.geometricBounds = [b[0] - 4000, b[1] - 4000, b[2] - 4000, b[3] - 4000];
-        } catch (eMove) {}
-        if (!shares && !itemLivesOnMaster(frame)) {
-            try { frame.remove(); } catch (eRm) {}
-        }
-        log("Suppressed extra opener " + kind +
-            " master=" + itemLivesOnMaster(frame) + " shared=" + shares);
-    }
-
+    // The page chip is already filled. The faint line above the orange bar is
+    // the CO-Verso sample, still drawn from the master. override() just hands
+    // back the page chip, so clear the master text in place.
     function hideDuplicateOpenerRoles(page, keepers) {
         var keep = keepers || [];
         var i;
+        var ki;
         var n;
         var item;
         var items;
         var ms;
-        var victims = [];
+        var kind;
+        var shares;
 
-        function collect(list) {
-            var c;
-            if (!list) return;
-            for (c = 0; c < list.length; c++) {
-                item = list[c];
-                try {
-                    if (item instanceof TextFrame) victims.push(item);
-                } catch (eTf) {}
-            }
+        function sameItem(a, b) {
+            if (!a || !b) return false;
+            if (a === b) return true;
+            try { return a.id === b.id; } catch (eId) { return false; }
         }
 
-        try { collect(page.allPageItems); } catch (ePage) {}
-        try { collect(page.masterPageItems); } catch (eMp) {}
+        function sharesStory(a, b) {
+            try {
+                return !!(a && b && a.parentStory && b.parentStory && a.parentStory === b.parentStory);
+            } catch (eS) { return false; }
+        }
+
+        function isKeeper(frame) {
+            for (ki = 0; ki < keep.length; ki++) {
+                if (sameItem(frame, keep[ki])) return true;
+            }
+            return false;
+        }
+
+        function chipKind(frame) {
+            var k = "";
+            try { k = openerChipKind(frame.contents); } catch (eK) { k = ""; }
+            if (k) return k;
+            try {
+                if (frame.paragraphs && frame.paragraphs.length) {
+                    return openerChipKind(frame.paragraphs[0].contents);
+                }
+            } catch (eP) {}
+            return "";
+        }
+
+        function clearSample(frame, fromMaster) {
+            kind = chipKind(frame);
+            if (!kind || isKeeper(frame)) return;
+            shares = false;
+            for (ki = 0; ki < keep.length; ki++) {
+                if (sharesStory(frame, keep[ki])) shares = true;
+            }
+            if (shares) {
+                if (fromMaster) return;
+                try { frame.remove(); } catch (eRm) { hideItem(frame); }
+                log("Removed extra opener " + kind + " frame");
+                return;
+            }
+            hideItem(frame);
+            try { frame.parentStory.contents = ""; } catch (eClr) {
+                try { frame.contents = ""; } catch (eClr2) {}
+            }
+            try { frame.nonprinting = true; } catch (eNp) {}
+            log("Cleared opener " + kind + (fromMaster ? " master sample" : " extra chip"));
+        }
+
+        try {
+            items = page.allPageItems;
+            for (n = 0; n < items.length; n++) {
+                item = items[n];
+                try { if (item instanceof TextFrame) clearSample(item, false); } catch (eTf) {}
+            }
+        } catch (ePage) {}
+
         try {
             for (n = 0; n < doc.masterSpreads.length; n++) {
                 ms = doc.masterSpreads[n];
-                try { collect(ms.allPageItems); } catch (eMs) {}
+                items = ms.allPageItems;
+                for (i = 0; i < items.length; i++) {
+                    item = items[i];
+                    try { if (item instanceof TextFrame) clearSample(item, true); } catch (eMs) {}
+                }
             }
         } catch (eMasters) {}
-
-        for (i = 0; i < victims.length; i++) {
-            try { suppressOpenerChipFrame(victims[i], keep); } catch (eSup) {}
-        }
-    }
-
-    // Fresh page frame holding only the JSON line. The template sample stays
-    // out of this story, so the sweep can clear it without wiping the JSON.
-    function materializeOpenerChip(page, frame, text, styleName) {
-        var clean = trim(stripMarkers(stripHtml(text || "")));
-        var bounds = null;
-        var local = null;
-        var localBox;
-        var pr;
-        var bg;
-        if (!clean) return null;
-        if (frame) {
-            try { bounds = frame.geometricBounds; } catch (eB) { bounds = null; }
-        }
-        if (!bounds) {
-            localBox = coVersoMasterLocalBounds(doc, styleName);
-            if (localBox) {
-                try { pr = pageRect(page, doc); } catch (ePr) {
-                    pr = { top: 0, left: 0, bottom: 783, right: 612 };
-                }
-                bounds = [
-                    pr.top + localBox.top,
-                    pr.left + localBox.left,
-                    pr.top + localBox.bottom,
-                    pr.left + localBox.right
-                ];
-            }
-        }
-        if (!bounds) return frame || null;
-        try {
-            local = page.textFrames.add({ geometricBounds: bounds });
-        } catch (eAdd) {
-            local = null;
-        }
-        if (!local) {
-            if (!frame) return null;
-            try { frame.locked = false; } catch (eLk) {}
-            try { frame.previousTextFrame = Nothing; } catch (ePrev) {}
-            try { frame.nextTextFrame = Nothing; } catch (eNext) {}
-            try { frame.parentStory.contents = clean; } catch (eC) {}
-            try { frame.label = styleName; } catch (eLab) {}
-            applyStyleToFrame(frame, styleName, doc);
-            try { frame.visible = true; } catch (eV) {}
-            return frame;
-        }
-        try { local.locked = false; } catch (eL0) {}
-        try { local.label = styleName; } catch (eLab2) {}
-        try { local.contents = clean; } catch (eC2) {}
-        if (frame) {
-            try { local.itemLayer = frame.itemLayer; } catch (eLay) {}
-            try { local.fillColor = frame.fillColor; } catch (eF) {}
-            try { local.strokeWeight = frame.strokeWeight; } catch (eSw) {}
-            try { local.strokeColor = frame.strokeColor; } catch (eSc) {}
-            try {
-                local.textFramePreferences.verticalJustification =
-                    frame.textFramePreferences.verticalJustification;
-            } catch (eVj) {}
-            try {
-                local.textFramePreferences.insetSpacing =
-                    frame.textFramePreferences.insetSpacing;
-            } catch (eIn) {}
-        }
-        try { local.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eW) {}
-        applyStyleToFrame(local, styleName, doc);
-        try { local.visible = true; } catch (eV2) {}
-        if (styleName === "CHPN") {
-            bg = findLabeledAnywhere(page, "CHPN_BG");
-            if (bg) {
-                try { bg.visible = true; } catch (eBg) {}
-                bringToFront(bg);
-            }
-        }
-        bringToFront(local);
-        log("Materialized " + styleName + " from JSON => \"" + clean.substring(0, 40) + "\"");
-        return local;
-    }
-
-    function pinOpenerJsonChips(page, specs) {
-        var keepers = [];
-        var i;
-        var spec;
-        if (!page || !specs) return keepers;
-        for (i = 0; i < specs.length; i++) {
-            spec = specs[i];
-            if (!trim(spec.text)) {
-                keepers.push(null);
-                continue;
-            }
-            keepers.push(materializeOpenerChip(page, spec.frame, spec.text, spec.styleName));
-        }
-        hideDuplicateOpenerRoles(page, keepers);
-        for (i = 0; i < keepers.length; i++) {
-            if (!keepers[i]) continue;
-            try { keepers[i].visible = true; } catch (eVis) {}
-            try { keepers[i].bringToFront(); } catch (eFront) {}
-        }
-        return keepers;
     }
 
     function shrinkFrameToContent(frame) {
@@ -6113,9 +5960,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
 
     var chpnFrame = null;
     var chnFrame = null;
-    var snappedPart = null;
-    var snappedChapter = null;
-    var pinnedOpenerChips = null;
     var chpnBg = null;
     var coobtTitle = "";
     var coobtIntro = "";
@@ -6347,16 +6191,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             startPage = doc.pages[0];
             snapOpenerFramesToMaster(startPage, doc);
             fitOpenerCoobToContent(startPage, doc);
-            // Snap may retarget the master sample. Pin a new frame from the
-            // snapped bounds and drop every other Part/Chapter chip.
-            try { snappedPart = getOrOverrideRoleFrame(startPage, "CHPN") || chpnFrame; } catch (eSp) { snappedPart = chpnFrame; }
-            try { snappedChapter = getOrOverrideRoleFrame(startPage, "CHN") || chnFrame; } catch (eSc) { snappedChapter = chnFrame; }
-            pinnedOpenerChips = pinOpenerJsonChips(startPage, [
-                { frame: snappedPart, text: partText, styleName: "CHPN" },
-                { frame: snappedChapter, text: chapterNum, styleName: "CHN" }
-            ]);
-            if (pinnedOpenerChips[0]) chpnFrame = pinnedOpenerChips[0];
-            if (pinnedOpenerChips[1]) chnFrame = pinnedOpenerChips[1];
+            hideDuplicateOpenerRoles(startPage, [chpnFrame, chnFrame]);
             // Facing-off can rebuild the master chip as a visible override.
             if (!trim(partText)) {
                 hideItem(findLabeledAnywhere(startPage, "CHPN_BG"));
@@ -6808,14 +6643,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     applyPerPageFootersFromJson(doc, pages);
 
     if (hasOpener) {
-        try {
-            pinnedOpenerChips = pinOpenerJsonChips(doc.pages[0], [
-                { frame: chpnFrame, text: partText, styleName: "CHPN" },
-                { frame: chnFrame, text: chapterNum, styleName: "CHN" }
-            ]);
-            if (pinnedOpenerChips[0]) chpnFrame = pinnedOpenerChips[0];
-            if (pinnedOpenerChips[1]) chnFrame = pinnedOpenerChips[1];
-        } catch (eDupFinal) {
+        try { hideDuplicateOpenerRoles(doc.pages[0], [chpnFrame, chnFrame]); } catch (eDupFinal) {
             log("Final opener chip cleanup failed: " + eDupFinal.message);
         }
     }
