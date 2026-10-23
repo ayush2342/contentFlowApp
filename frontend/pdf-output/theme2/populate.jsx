@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v73-opener-chips";
+    var VERSION = "cengage-v72-title-span";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -511,63 +511,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         } catch (e2) {
             try { item.textWrapPreferences.textWrapMode = 1852796517; } catch (e3) {}
         }
-    }
-
-    // Facing-pages off reapplies the CO-Verso sample "Part 1" / "Chapter 1"
-    // on top of the frame we already filled. Keep one of each role.
-    function hideDuplicateOpenerRoles(page) {
-        var roles = ["CHPN", "CHN", "CHT", "CHPN_BG"];
-        var ri;
-        var list;
-        var i;
-        var keep;
-        var bestLen;
-        var len;
-        var item;
-        var plain;
-        var lab;
-        for (ri = 0; ri < roles.length; ri++) {
-            list = collectByLabel(page, roles[ri]);
-            if (list.length > 1) {
-                keep = null;
-                bestLen = -1;
-                for (i = 0; i < list.length; i++) {
-                    try {
-                        if (!list[i].parentPage || list[i].parentPage !== page) continue;
-                    } catch (eOwn) { continue; }
-                    len = 0;
-                    if (roles[ri] !== "CHPN_BG") {
-                        try { len = trim(String(list[i].contents || "")).length; } catch (eLen) { len = 0; }
-                    }
-                    if (!keep || roles[ri] === "CHPN_BG" || len >= bestLen) {
-                        bestLen = len;
-                        keep = list[i];
-                    }
-                }
-                if (!keep) continue;
-                for (i = 0; i < list.length; i++) {
-                    if (list[i] === keep) continue;
-                    try {
-                        if (!list[i].parentPage || list[i].parentPage !== page) continue;
-                    } catch (eOwn2) { continue; }
-                    hideItem(list[i]);
-                }
-                log("Hid extra opener " + roles[ri] + " kept 1 of " + list.length);
-            }
-        }
-        try {
-            for (i = 0; i < page.textFrames.length; i++) {
-                item = page.textFrames[i];
-                lab = itemLabel(item);
-                if (lab === "CHPN" || lab === "CHN" || lab === "CHT" ||
-                    lab === "COOBT" || lab === "COOB" || lab === "PHCR") continue;
-                try { plain = trim(String(item.contents || "")).replace(/\s+/g, " "); } catch (eP) { continue; }
-                if (/^part\s*\d+$/i.test(plain) || /^chapter\s*\d+$/i.test(plain)) {
-                    hideItem(item);
-                    log("Hid loose opener chip \"" + plain + "\"");
-                }
-            }
-        } catch (eLoose) {}
     }
 
     function shrinkFrameToContent(frame) {
@@ -6146,7 +6089,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             startPage = doc.pages[0];
             snapOpenerFramesToMaster(startPage, doc);
             fitOpenerCoobToContent(startPage, doc);
-            hideDuplicateOpenerRoles(startPage);
             // Facing-off can rebuild the master chip as a visible override.
             if (!trim(partText)) {
                 hideItem(findLabeledAnywhere(startPage, "CHPN_BG"));
