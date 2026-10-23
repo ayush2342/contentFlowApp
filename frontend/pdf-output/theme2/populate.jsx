@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v72-title-span";
+    var VERSION = "cengage-v73-figure-after-text";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -5330,6 +5330,138 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return { top: best[0], left: best[1], bottom: bottom, right: best[3] };
     }
 
+    function isCaptionParaStyle(name) {
+        return /^(PHCAP|FIGCAP|PHCR)/i.test(String(name || ""));
+    }
+
+    /** Bottom of a composed line, including descent — never just the baseline. */
+    function lineBottomY(line) {
+        var y = 0;
+        var extra = 4;
+        var leading;
+        var size;
+        var gb;
+        try { y = Number(line.baseline); } catch (e0) { return 0; }
+        try {
+            gb = line.geometricBounds;
+            if (gb && gb.length >= 3 && Number(gb[2]) > y) return Number(gb[2]);
+        } catch (eGb) {}
+        try {
+            leading = line.leading;
+            if (typeof leading === "number" && leading > 0 && leading < 200) {
+                extra = Math.max(extra, leading * 0.3);
+            }
+        } catch (eL) {}
+        try {
+            size = Number(line.pointSize);
+            if (size > 0) extra = Math.max(extra, size * 0.35);
+        } catch (eS) {}
+        return y + extra;
+    }
+
+    function paragraphLastLineBottom(para) {
+        try {
+            if (!para || !para.lines || para.lines.length < 1) return 0;
+            return lineBottomY(para.lines.item(-1));
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function lastNonEmptyBodyParagraph(story) {
+        var i;
+        var p;
+        var sn;
+        var last = null;
+        if (!story) return null;
+        try {
+            for (i = 0; i < story.paragraphs.length; i++) {
+                p = story.paragraphs[i];
+                if (trim(p.contents) === "") continue;
+                try { sn = String(p.appliedParagraphStyle.name || ""); } catch (eN) { sn = ""; }
+                if (isCaptionParaStyle(sn)) return last;
+                last = p;
+            }
+        } catch (e) {}
+        return last;
+    }
+
+    /**
+     * JUMP wrap must not steal the last line of the paragraph that precedes the
+     * figure. Measure with wrap off, then sit the figure fully below that line.
+     */
+    function placeFigureBelowPrecedingBody(frame, docRef, story) {
+        var page;
+        var live;
+        var b;
+        var h;
+        var lastBottom;
+        var newTop;
+        var wrapTop = 6;
+        var gap = 8;
+        var prev;
+        if (!frame) return;
+        try { page = frame.parentPage; } catch (e0) { return; }
+        if (!page) return;
+        try { frame.textWrapPreferences.textWrapMode = TextWrapModes.NONE; } catch (eW) {}
+        try { docRef.recompose(); } catch (eR) {}
+        prev = lastNonEmptyBodyParagraph(story);
+        lastBottom = paragraphLastLineBottom(prev);
+        try { b = frame.geometricBounds; } catch (eB) { forceJumpWrap(frame); return; }
+        live = columnLiveBox(page, docRef, b);
+        h = b[2] - b[0];
+        if (!(lastBottom > 0)) lastBottom = live.top;
+        newTop = lastBottom + gap + wrapTop;
+        if (newTop < live.top) newTop = live.top;
+        if (newTop + 40 > live.bottom) {
+            // Keep the preceding line above the figure even if the art must shrink.
+            newTop = Math.min(newTop, Math.max(live.top, lastBottom + gap + wrapTop));
+        }
+        if (newTop + h > live.bottom) {
+            h = live.bottom - newTop;
+            if (h < 40) {
+                h = Math.min(b[2] - b[0], live.bottom - live.top);
+                newTop = Math.max(live.top, live.bottom - h);
+            }
+        }
+        try {
+            frame.geometricBounds = [newTop, b[1], newTop + h, b[3]];
+            try { frame.fit(FitOptions.PROPORTIONALLY); } catch (eF1) {}
+            try { frame.fit(FitOptions.CENTER_CONTENT); } catch (eF2) {}
+        } catch (eSet) {}
+        forceJumpWrap(frame);
+        try { frame.textWrapPreferences.textWrapOffset = [wrapTop, 0, 6, 0]; } catch (eOff) {}
+        try { docRef.recompose(); } catch (eR2) {}
+        log("Figure below preceding body => top=" + newTop +
+            " afterLine=" + lastBottom +
+            " bounds=" + frame.geometricBounds);
+    }
+
+    function nudgeAllFiguresBelowPrecedingBody(docRef) {
+        var pi;
+        var page;
+        var items;
+        var i;
+        var t1;
+        var story;
+        var n = 0;
+        for (pi = 0; pi < docRef.pages.length; pi++) {
+            page = docRef.pages[pi];
+            items = collectByLabel(page, "FIGORTABLE");
+            t1 = collectByLabel(page, "T1");
+            story = null;
+            try { if (t1.length) story = t1[0].parentStory; } catch (eS) {}
+            for (i = 0; i < items.length; i++) {
+                try {
+                    if (!items[i].graphics || !items[i].graphics.length) continue;
+                    placeFigureBelowPrecedingBody(items[i], docRef, story);
+                    n += 1;
+                } catch (e) {}
+            }
+        }
+        log("nudgeAllFiguresBelowPrecedingBody => " + n);
+    }
+
     /**
      * Place the figure where the story has been filled so far, in that column.
      * An Image block that is last in the JSON stays after that text. The caption
@@ -5372,7 +5504,9 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 live = columnLiveBox(tf.parentPage, docRef, gb);
                 top = live.top;
                 if (tf.lines && tf.lines.length > 0) {
-                    try { top = Number(tf.lines.item(-1).baseline) + 8; } catch (eB) {}
+                    // Sit below the full line box + JUMP wrap inset so the last
+                    // body line cannot be kicked under the figure.
+                    try { top = lineBottomY(tf.lines.item(-1)) + 14; } catch (eB) {}
                 }
                 if (top < live.top) top = live.top;
                 anchor = {
@@ -5435,8 +5569,9 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 } catch (eFit) {}
             }
             forceJumpWrap(rect);
-            try { rect.textWrapPreferences.textWrapOffset = [4, 0, 6, 0]; } catch (eOff) {}
+            try { rect.textWrapPreferences.textWrapOffset = [6, 0, 6, 0]; } catch (eOff) {}
             clampFigureToLiveArea(rect, docRef);
+            placeFigureBelowPrecedingBody(rect, docRef, story);
             populated += 1;
             log("Placed JSON Image in flow => " + file.name +
                 " scale=" + scale +
@@ -6508,6 +6643,8 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     try { doc.recompose(); } catch (eRf2c) {}
     clampAllFiguresInDoc(doc);
     try { doc.recompose(); } catch (eRf3) {}
+    nudgeAllFiguresBelowPrecedingBody(doc);
+    try { doc.recompose(); } catch (eRf3b) {}
 
     // Drop blank pages left by reflow, then keep the PDF at one page per JSON page.
     // Overflow stays overset on its own page and is not given a new page.
