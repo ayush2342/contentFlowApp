@@ -38,7 +38,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     var bodyTxCount = 0;
     var imageIndex = 0;
     var usedLocalAssets = {};
-    var VERSION = "cengage-v75-opener-chips";
+    var VERSION = "cengage-v74-opener-chips";
 
     /**
      * InDesign 2026 renamed the boolean to paragraphShadingOn.
@@ -527,90 +527,126 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return "";
     }
 
-    // The page chip is already filled. The faint line above the orange bar is
-    // the CO-Verso sample, still drawn from the master. override() just hands
-    // back the page chip, so clear the master text in place.
-    function hideDuplicateOpenerRoles(page, keepers) {
-        var keep = keepers || [];
+    // Facing-off puts the CO-Verso sample back on the page above the orange
+    // bar. That sample is still a master item, so it is not in page.textFrames.
+    // Override it, then keep the lower chip (the one on the orange bar).
+    function hideDuplicateOpenerRoles(page) {
+        var buckets = { part: [], chapter: [] };
+        var seen = {};
         var i;
-        var ki;
-        var n;
         var item;
-        var items;
-        var ms;
-        var kind;
-        var shares;
+        var ov;
+        var masterItems;
 
-        function sameItem(a, b) {
-            if (!a || !b) return false;
-            if (a === b) return true;
-            try { return a.id === b.id; } catch (eId) { return false; }
-        }
-
-        function sharesStory(a, b) {
+        function remember(frame) {
+            var id;
+            var kind;
+            var story;
+            var pi;
+            var lines;
+            var line;
+            var lineKind;
+            var kept;
+            if (!frame) return;
+            try { id = frame.id; } catch (eId) { id = null; }
+            if (id !== null && seen[id]) return;
+            if (id !== null) seen[id] = true;
             try {
-                return !!(a && b && a.parentStory && b.parentStory && a.parentStory === b.parentStory);
-            } catch (eS) { return false; }
-        }
-
-        function isKeeper(frame) {
-            for (ki = 0; ki < keep.length; ki++) {
-                if (sameItem(frame, keep[ki])) return true;
-            }
-            return false;
-        }
-
-        function chipKind(frame) {
-            var k = "";
-            try { k = openerChipKind(frame.contents); } catch (eK) { k = ""; }
-            if (k) return k;
-            try {
-                if (frame.paragraphs && frame.paragraphs.length) {
-                    return openerChipKind(frame.paragraphs[0].contents);
+                story = frame.parentStory;
+                lines = [];
+                for (pi = 0; pi < story.paragraphs.length; pi++) {
+                    line = trim(String(story.paragraphs[pi].contents || "").replace(/\uFEFF/g, ""));
+                    if (line) lines.push(line);
                 }
-            } catch (eP) {}
-            return "";
+                if (lines.length > 1) {
+                    lineKind = openerChipKind(lines[0]);
+                    if (lineKind) {
+                        kept = true;
+                        for (pi = 1; pi < lines.length; pi++) {
+                            if (openerChipKind(lines[pi]) !== lineKind) kept = false;
+                        }
+                        if (kept) {
+                            story.contents = lines[lines.length - 1];
+                            log("Collapsed opener " + lineKind + " story to one line");
+                        }
+                    }
+                }
+            } catch (eStory) {}
+            try { kind = openerChipKind(frame.contents); } catch (eKind) { kind = ""; }
+            if (!kind) return;
+            buckets[kind].push(frame);
         }
 
-        function clearSample(frame, fromMaster) {
-            kind = chipKind(frame);
-            if (!kind || isKeeper(frame)) return;
-            shares = false;
-            for (ki = 0; ki < keep.length; ki++) {
-                if (sharesStory(frame, keep[ki])) shares = true;
-            }
-            if (shares) {
-                if (fromMaster) return;
-                try { frame.remove(); } catch (eRm) { hideItem(frame); }
-                log("Removed extra opener " + kind + " frame");
-                return;
-            }
-            hideItem(frame);
-            try { frame.parentStory.contents = ""; } catch (eClr) {
-                try { frame.contents = ""; } catch (eClr2) {}
-            }
-            try { frame.nonprinting = true; } catch (eNp) {}
-            log("Cleared opener " + kind + (fromMaster ? " master sample" : " extra chip"));
-        }
-
-        try {
-            items = page.allPageItems;
+        function walk(root) {
+            var items;
+            var n;
+            var candidate;
+            try { items = root.allPageItems; } catch (eItems) { items = null; }
+            if (!items) return;
             for (n = 0; n < items.length; n++) {
-                item = items[n];
-                try { if (item instanceof TextFrame) clearSample(item, false); } catch (eTf) {}
+                candidate = items[n];
+                try {
+                    if (candidate instanceof TextFrame) remember(candidate);
+                } catch (eTf) {}
             }
-        } catch (ePage) {}
+        }
 
+        walk(page);
         try {
-            for (n = 0; n < doc.masterSpreads.length; n++) {
-                ms = doc.masterSpreads[n];
-                items = ms.allPageItems;
-                for (i = 0; i < items.length; i++) {
-                    item = items[i];
-                    try { if (item instanceof TextFrame) clearSample(item, true); } catch (eMs) {}
+            if (page.appliedMaster) {
+                masterItems = page.appliedMaster.allPageItems;
+                for (i = 0; i < masterItems.length; i++) {
+                    item = masterItems[i];
+                    try { if (!(item instanceof TextFrame)) continue; } catch (eTf2) { continue; }
+                    try { if (!openerChipKind(item.contents)) continue; } catch (eChip) { continue; }
+                    ov = null;
+                    try { ov = item.override(page); } catch (eOv) { ov = null; }
+                    remember(ov || item);
                 }
             }
-        } catch (eMasters) {}
+        } catch (eMaster) {}
+        try {
+            if (page.masterPageItems) {
+                for (i = 0; i < page.masterPageItems.length; i++) {
+                    remember(page.masterPageItems[i]);
+                }
+            }
+        } catch (eMp) {}
+
+        function keepLower(list, label) {
+            var keep;
+            var bestTop;
+            var top;
+            var b;
+            var n;
+            if (!list.length) return;
+            keep = list[0];
+            bestTop = -99999;
+            for (n = 0; n < list.length; n++) {
+                top = -99999;
+                try { b = list[n].geometricBounds; top = b[0]; } catch (eB) {}
+                if (top > bestTop + 0.5) {
+                    bestTop = top;
+                    keep = list[n];
+                }
+            }
+            for (n = 0; n < list.length; n++) {
+                if (list[n] === keep) continue;
+                try {
+                    if (list[n].parentStory && keep.parentStory && list[n].parentStory === keep.parentStory) {
+                        continue;
+                    }
+                } catch (eSame) {}
+                hideItem(list[n]);
+                try { list[n].contents = ""; } catch (eClr) {}
+                try { list[n].nonprinting = true; } catch (eNp) {}
+                log("Hid opener " + label + " ghost");
+            }
+            log("Opener " + label + " copies=" + list.length + " keptTop=" + bestTop);
+        }
+
+        keepLower(buckets.part, "part");
+        keepLower(buckets.chapter, "chapter");
     }
 
     function shrinkFrameToContent(frame) {
@@ -5959,7 +5995,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     }
 
     var chpnFrame = null;
-    var chnFrame = null;
     var chpnBg = null;
     var coobtTitle = "";
     var coobtIntro = "";
@@ -6027,11 +6062,10 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         log("No PartNumber in JSON — hid CHPN + CHPN_BG");
     }
 
-    chnFrame = getOrOverrideRoleFrame(startPage, "CHN");
     if (trim(chapterNum)) {
-        setFrameText(chnFrame, chapterNum, "CHN", doc);
+        setFrameText(getOrOverrideRoleFrame(startPage, "CHN"), chapterNum, "CHN", doc);
     } else {
-        hideItem(chnFrame);
+        hideItem(getOrOverrideRoleFrame(startPage, "CHN"));
     }
     if (trim(chapterTitle)) {
         setFrameText(getOrOverrideRoleFrame(startPage, "CHT"), chapterTitle, "CHT", doc);
@@ -6191,7 +6225,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             startPage = doc.pages[0];
             snapOpenerFramesToMaster(startPage, doc);
             fitOpenerCoobToContent(startPage, doc);
-            hideDuplicateOpenerRoles(startPage, [chpnFrame, chnFrame]);
+            hideDuplicateOpenerRoles(startPage);
             // Facing-off can rebuild the master chip as a visible override.
             if (!trim(partText)) {
                 hideItem(findLabeledAnywhere(startPage, "CHPN_BG"));
@@ -6643,7 +6677,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     applyPerPageFootersFromJson(doc, pages);
 
     if (hasOpener) {
-        try { hideDuplicateOpenerRoles(doc.pages[0], [chpnFrame, chnFrame]); } catch (eDupFinal) {
+        try { hideDuplicateOpenerRoles(doc.pages[0]); } catch (eDupFinal) {
             log("Final opener chip cleanup failed: " + eDupFinal.message);
         }
     }
