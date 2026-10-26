@@ -141,6 +141,141 @@ NameArray:0,Win,1,Minion Pro
 %BeginFont
 Handler:DirectoryHandler
 FontType:Type1
+FontName:NeueKabel-Bold
+FamilyName:Neue Kabel
+StyleName:Bold
+FullName:Neue Kabel Bold
+MenuName:Neue Kabel
+StyleBits:2
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NeueKabel-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:92104
+FileModTime:1793019582
+WeightClass:700
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Neue Kabel Bold
+NameArray:0,Win,1,Neue Kabel
+NameArray:0,Win,16,Neue Kabel
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NeueKabel-Book
+FamilyName:Neue Kabel
+StyleName:Book
+FullName:Neue Kabel Book
+MenuName:Neue Kabel
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NeueKabel-Book.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:90304
+FileModTime:1793019583
+WeightClass:350
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Neue Kabel Book
+NameArray:0,Win,1,Neue Kabel
+NameArray:0,Win,16,Neue Kabel
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NeueKabel-Italic
+FamilyName:Neue Kabel
+StyleName:Italic
+FullName:Neue Kabel Italic
+MenuName:Neue Kabel
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NeueKabel-Italic.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:95900
+FileModTime:1793019583
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Neue Kabel Italic
+NameArray:0,Win,1,Neue Kabel
+NameArray:0,Win,16,Neue Kabel
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NeueKabel-Medium
+FamilyName:Neue Kabel
+StyleName:Medium
+FullName:Neue Kabel Medium
+MenuName:Neue Kabel
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NeueKabel-Medium.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:90472
+FileModTime:1793019582
+WeightClass:500
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Neue Kabel Medium
+NameArray:0,Win,1,Neue Kabel
+NameArray:0,Win,16,Neue Kabel
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:NeueKabel-Regular
+FamilyName:Neue Kabel
+StyleName:Regular
+FullName:Neue Kabel
+MenuName:Neue Kabel
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\contentFlowApp\frontend\pdf-output\theme2\templates\Document fonts\NeueKabel-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:90300
+FileModTime:1793019582
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Neue Kabel
+NameArray:0,Win,1,Neue Kabel
+NameArray:0,Win,16,Neue Kabel
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
 FontName:NewCaledoniaLTStd-Bold
 FamilyName:New Caledonia LT Std
 StyleName:Bold
