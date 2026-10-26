@@ -4449,9 +4449,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var bottom = floorBottom;
         var gi;
         try {
-            if (frame.overflows) return ceiling;
-        } catch (eOv) {}
-        try {
             if (frame.lines && frame.lines.length) {
                 gb = frame.lines[frame.lines.length - 1].geometricBounds;
                 if (gb[2] + 10 > bottom) bottom = gb[2] + 10;
@@ -4467,6 +4464,38 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         } catch (eGr) {}
         if (bottom > ceiling) bottom = ceiling;
         if (bottom < floorBottom) bottom = floorBottom;
+        return bottom;
+    }
+
+    /** Lock a callout column to its table width, then grow only downward until the copy fits. */
+    function fitCalloutColumnHeight(frame, docRef, top, left, rightEdge, floorBottom, ceiling) {
+        var bottom;
+        var guard;
+        var gb;
+        if (!frame) return floorBottom;
+        bottom = floorBottom;
+        try { frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF; } catch (eAs) {}
+        try { frame.geometricBounds = [top, left, bottom, rightEdge]; } catch (e0) {}
+        for (guard = 0; guard < 24; guard++) {
+            try { docRef.recompose(); } catch (eR) {}
+            try { if (!frame.overflows) break; } catch (eOv) { break; }
+            if (bottom >= ceiling - 0.5) break;
+            bottom = Math.min(ceiling, bottom + 28);
+            try { frame.geometricBounds = [top, left, bottom, rightEdge]; } catch (e1) {}
+        }
+        try { docRef.recompose(); } catch (eR2) {}
+        try {
+            if (frame.lines && frame.lines.length && !frame.overflows) {
+                gb = frame.lines[frame.lines.length - 1].geometricBounds;
+                bottom = Math.max(floorBottom, Math.min(ceiling, gb[2] + 8));
+                frame.geometricBounds = [top, left, bottom, rightEdge];
+            }
+        } catch (eLn) {}
+        try {
+            gb = frame.geometricBounds;
+            log("Callout column locked left=" + gb[1] + " right=" + gb[3] +
+                " bottom=" + gb[2] + " overflows=" + frame.overflows);
+        } catch (eLog) {}
         return bottom;
     }
 
@@ -4550,6 +4579,9 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 frame.paragraphs[pi].spaceAfter = 2;
                 if (size > 0) frame.paragraphs[pi].pointSize = size;
                 try { frame.paragraphs[pi].leading = Math.max(9, (size || 9) * 1.15); } catch (eLead) {}
+                try { frame.paragraphs[pi].leftIndent = 0; } catch (eLi) {}
+                try { frame.paragraphs[pi].rightIndent = 0; } catch (eRi) {}
+                try { frame.paragraphs[pi].firstLineIndent = 0; } catch (eFi) {}
                 if (align === "center") frame.paragraphs[pi].justification = Justification.CENTER_ALIGN;
                 else if (align === "right") frame.paragraphs[pi].justification = Justification.RIGHT_ALIGN;
                 else frame.paragraphs[pi].justification = Justification.LEFT_ALIGN;
@@ -4618,16 +4650,22 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 continue;
             }
             try { frame.label = "CF_TABLE_COL_" + c; } catch (eLab) {}
+            try { frame.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF; } catch (eAs) {}
             fillThemeCalloutFrame(frame, sources[c], docRef, matrix, colW);
+            // A long URL must not widen the column past the green table.
+            try { frame.geometricBounds = [bodyTop, x, colBottom, x + colW]; } catch (eLock) {}
             try { lens.push(String(frame.parentStory.contents || "").length); } catch (eLen) { lens.push(0); }
-            frames.push(frame);
+            frames.push({ frame: frame, left: x, right: x + colW });
             x += colW;
         }
         try { docRef.recompose(); } catch (eRc0) {}
         tallest = floorBottom;
         for (i = 0; i < frames.length; i++) {
-            bottom = calloutFrameBottom(frames[i], floorBottom, colBottom);
+            bottom = fitCalloutColumnHeight(
+                frames[i].frame, docRef, bodyTop, frames[i].left, frames[i].right, floorBottom, colBottom
+            );
             if (bottom > tallest) tallest = bottom;
+            frames[i] = frames[i].frame;
         }
         if (tallest > colBottom) tallest = colBottom;
         for (i = 0; i < frames.length; i++) {
