@@ -3879,7 +3879,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var quoteText = blockText(data);
         var author = trim(stripHtml((data && data.author) || ""));
         var styleName = resolveExtractStyleName(docRef);
-        var authorStyle = findParaStyle(docRef, "EXT2") ? "EXT2" : styleName;
+        var combined;
         var st;
         var startPara;
         var i;
@@ -3890,34 +3890,102 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             author = "";
         }
         if (!quoteText) return;
+        quoteText = quoteText.replace(/[ \t]{2,}/g, " ");
+        author = author.replace(/[ \t]{2,}/g, " ");
+        // One paragraph (forced line break) so quote + attribution share one shading box.
+        if (author) {
+            if (!/^[\u2014\u2013\-]/.test(author)) author = "\u2014" + author;
+            combined = quoteText + "\n" + author;
+        } else {
+            combined = quoteText;
+        }
         try { startPara = story.paragraphs.length; } catch (eS) { startPara = 0; }
         st = findParaStyle(docRef, styleName);
         try {
             log("Quotation style=" + styleName +
                 " styleShadingOn=" + getShadingOn(st) +
                 " styleColor=" + (st && st.paragraphShadingColor ? st.paragraphShadingColor.name : "?") +
-                " styleTint=" + (st ? st.paragraphShadingTint : "?"));
+                " styleTint=" + (st ? st.paragraphShadingTint : "?") +
+                " singleBox=" + (author ? "yes" : "no"));
         } catch (eL0) {}
-        appendParagraph(story, quoteText, styleName, docRef);
-        if (author) {
-            if (!/^[\u2014\u2013\-]/.test(author)) author = "\u2014" + author;
-            appendParagraph(story, author, authorStyle, docRef);
-        }
-        // Re-assert green band on every quotation paragraph we just added.
+        appendParagraph(story, combined, styleName, docRef);
         try {
             for (i = startPara; i < story.paragraphs.length; i++) {
                 if (trim(story.paragraphs[i].contents) === "") continue;
-                // Author line uses EXT2 typography but same green band as EXT1.
                 ensureExtractGreenShading(story.paragraphs[i], docRef, styleName);
-                // Tighten gap so quote + attribution read as one green box.
-                try {
-                    if (i > startPara) story.paragraphs[i].spaceBefore = 0;
-                    if (i < story.paragraphs.length - 1) story.paragraphs[i].spaceAfter = 2;
-                } catch (eSp) {}
+                applyQuotationAuthorFace(story.paragraphs[i], docRef);
             }
         } catch (eFix) {
             log("Quotation shading reinforce failed: " + eFix.message);
         }
+    }
+
+    /** Attribution sits on the forced line break and keeps EXT2 type inside the EXT1 green box. */
+    function applyQuotationAuthorFace(para, docRef) {
+        var br;
+        var ext2;
+        var end;
+        var range;
+        if (!para) return;
+        br = quotationBreakIndex(para);
+        if (br < 0) return;
+        ext2 = findParaStyle(docRef, "EXT2");
+        if (!ext2) return;
+        end = para.characters.length - 2;
+        if (end < br + 1) end = para.characters.length - 1;
+        if (end < br + 1) return;
+        try {
+            range = para.characters.itemByRange(br + 1, end);
+        } catch (eR) {
+            return;
+        }
+        try { range.appliedFont = ext2.appliedFont; } catch (eF) {}
+        try { range.fontStyle = ext2.fontStyle; } catch (eFs) {}
+        try { range.pointSize = ext2.pointSize; } catch (ePs) {}
+        // Open the green gap between the quote and the attribution.
+        try { range.leading = quotationLeadingPoints(para) + 11; } catch (eLd) {}
+        try { range.fillColor = ext2.fillColor; } catch (eC) {}
+        try { range.tracking = ext2.tracking; } catch (eTr) {}
+        log("Quotation author face => break=" + br + " size=" + ext2.pointSize +
+            " lead=" + range.leading);
+    }
+
+    function quotationLeadingPoints(para) {
+        var lead;
+        var size;
+        var auto;
+        try { lead = para.leading; } catch (e0) { lead = 16; }
+        try {
+            if (lead === Leading.AUTO) lead = "auto";
+        } catch (e1) {}
+        if (lead === "auto" || lead === 1633771873) {
+            size = 13;
+            auto = 120;
+            try { size = Number(para.pointSize) || 13; } catch (e2) {}
+            try { auto = Number(para.autoLeading) || 120; } catch (e3) {}
+            return size * auto / 100;
+        }
+        lead = Number(lead);
+        if (isNaN(lead) || lead <= 0 || lead > 200) return 8;
+        return lead;
+    }
+
+    function quotationBreakIndex(para) {
+        var contents;
+        var i;
+        var ch;
+        try { contents = String(para.contents || ""); } catch (e0) { contents = ""; }
+        i = contents.indexOf("\n");
+        if (i >= 0) return i;
+        i = contents.indexOf("\u2028");
+        if (i >= 0) return i;
+        try {
+            for (i = 0; i < para.characters.length; i++) {
+                ch = String(para.characters[i].contents || "");
+                if (ch === "\n" || ch === "\u2028" || ch === "\u000A") return i;
+            }
+        } catch (e1) {}
+        return -1;
     }
 
     function themeTableCellText(cell) {
@@ -4337,6 +4405,45 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         } catch (eSc) {}
     }
 
+    /** Drop the template keyline on figures and tables. */
+    function hideFrameStroke(item, docRef) {
+        if (!item) return;
+        try { if (item.itemLayer) item.itemLayer.locked = false; } catch (eLayer) {}
+        try { item.locked = false; } catch (eLock) {}
+        try { docRef.viewPreferences.strokeMeasurementUnits = MeasurementUnits.POINTS; } catch (eU) {}
+        try { item.strokeColor = "None"; } catch (eC) {}
+        try { item.strokeWeight = 0; } catch (eW) {}
+        try { item.strokeTint = 0; } catch (eT) {}
+        try { item.strokeTransparencySettings.blendingSettings.opacity = 0; } catch (eOp) {}
+    }
+
+    /**
+     * FIGORTABLE and callout/table frames inherit the template's 1pt orange
+     * stroke. Clear it after layout so images and tables are not boxed.
+     */
+    function stripFigureAndTableStrokes(docRef) {
+        var pi;
+        var page;
+        var items;
+        var i;
+        var lab;
+        var n = 0;
+        for (pi = 0; pi < docRef.pages.length; pi++) {
+            page = docRef.pages[pi];
+            try { items = page.allPageItems; } catch (eItems) { continue; }
+            for (i = 0; i < items.length; i++) {
+                lab = itemLabel(items[i]);
+                if (lab === "FIGORTABLE" || lab === "CF_TABLE" || lab === "CF_TABLE_TITLE" ||
+                        lab === "CF_TABLE_HEADER" || lab === "CF_TABLE_BODY" ||
+                        lab.indexOf("CF_TABLE_COL_") === 0) {
+                    hideFrameStroke(items[i], docRef);
+                    n += 1;
+                }
+            }
+        }
+        log("Stripped figure/table strokes => " + n);
+    }
+
     function calloutFrameBottom(frame, floorBottom, ceiling) {
         var gb;
         var bottom = floorBottom;
@@ -4531,7 +4638,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             forceJumpWrap(frames[i]);
             try { frames[i].textWrapPreferences.textWrapOffset = [0, 0, 8, 0]; } catch (eOff) {}
             try { frames[i].textFramePreferences.ignoreWrap = true; } catch (eIg2) {}
-            try { frames[i].strokeWeight = 0; } catch (eSt) {}
+            hideFrameStroke(frames[i], docRef);
         }
         try {
             var span = bothColumnSpan(docRef, page);
@@ -4543,7 +4650,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             var titleItem = null;
             var ti;
             headerBand.label = "CF_TABLE_HEADER";
-            headerBand.strokeWeight = 0;
+            hideFrameStroke(headerBand, docRef);
             try {
                 none = docRef.swatches.itemByName("None");
                 if (none && none.isValid) headerBand.strokeColor = none;
@@ -4561,7 +4668,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             if (titleItem) {
                 try { titleItem.textFramePreferences.autoSizingType = AutoSizingTypeEnum.OFF; } catch (eAs) {}
                 titleItem.geometricBounds = [bandTop, titleLeft, bodyTop, titleRight];
-                try { titleItem.strokeWeight = 0; } catch (eTs) {}
+                hideFrameStroke(titleItem, docRef);
                 try {
                     if (none && none.isValid) titleItem.fillColor = none;
                 } catch (eTf) {}
@@ -4577,7 +4684,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 geometricBounds: [bodyTop, left, tallest, right]
             });
             bg.label = "CF_TABLE_BODY";
-            bg.strokeWeight = 0;
+            hideFrameStroke(bg, docRef);
             try {
                 none = docRef.swatches.itemByName("None");
                 if (none && none.isValid) bg.strokeColor = none;
@@ -4769,7 +4876,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             return;
         }
         try { frame.label = "CF_TABLE"; } catch (eLab) {}
-        try { frame.strokeWeight = 0; } catch (eSw) {}
+        hideFrameStroke(frame, docRef);
         try { if (bodyColor) frame.fillColor = bodyColor; } catch (eFill) {}
         try { frame.textFramePreferences.insetSpacing = [0, 0, 0, 0]; } catch (eIn) {}
         allRows = matrix.headerRows.concat(matrix.bodyRows);
@@ -4920,16 +5027,36 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             } catch (eW) {
                 try { para.paragraphShadingWidth = 1131565687; } catch (eW2) {}
             }
-            try { para.paragraphShadingTopOffset = 6; } catch (eTo) {}
-            try { para.paragraphShadingBottomOffset = 6; } catch (eBo) {}
+            try { para.paragraphShadingTopOffset = 11; } catch (eTo) {}
+            try { para.paragraphShadingBottomOffset = 10; } catch (eBo) {}
             try { para.paragraphShadingLeftOffset = 8; } catch (eLo) {}
             try { para.paragraphShadingRightOffset = 8; } catch (eRo) {}
+            bumpExtractBoxSpacing(para, style);
             log("Quotation shading ON => swatch=" + color.name +
                 " tint=" + para.paragraphShadingTint +
-                " on=" + getShadingOn(para));
+                " on=" + getShadingOn(para) +
+                " spaceBefore=" + para.spaceBefore +
+                " spaceAfter=" + para.spaceAfter);
         } catch (eSet) {
             log("Quotation shading force failed: " + eSet.message);
         }
+    }
+
+    /**
+     * White gap around the green box, measured against the expected quotation.
+     * Shading inset grows upward/downward, so space before/after has to clear
+     * that inset or the extra space never shows.
+     * Targets: ~22pt white above, ~23pt white below.
+     */
+    function bumpExtractBoxSpacing(para, style) {
+        if (!para) return;
+        try { para.spaceBefore = 15; } catch (e1) {}
+        try { para.spaceAfter = 15; } catch (e2) {}
+        // Full justification was stretching the quote to about 8–11pt between words.
+        try { para.justification = Justification.LEFT_ALIGN; } catch (eJ) {}
+        try { para.desiredWordSpacing = 100; } catch (eW) {}
+        try { para.maximumWordSpacing = 100; } catch (eW2) {}
+        try { para.minimumWordSpacing = 100; } catch (eW3) {}
     }
 
     /** Process RGB sage matching client pull-quote sample — visible in browser PDFs. */
@@ -5214,6 +5341,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             frame.place(file, false);
             try { frame.fit(FitOptions.PROPORTIONALLY); } catch (e1) {}
             try { frame.fit(FitOptions.CENTER_CONTENT); } catch (e2) {}
+            hideFrameStroke(frame, docRef);
             snapFigureToNearestColumn(frame);
             forceJumpWrap(frame);
             try {
@@ -5469,7 +5597,258 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
      * Room is the column under the last line, down to the footer — not the
      * text frame's own bottom, which can stop where the type stops.
      */
-    function placeAnchoredImage(story, file, docRef, scalePercent, preferPage) {
+    function applyImageCaptionSpacing(story, data) {
+        var i;
+        var p;
+        var sb;
+        var sa;
+        var lead;
+        if (!story || !data) return;
+        p = null;
+        try {
+            for (i = story.paragraphs.length - 1; i >= 0; i--) {
+                if (trim(story.paragraphs[i].contents) === "") continue;
+                p = story.paragraphs[i];
+                break;
+            }
+        } catch (e0) { return; }
+        if (!p) return;
+        sb = parseFloat(data.caption_space_before_pt);
+        sa = parseFloat(data.caption_space_after_pt);
+        lead = parseFloat(data.caption_line_spacing_pt);
+        try { if (!isNaN(sb)) p.spaceBefore = sb; } catch (e1) {}
+        try { if (!isNaN(sa)) p.spaceAfter = sa; } catch (e2) {}
+        try { if (!isNaN(lead) && lead > 0) p.leading = lead; } catch (e3) {}
+    }
+
+    /**
+     * T1 frame whose column contains the source-page x of this figure.
+     * An image that belongs in the right column must not fall back to the
+     * left column just because that column still holds the previous lines.
+     */
+    function columnFrameForSourceX(page, story, docRef, srcX) {
+        var frames;
+        var i;
+        var frame;
+        var b;
+        var pr;
+        var local0;
+        var local1;
+        var best;
+        var bestDist;
+        var dist;
+        if (!page || isNaN(srcX)) return null;
+        pr = pageRect(page, docRef);
+        best = null;
+        bestDist = 1e9;
+        try { frames = collectByLabel(page, "T1"); } catch (e0) { frames = []; }
+        for (i = 0; i < frames.length; i++) {
+            frame = frames[i];
+            try {
+                if (story && frame.parentStory && frame.parentStory.id !== story.id) continue;
+            } catch (eS) { continue; }
+            try { b = frame.geometricBounds; } catch (eB) { continue; }
+            local0 = b[1] - pr.left;
+            local1 = b[3] - pr.left;
+            if ((srcX >= local0 - 12 && srcX <= local1 + 12) ||
+                    (srcX >= b[1] - 12 && srcX <= b[3] + 12)) {
+                return frame;
+            }
+            dist = Math.abs(((local0 + local1) / 2) - srcX);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = frame;
+            }
+        }
+        return best;
+    }
+
+    /** Following caption belongs in the figure's column, not the leftover lines of the previous one. */
+    function insertColumnBreakIfFigureIsAhead(story, page, docRef, srcX) {
+        var tf;
+        var fig;
+        var x;
+        if (!story || !page) return;
+        x = parseFloat(srcX);
+        if (isNaN(x)) return;
+        tf = lastUsedStoryColumn(page, story);
+        fig = columnFrameForSourceX(page, story, docRef, x);
+        if (!tf || !fig) return;
+        try { if (tf.id === fig.id) return; } catch (eId) { return; }
+        try {
+            story.insertionPoints.item(-1).contents = SpecialCharacters.COLUMN_BREAK;
+            log("Column break before figure caption => srcX=" + x);
+        } catch (eBr) {
+            log("Column break failed: " + eBr.message);
+        }
+    }
+
+    /** Keep the caption under the figure. A gap above the art lets the caption sit on top of it. */
+    function seatFigureOnBody(page, docRef, srcX) {
+        var items;
+        var i;
+        var fig;
+        var best;
+        var bestTop;
+        var b;
+        var h;
+        var left;
+        var tf;
+        var li;
+        var line;
+        var y;
+        var size;
+        var lastBody;
+        var newTop;
+        var x;
+        x = parseFloat(srcX);
+        if (!page || isNaN(x)) return;
+        try { items = collectByLabel(page, "FIGORTABLE"); } catch (e0) { return; }
+        best = null;
+        bestTop = -1e9;
+        for (i = 0; i < items.length; i++) {
+            try {
+                if (!items[i].graphics || !items[i].graphics.length) continue;
+                b = items[i].geometricBounds;
+                if (Math.abs(b[1] - x) > 30 && Math.abs((b[1] - pageRect(page, docRef).left) - x) > 30) continue;
+                if (b[0] > bestTop) {
+                    bestTop = b[0];
+                    best = items[i];
+                }
+            } catch (e1) {}
+        }
+        fig = best;
+        if (!fig) return;
+        try { b = fig.geometricBounds; } catch (eB) { return; }
+        h = b[2] - b[0];
+        tf = columnFrameForSourceX(page, null, docRef, x);
+        if (!tf) return;
+        lastBody = 0;
+        try {
+            for (li = 0; li < tf.lines.length; li++) {
+                line = tf.lines[li];
+                try { y = Number(line.baseline); } catch (eY) { continue; }
+                if (y >= b[0] - 1) continue;
+                size = 11;
+                try { size = Number(line.pointSize); } catch (eS) {}
+                if (!(size >= 10.5)) continue;
+                y = lineBottomY(line);
+                if (y > lastBody) lastBody = y;
+            }
+        } catch (eL) {}
+        if (!(lastBody > 0)) return;
+        newTop = lastBody + 2;
+        if (Math.abs(newTop - b[0]) < 1.5) return;
+        if (newTop < b[0] - 80) return;
+        left = b[1];
+        try {
+            fig.geometricBounds = [newTop, left, newTop + h, b[3]];
+            try { fig.fit(FitOptions.FILL_PROPORTIONALLY); } catch (eF) {}
+            try { fig.fit(FitOptions.CENTER_CONTENT); } catch (eC) {}
+            fig.geometricBounds = [newTop, left, newTop + h, b[3]];
+            log("Seated figure on body => top=" + newTop + " was=" + b[0]);
+        } catch (eSet) {
+            log("seatFigureOnBody failed: " + eSet.message);
+        }
+    }
+
+    function placeExplicitFigure(story, file, docRef, preferPage, imageData) {
+        var srcX;
+        var figW;
+        var aspect;
+        var figH;
+        var page;
+        var tf;
+        var b;
+        var pr;
+        var top;
+        var left;
+        var live;
+        var rect;
+        var noneSw;
+        var shifted;
+        var textBottom;
+        if (!imageData || !story || !file) return false;
+        srcX = parseFloat(imageData.source_x0_pt);
+        figW = parseFloat(imageData.display_width_pt);
+        aspect = parseFloat(imageData.aspect_ratio);
+        if (isNaN(srcX) || isNaN(figW) || figW < 40 || isNaN(aspect) || aspect < 0.2 || aspect > 8) {
+            return false;
+        }
+        figH = figW / aspect;
+        if (!(figH > 24)) return false;
+        page = preferPage;
+        try { story.recompose(); } catch (eR0) {}
+        tf = columnFrameForSourceX(page, story, docRef, srcX);
+        if (!tf) {
+            try { page = storyEndFrame(story).parentPage; } catch (eP) { page = preferPage; }
+            tf = columnFrameForSourceX(page, story, docRef, srcX);
+        }
+        if (!tf || !page) return false;
+        try { b = tf.geometricBounds; } catch (eB) { return false; }
+        pr = pageRect(page, docRef);
+        left = pr.left + srcX;
+        if (left < b[1] - 4 || left + 20 > b[3]) {
+            if (srcX >= b[1] - 4 && srcX + 20 <= b[3]) left = srcX;
+            else left = b[1];
+        }
+        if (left + figW > b[3] + 4) {
+            figW = Math.max(80, Math.min(figW, b[3] - left));
+            figH = figW / aspect;
+        }
+        top = b[0];
+        textBottom = top;
+        try {
+            if (tf.lines && tf.lines.length > 0) {
+                textBottom = lineBottomY(tf.lines.item(-1));
+                top = textBottom + 16;
+            }
+        } catch (eL) {}
+        try { live = columnLiveBox(page, docRef, b); } catch (eLive) { live = null; }
+        if (live && top < live.top) top = live.top;
+        if (live && top + figH > live.bottom) {
+            shifted = live.bottom - figH;
+            if (shifted >= textBottom + 4) top = shifted;
+        }
+        try {
+            rect = page.rectangles.add({
+                geometricBounds: [top, left, top + figH, left + figW]
+            });
+        } catch (eAdd) {
+            log("explicit figure add failed: " + eAdd.message);
+            return false;
+        }
+        try { rect.label = "FIGORTABLE"; } catch (eLab) {}
+        try { rect.visible = true; } catch (eV) {}
+        try {
+            noneSw = docRef.swatches.itemByName("None");
+            if (noneSw && noneSw.isValid) rect.fillColor = noneSw;
+        } catch (eFill) {}
+        hideFrameStroke(rect, docRef);
+        try { rect.place(file, false); } catch (ePlace) {
+            log("explicit figure place failed: " + ePlace.message);
+            try { rect.remove(); } catch (eRm) {}
+            return false;
+        }
+        try { rect.fit(FitOptions.FILL_PROPORTIONALLY); } catch (eFit) {
+            try { rect.fit(FitOptions.PROPORTIONALLY); } catch (eFit2) {}
+        }
+        try { rect.fit(FitOptions.CENTER_CONTENT); } catch (eC) {}
+        try { rect.geometricBounds = [top, left, top + figH, left + figW]; } catch (eBox) {}
+        forceJumpWrap(rect);
+        try { rect.textWrapPreferences.textWrapOffset = [2, 0, 2, 0]; } catch (eOff) {}
+        hideFrameStroke(rect, docRef);
+        populated += 1;
+        log("Placed explicit figure => " + file.name +
+            " bounds=" + rect.geometricBounds +
+            " srcX=" + srcX +
+            " w=" + figW +
+            " h=" + figH +
+            " on p" + page.name);
+        return true;
+    }
+
+    function placeAnchoredImage(story, file, docRef, scalePercent, preferPage, imageData) {
         var anchor;
         var page;
         var colW;
@@ -5488,6 +5867,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var cropped;
         if (!story || !file) return false;
         try {
+            if (placeExplicitFigure(story, file, docRef, preferPage, imageData)) return true;
             anchor = null;
             try {
                 var tf = lastUsedStoryColumn(preferPage, story);
@@ -5547,7 +5927,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 noneSw = docRef.swatches.itemByName("None");
                 if (noneSw && noneSw.isValid) rect.fillColor = noneSw;
             } catch (eFill) {}
-            try { rect.strokeWeight = 0; } catch (eSt) {}
+            hideFrameStroke(rect, docRef);
             rect.place(file, false);
             if (cropped) {
                 try { rect.fit(FitOptions.FILL_PROPORTIONALLY); } catch (eFillFit) {
@@ -5572,6 +5952,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             try { rect.textWrapPreferences.textWrapOffset = [6, 0, 6, 0]; } catch (eOff) {}
             clampFigureToLiveArea(rect, docRef);
             placeFigureBelowPrecedingBody(rect, docRef, story);
+            hideFrameStroke(rect, docRef);
             populated += 1;
             log("Placed JSON Image in flow => " + file.name +
                 " scale=" + scale +
@@ -5649,6 +6030,11 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         botMax = pr.top + col.bottom - 8;
         left = pr.left + col.left;
         right = pr.left + col.right;
+        // Explicit figure boxes already sit inside the column. Do not stretch
+        // them to the full column width.
+        if (b[0] >= topMin - 1 && b[2] <= botMax + 1 && b[1] >= left - 2 && b[3] <= right + 2) {
+            return;
+        }
         h = b[2] - b[0];
         if (h > botMax - topMin) h = botMax - topMin;
         if (h < 40) return;
@@ -6306,12 +6692,18 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     continue;
                 }
                 // Place at the current end of this page's text, in JSON order.
-                if (placeAnchoredImage(pageStory, imgFile, doc, data.scale_percent, startPage)) {
+                if (placeAnchoredImage(pageStory, imgFile, doc, data.scale_percent, startPage, data)) {
                     try { doc.recompose(); } catch (eRc) {}
+                    insertColumnBreakIfFigureIsAhead(pageStory, startPage, doc, data.source_x0_pt);
+                    try { doc.recompose(); } catch (eRc2) {}
                     ensureOverflowCapacity(pageHead, doc);
                     pageStory = pageHead.parentStory;
                     if (data.caption) {
                         appendParagraph(pageStory, data.caption, "PHCAP", doc);
+                        applyImageCaptionSpacing(pageStory, data);
+                        try { doc.recompose(); } catch (eCap) {}
+                        seatFigureOnBody(startPage, doc, data.source_x0_pt);
+                        try { doc.recompose(); } catch (eSeat) {}
                         ensureOverflowCapacity(pageHead, doc);
                         pageStory = pageHead.parentStory;
                     }
@@ -6628,6 +7020,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                     try { sn = String(para.appliedParagraphStyle.name || ""); } catch (eN) { sn = ""; }
                     if (!/^EXT/i.test(sn)) continue;
                     ensureExtractGreenShading(para, docRef, sn);
+                    applyQuotationAuthorFace(para, docRef);
                     n += 1;
                 }
             }
@@ -6643,8 +7036,6 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
     try { doc.recompose(); } catch (eRf2c) {}
     clampAllFiguresInDoc(doc);
     try { doc.recompose(); } catch (eRf3) {}
-    nudgeAllFiguresBelowPrecedingBody(doc);
-    try { doc.recompose(); } catch (eRf3b) {}
 
     // Drop blank pages left by reflow, then keep the PDF at one page per JSON page.
     // Overflow stays overset on its own page and is not given a new page.
@@ -6675,6 +7066,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
             " trimmed=" + removed);
     }(doc, bodyStartIndex + storyHeads.length));
     applyPerPageFootersFromJson(doc, pages);
+    stripFigureAndTableStrokes(doc);
 
     try { if (pdfFile.exists) pdfFile.remove(); } catch (e) {}
     try {
