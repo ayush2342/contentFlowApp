@@ -205,13 +205,7 @@
     }
 
     function ensureStoryComposed(doc, story) {
-        var containers, tail;
-        try {
-            containers = story.textContainers;
-            if (!containers || !containers.length) return;
-            tail = containers[containers.length - 1];
-            if (tail.overflows) threadForward(doc, tail);
-        } catch (eComp) {}
+        try { if (story && story.recompose) story.recompose(); } catch (eComp) {}
     }
 
     function placeInline(doc, paraRef, w, h, objectStyleName, label) {
@@ -725,8 +719,8 @@
         return null;
     }
 
-    // A PageHeader with a printed page number goes on that page. Pages without one (overflow pages)
-    // reuse the header from two pages earlier, so verso and recto keep their own running heads.
+    // A PageHeader with a printed page number goes on that page. A page without one
+    // reuses the header from two pages earlier, so verso and recto keep their own running heads.
     function applyPageHeaders(doc, story, pageHeaders, pageStartPara, fallback, headerByNumber, startPage) {
         var variable = doc.textVariables.itemByName("proto:runningHeader");
         var byOffset = {};
@@ -735,14 +729,11 @@
         var numbered = false;
         for (num in headerByNumber) { if (headerByNumber.hasOwnProperty(num)) numbered = true; }
         try { story.recompose(); } catch (eRc) {}
-        for (pi = 0; pi < pageStartPara.length && !numbered; pi++) {
+        for (pi = 0; pi < pageHeaders.length && !numbered; pi++) {
             if (pageHeaders[pi] === undefined) continue;
-            try {
-                if (pageStartPara[pi] >= story.paragraphs.length) continue;
-                para = story.paragraphs[pageStartPara[pi]];
-                offset = para.parentTextFrames[0].parentPage.documentOffset;
-                if (byOffset[offset] === undefined) byOffset[offset] = pageHeaders[pi];
-            } catch (eMap) {}
+            offset = (pageStartPara && pageStartPara[pi] !== undefined) ? pageStartPara[pi] : -1;
+            if (offset < 0) continue;
+            if (byOffset[offset] === undefined) byOffset[offset] = pageHeaders[pi];
         }
         for (num in headerByNumber) {
             if (headerByNumber.hasOwnProperty(num)) byOffset[parseInt(num, 10) - startPage] = headerByNumber[num];
@@ -775,6 +766,167 @@
             return content[j].type === type;
         }
         return false;
+    }
+
+    // ParagraphText markdown arrives as data.rich_text (b/i/u/s/sub/sup/mark/a and list items).
+    function parseMarkup(raw) {
+        var text = decode(String(raw || ""));
+        var plain = "";
+        var runs = [];
+        var stack = [];
+        var i = 0;
+        function pushRun(start, end) {
+            var f, s, prev;
+            if (end <= start) return;
+            f = { start: start, end: end, bold: false, italic: false, underline: false, strike: false, sup: false, sub: false, highlight: false, href: "" };
+            for (s = 0; s < stack.length; s++) {
+                if (stack[s].bold) f.bold = true;
+                if (stack[s].italic) f.italic = true;
+                if (stack[s].underline) f.underline = true;
+                if (stack[s].strike) f.strike = true;
+                if (stack[s].sup) f.sup = true;
+                if (stack[s].sub) f.sub = true;
+                if (stack[s].highlight) f.highlight = true;
+                if (stack[s].href) f.href = stack[s].href;
+            }
+            prev = runs.length ? runs[runs.length - 1] : null;
+            if (prev && prev.end === f.start && prev.bold === f.bold && prev.italic === f.italic && prev.underline === f.underline && prev.strike === f.strike && prev.sup === f.sup && prev.sub === f.sub && prev.highlight === f.highlight && prev.href === f.href) {
+                prev.end = f.end;
+            } else if (f.bold || f.italic || f.underline || f.strike || f.sup || f.sub || f.highlight || f.href) {
+                runs.push(f);
+            }
+        }
+        while (i < text.length) {
+            if (text.charAt(i) !== "<") { plain += text.charAt(i); i++; continue; }
+            var close = text.indexOf(">", i);
+            if (close < 0) { plain += text.substring(i); break; }
+            var tag = text.substring(i + 1, close);
+            var low = tag.toLowerCase();
+            var name = low.replace(/^\//, "").replace(/\s.*$/, "").replace(/\/$/, "");
+            var isClose = low.charAt(0) === "/";
+            if (name === "br") {
+                plain += "\u0001";
+            } else if (!isClose && (name === "b" || name === "strong" || name === "i" || name === "em" || name === "u" || name === "s" || name === "strike" || name === "del" || name === "sub" || name === "sup" || name === "mark" || name === "a" || name === "span")) {
+                var href = "";
+                var hrefMatch = tag.match(/href\s*=\s*["']([^"']+)["']/i);
+                if (hrefMatch) href = hrefMatch[1];
+                stack.push({
+                    name: name,
+                    start: plain.length,
+                    bold: name === "b" || name === "strong",
+                    italic: name === "i" || name === "em" || /font-style\s*:\s*italic/i.test(tag),
+                    underline: name === "u" || /underline/i.test(tag),
+                    strike: name === "s" || name === "strike" || name === "del" || /line-through/i.test(tag),
+                    sup: name === "sup",
+                    sub: name === "sub",
+                    highlight: name === "mark" || /background-color/i.test(tag),
+                    href: name === "a" ? href : ""
+                });
+            } else if (isClose) {
+                var s, opened;
+                for (s = stack.length - 1; s >= 0; s--) {
+                    if (stack[s].name === name) {
+                        opened = stack[s];
+                        stack.splice(s, 1);
+                        stack.push(opened);
+                        pushRun(opened.start, plain.length);
+                        stack.pop();
+                        break;
+                    }
+                }
+            }
+            i = close + 1;
+        }
+        while (stack.length) {
+            var open = stack[stack.length - 1];
+            pushRun(open.start, plain.length);
+            stack.pop();
+        }
+        return { plain: plain, runs: runs };
+    }
+
+    function paintMarkup(doc, paraRef, runs) {
+        var i, run, range;
+        runs.sort(function (a, b) { return (b.end - b.start) - (a.end - a.start); });
+        for (i = 0; i < runs.length; i++) {
+            run = runs[i];
+            if (!run || run.end <= run.start) continue;
+            try {
+                range = paraRef.characters.itemByRange(run.start, run.end - 1);
+            } catch (eRange) { continue; }
+            try {
+                if (run.bold && run.italic) range.fontStyle = "Bold Italic";
+                else if (run.bold) range.appliedCharacterStyle = doc.characterStyles.itemByName("Bold");
+                else if (run.italic) range.appliedCharacterStyle = doc.characterStyles.itemByName("Italic");
+            } catch (eFace) {}
+            if (run.href) {
+                try { range.appliedCharacterStyle = doc.characterStyles.itemByName("Link"); } catch (eLink) {}
+                try { range.underline = true; } catch (eU) {}
+            } else if (run.underline) {
+                try { range.underline = true; } catch (eU2) {}
+            }
+            if (run.strike) {
+                try { range.strikeThru = true; } catch (eS) {}
+            }
+            if (run.highlight) {
+                try {
+                    range.underline = true;
+                    range.underlineWeight = 8;
+                    range.underlineOffset = -3;
+                    range.underlineColor = "Theme 2 Cream";
+                } catch (eH) {}
+            }
+            if (run.sup) {
+                try { range.position = Position.SUPERSCRIPT; } catch (eSup) {}
+            } else if (run.sub) {
+                try { range.position = Position.SUBSCRIPT; } catch (eSub) {}
+            }
+        }
+    }
+
+    function appendMarkdownParagraph(doc, story, node) {
+        var entries = node.data.rich_text || [];
+        var pf = node.data.paragraph_format;
+        var blockStyle = styleFor(node);
+        var overrides = overridesFrom(pf);
+        var i, j, entry, kind, styleName, parsed, paraRef, followedByList, laterBullet;
+        for (i = 0; i < entries.length; i++) {
+            entry = entries[i] || {};
+            kind = entry.kind || "paragraph";
+            if (kind === "blank") continue;
+            parsed = parseMarkup(entry.html || "");
+            if (!parsed.plain) continue;
+            followedByList = false;
+            if (i + 1 < entries.length && entries[i + 1] && (entries[i + 1].kind === "bullet" || entries[i + 1].kind === "number")) followedByList = true;
+            if (kind === "bullet") {
+                laterBullet = false;
+                for (j = i + 1; j < entries.length; j++) {
+                    if (entries[j] && entries[j].kind === "bullet") { laterBullet = true; break; }
+                }
+                styleName = (!laterBullet && doc.paragraphStyles.itemByName("BulletListLast").isValid) ? "BulletListLast" : "BulletList";
+            } else if (kind === "number") {
+                styleName = "NumberedList";
+            } else if (followedByList) {
+                styleName = "ListIntro";
+            } else if (kind === "h1" || kind === "h2") {
+                styleName = doc.paragraphStyles.itemByName("SubSectionTitle").isValid ? "SubSectionTitle" : "ParagraphText";
+            } else if (blockStyle === "CalloutBodyRule") {
+                styleName = "CalloutBodyRule";
+            } else {
+                styleName = "ParagraphText";
+            }
+            paraRef = appendPlain(doc, story, styleName, parsed.plain, i === 0 ? overrides : null);
+            try {
+                var k;
+                for (k = paraRef.characters.length - 1; k >= 0; k--) {
+                    if (paraRef.characters[k].contents === "\u0001") {
+                        paraRef.characters[k].contents = SpecialCharacters.FORCED_LINE_BREAK;
+                    }
+                }
+            } catch (eBr) {}
+            paintMarkup(doc, paraRef, parsed.runs);
+            if (kind !== "bullet" && kind !== "number") applyRule(doc, paraRef, pf);
+        }
     }
 
     function appendBlock(doc, story, styleName, raw, pf) {
@@ -845,43 +997,37 @@
         pinFace(doc, "CaptionItalic", italic);
     }
 
-    function breakToNextPage(doc, story) {
-        ensureStoryComposed(doc, story);
-        var containers = story.textContainers;
-        var tail = containers[containers.length - 1];
-        if (!tail.nextTextFrame || !tail.nextTextFrame.isValid) {
-            var body = doc.masterSpreads.itemByName("B-Body");
-            var pg = doc.pages.add(LocationOptions.AT_END);
-            pg.appliedMaster = body;
-            var hand = (pg.side === PageSideOptions.LEFT_HAND) ? body.pages[0] : body.pages[1];
-            var src = null;
-            var i;
-            for (i = 0; i < hand.textFrames.length; i++) {
-                if (hand.textFrames[i].label === "proto:flow") src = hand.textFrames[i];
-            }
-            if (src) tail.nextTextFrame = src.override(pg);
-        }
-        pendingPageStart = true;
+    function severThread(frame) {
+        try { frame.nextTextFrame = Nothing; } catch (e) {}
     }
 
-    function threadForward(doc, frame) {
+    // One JSON page owns one PDF page. The flow frame is not threaded onward,
+    // so text that does not fit stays overset and is left out of the PDF.
+    function addUnthreadedBodyPage(doc) {
         var body = doc.masterSpreads.itemByName("B-Body");
-        var guard = 0;
-        while (frame && frame.overflows && guard < 60) {
-            var pg = doc.pages.add(LocationOptions.AT_END);
-            pg.appliedMaster = body;
-            var hand = (pg.side === PageSideOptions.LEFT_HAND) ? body.pages[0] : body.pages[1];
-            var src = null;
-            var i;
-            for (i = 0; i < hand.textFrames.length; i++) {
-                if (hand.textFrames[i].label === "proto:flow") src = hand.textFrames[i];
-            }
-            if (!src) break;
-            var next = src.override(pg);
-            frame.nextTextFrame = next;
-            frame = next;
-            guard++;
+        var pg = doc.pages.add(LocationOptions.AT_END);
+        var hand, src, i, frame;
+        pg.appliedMaster = body;
+        hand = (pg.side === PageSideOptions.LEFT_HAND) ? body.pages[0] : body.pages[1];
+        src = null;
+        for (i = 0; i < hand.textFrames.length; i++) {
+            if (hand.textFrames[i].label === "proto:flow") src = hand.textFrames[i];
         }
+        if (!src) return null;
+        frame = src.override(pg);
+        severThread(frame);
+        try { frame.parentStory.contents = ""; } catch (eClear) {}
+        return frame;
+    }
+
+    function noteTrimmedOverflow(story, label) {
+        var containers, tail;
+        try { if (story && story.recompose) story.recompose(); } catch (e0) {}
+        try {
+            containers = story.textContainers;
+            tail = containers[containers.length - 1];
+            if (tail && tail.overflows) note("trimmed overflow on " + label);
+        } catch (e1) {}
     }
 
     try {
@@ -899,27 +1045,38 @@
         var doc = app.open(templateFile);
         doc.viewPreferences.horizontalMeasurementUnits = MeasurementUnits.POINTS;
         doc.viewPreferences.verticalMeasurementUnits = MeasurementUnits.POINTS;
+        try { doc.textPreferences.smartTextReflow = false; } catch (eReflow) {}
         pinStaticFonts(doc);
 
         var flow = findFlow(doc);
         if (!flow) throw new Error("proto:flow frame not found on page 1");
         clearStory(doc, flow.parentStory);
+        severThread(flow);
+        var dropPi;
+        for (dropPi = doc.pages.length - 1; dropPi >= 1; dropPi--) {
+            try { doc.pages[dropPi].remove(); } catch (eDrop) { note("drop template page " + eDrop.message); }
+        }
 
         var headerText = "";
         var footerText = "";
         var startPage = 1;
         var pageHeaders = [];
-        var pageStartPara = [];
+        var pageDocIndex = [];
         var headerByNumber = {};
-        var pi, node, ci, page, content, headerIndex, heroPlaced;
+        var pi, node, ci, page, content, headerIndex, heroPlaced, story;
+        story = flow.parentStory;
         for (pi = 0; pi < data.pages.length; pi++) {
             page = data.pages[pi];
             if (pi > 0) {
-                try { breakToNextPage(doc, flow.parentStory); } catch (eBreak) { note("page-break " + eBreak.message); }
+                try {
+                    flow = addUnthreadedBodyPage(doc);
+                    if (!flow) throw new Error("proto:flow missing on new page");
+                    story = flow.parentStory;
+                } catch (eBreak) { note("page-break " + eBreak.message); }
             }
+            pageDocIndex[pi] = doc.pages.length - 1;
             content = page.content || [];
             heroPlaced = false;
-            pageStartPara[pi] = storyBlank(flow.parentStory) ? 0 : flow.parentStory.paragraphs.length;
             var callout = null;
             for (ci = 0; ci < content.length; ci++) {
                 node = content[ci];
@@ -945,24 +1102,28 @@
                 }
                 try {
                     if (node.type === "Image") {
-                        addImage(doc, flow.parentStory, node.data, page.page_type === "opener" && !heroPlaced);
+                        addImage(doc, story, node.data, page.page_type === "opener" && !heroPlaced);
                         heroPlaced = true;
-                    } else if (node.type === "Table") addTable(doc, flow.parentStory, node.data);
-                    else if (node.type === "LogoWithText") addLogo(doc, flow.parentStory, node.data);
-                    else if (node.data.text) {
+                    } else if (node.type === "Table") addTable(doc, story, node.data);
+                    else if (node.type === "LogoWithText") addLogo(doc, story, node.data);
+                    else if (node.type === "ParagraphText" && node.data.rich_text && node.data.rich_text.length) {
+                        appendMarkdownParagraph(doc, story, node);
+                    } else if (node.data.text) {
                         var nodeStyle = styleFor(node);
                         if (nodeStyle === "LessonOverview" && !nextIsType(content, ci, "LessonOverview")) nodeStyle = "LessonOverviewRule";
-                        appendBlock(doc, flow.parentStory, nodeStyle, node.data.text, node.data.paragraph_format);
+                        appendBlock(doc, story, nodeStyle, node.data.text, node.data.paragraph_format);
                     }
                 } catch (eNode) {
                     note("node " + node.type + " " + eNode.message);
                 }
                 if (callout && ci === callout.end) {
-                    if (ci > 0 && node.type !== "LogoWithText") closeCallout(flow.parentStory, callout.swatch);
+                    if (ci > 0 && node.type !== "LogoWithText") closeCallout(story, callout.swatch);
                     note("callout end page " + (pi + 1) + " node " + ci + " " + callout.swatch);
                     callout = null;
                 }
             }
+            severThread(flow);
+            noteTrimmedOverflow(story, "json page " + (pi + 1));
         }
 
         if (headerText) {
@@ -986,14 +1147,7 @@
             doc.sections[0].pageNumberStart = startPage > 0 ? startPage : 1;
         } catch (eSec) { note("section " + eSec.message); }
 
-        var tail = flow;
-        var hop = 0;
-        while (tail.nextTextFrame && tail.nextTextFrame.isValid && hop < 100) {
-            tail = tail.nextTextFrame;
-            hop++;
-        }
-        threadForward(doc, tail);
-        applyPageHeaders(doc, flow.parentStory, pageHeaders, pageStartPara, headerText, headerByNumber, startPage);
+        applyPageHeaders(doc, flow.parentStory, pageHeaders, pageDocIndex, headerText, headerByNumber, startPage);
         var placed = 0;
         var logos = 0;
         var allItems = doc.allPageItems;
