@@ -1,0 +1,278 @@
+%!Adobe-FontList 1.25
+%Locale:0x409
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-Bold
+FamilyName:IBM Plex Sans
+StyleName:Bold
+FullName:IBM Plex Sans Bold
+MenuName:IBM Plex Sans
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-Bold.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:218268
+FileModTime:1791880703
+WeightClass:700
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,IBM Plex Sans Bold
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-BoldItalic
+FamilyName:IBM Plex Sans
+StyleName:Bold Italic
+FullName:IBM Plex Sans Bold Italic
+MenuName:IBM Plex Sans
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-BoldItalic.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:233276
+FileModTime:1791880707
+WeightClass:700
+WidthClass:5
+AngleClass:1
+NameArray:0,Mac,4,IBM Plex Sans Bold Italic
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-Italic
+FamilyName:IBM Plex Sans
+StyleName:Italic
+FullName:IBM Plex Sans Italic
+MenuName:IBM Plex Sans
+StyleBits:1
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-Italic.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:233244
+FileModTime:1791880705
+WeightClass:400
+WidthClass:5
+AngleClass:1
+NameArray:0,Mac,4,IBM Plex Sans Italic
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-Light
+FamilyName:IBM Plex Sans
+StyleName:Light
+FullName:IBM Plex Sans Light
+MenuName:IBM Plex Sans
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-Light.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:218488
+FileModTime:1791880685
+WeightClass:300
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,IBM Plex Sans Light
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-Medium
+FamilyName:IBM Plex Sans
+StyleName:Medium
+FullName:IBM Plex Sans Medium
+MenuName:IBM Plex Sans
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-Medium.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:218356
+FileModTime:1791880697
+WeightClass:500
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,IBM Plex Sans Medium
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:IBMPlexSans-Regular
+FamilyName:IBM Plex Sans
+StyleName:Regular
+FullName:IBM Plex Sans Regular
+MenuName:IBM Plex Sans
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\IBMPlexSans-Regular.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:218212
+FileModTime:1791880691
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,IBM Plex Sans Regular
+NameArray:0,Win,1,IBM Plex Sans
+NameArray:0,Win,16,IBM Plex Sans
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Mulish-Black
+FamilyName:Mulish
+StyleName:Black
+FullName:Mulish Black
+MenuName:Mulish
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\Mulish-Black.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:106688
+FileModTime:1791880679
+WeightClass:900
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Mulish Black
+NameArray:0,Win,1,Mulish
+NameArray:0,Win,16,Mulish
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Mulish-Bold
+FamilyName:Mulish
+StyleName:Bold
+FullName:Mulish Bold
+MenuName:Mulish
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\Mulish-Bold.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:106712
+FileModTime:1791880677
+WeightClass:700
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Mulish Bold
+NameArray:0,Win,1,Mulish
+NameArray:0,Win,16,Mulish
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Mulish-Medium
+FamilyName:Mulish
+StyleName:Medium
+FullName:Mulish Medium
+MenuName:Mulish
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\Mulish-Medium.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:106688
+FileModTime:1791880676
+WeightClass:500
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Mulish Medium
+NameArray:0,Win,1,Mulish
+NameArray:0,Win,16,Mulish
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Mulish-Regular
+FamilyName:Mulish
+StyleName:Regular
+FullName:Mulish Regular
+MenuName:Mulish
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\Mulish-Regular.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:106676
+FileModTime:1791880778
+WeightClass:400
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Mulish Regular
+NameArray:0,Win,1,Mulish
+NameArray:0,Win,16,Mulish
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Mulish-SemiBold
+FamilyName:Mulish
+StyleName:SemiBold
+FullName:Mulish SemiBold
+MenuName:Mulish
+StyleBits:0
+WritingScript:Roman
+OutlineFileName:C:\projects\theme1\Document fonts\Mulish-SemiBold.ttf
+DataFormat:sfntData
+hasSVG:no
+hasCOLR:no
+VariableFontType:NonVariableFont
+FileLength:106628
+FileModTime:1791880677
+WeightClass:600
+WidthClass:5
+AngleClass:0
+NameArray:0,Mac,4,Mulish SemiBold
+NameArray:0,Win,1,Mulish
+NameArray:0,Win,16,Mulish
+%EndFont
+

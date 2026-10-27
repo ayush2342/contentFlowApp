@@ -25,8 +25,9 @@ Create `backend/.env` (sample in `.env.example`):
 - `PDF_CACHE_TTL_SECONDS`
 - `OUTPUT_SESSION_TTL_SECONDS`
 - `INDESIGN_EXE_PATH`
-- `INDESIGN_SCRIPT_PATH` (optional; defaults to `../frontend/pdf-output/populate-indesign.jsx`)
-- `INDESIGN_TEMPLATE_PATH` (optional; defaults to `../frontend/pdf-output/templates/projectX.indd`)
+- `INDESIGN_SCRIPT_PATH` (optional; generic themes only; defaults to `../frontend/pdf-output/populate-indesign.jsx`)
+- `INDESIGN_TEMPLATE_PATH` (optional; generic themes only; defaults to `../frontend/pdf-output/templates/projectX.indd`)
+- Theme 1 and theme 2 ignore those two paths and use `frontend/pdf-output/theme1` and `frontend/pdf-output/theme2`.
 - `INDESIGN_TIMEOUT_MS`
 
 ## S3 Contract

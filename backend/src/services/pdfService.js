@@ -9,7 +9,7 @@ import { normalizeAppearanceId } from '../../../shared/layout-formats.js';
 
 const pdfCache = new Map();
 const defaultPdfSourceDir = path.resolve(process.cwd(), '..', 'frontend', 'pdf-output');
-const theme2SourceDir = path.join(defaultPdfSourceDir, 'theme2');
+const themeMasterDir = (themeId) => path.join(defaultPdfSourceDir, `theme${themeId}`);
 const runtimeRoot = path.resolve(process.cwd(), 'runtime', 'pdf-jobs');
 
 const getCacheRecord = (cacheKey) => {
@@ -173,14 +173,17 @@ const collectImageKeys = (data) => {
   return keys;
 };
 
+const THEME_MASTER_IDS = new Set(['1', '2']);
+
 const resolveInDesignPaths = (templateId) => {
   const themeId = normalizeAppearanceId(templateId, '');
-  const useThemeMaster = themeId === '2';
+  const useThemeMaster = THEME_MASTER_IDS.has(themeId);
+  const sourceDir = themeMasterDir(themeId);
   const scriptSourcePath = useThemeMaster
-    ? path.join(theme2SourceDir, 'populate.jsx')
+    ? path.join(sourceDir, 'populate.jsx')
     : env.inDesignScriptPath || path.join(defaultPdfSourceDir, 'populate-indesign.jsx');
   const templateSourcePath = useThemeMaster
-    ? path.join(theme2SourceDir, 'templates', 'projectX.indd')
+    ? path.join(sourceDir, 'templates', 'projectX.indd')
     : env.inDesignTemplatePath || path.join(defaultPdfSourceDir, 'templates', 'projectX.indd');
 
   if (!env.inDesignExePath) {
@@ -190,7 +193,7 @@ const resolveInDesignPaths = (templateId) => {
   }
 
   return {
-    mode: useThemeMaster ? 'theme2' : 'generic',
+    mode: useThemeMaster ? `theme${themeId}` : 'generic',
     scriptSourcePath,
     templateSourcePath,
   };
