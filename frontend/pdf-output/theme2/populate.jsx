@@ -5701,6 +5701,33 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         return best;
     }
 
+    /**
+     * Page-local x of a figure. Newer JSON leaves source_x0_pt null and stores
+     * the position as left_offset_pt inside the content box.
+     */
+    function figurePageX(imageData, docRef) {
+        var srcX;
+        var off;
+        var contentW;
+        var pageW;
+        var margin;
+        if (!imageData) return NaN;
+        srcX = parseFloat(imageData.source_x0_pt);
+        if (!isNaN(srcX)) return srcX;
+        off = parseFloat(imageData.left_offset_pt);
+        if (isNaN(off)) return NaN;
+        contentW = parseFloat(imageData.source_content_width_pt);
+        pageW = 612;
+        try {
+            if (docRef) pageW = Number(docRef.documentPreferences.pageWidth) || pageW;
+        } catch (eW) {}
+        margin = 0;
+        if (!isNaN(contentW) && contentW > 40 && contentW < pageW - 1) {
+            margin = (pageW - contentW) / 2;
+        }
+        return off + margin;
+    }
+
     /** Following caption belongs in the figure's column, not the leftover lines of the previous one. */
     function insertColumnBreakIfFigureIsAhead(story, page, docRef, srcX) {
         var tf;
@@ -5807,7 +5834,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
         var shifted;
         var textBottom;
         if (!imageData || !story || !file) return false;
-        srcX = parseFloat(imageData.source_x0_pt);
+        srcX = figurePageX(imageData, docRef);
         figW = parseFloat(imageData.display_width_pt);
         aspect = parseFloat(imageData.aspect_ratio);
         if (isNaN(srcX) || isNaN(figW) || figW < 40 || isNaN(aspect) || aspect < 0.2 || aspect > 8) {
@@ -6732,7 +6759,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                 // Place at the current end of this page's text, in JSON order.
                 if (placeAnchoredImage(pageStory, imgFile, doc, data.scale_percent, startPage, data)) {
                     try { doc.recompose(); } catch (eRc) {}
-                    insertColumnBreakIfFigureIsAhead(pageStory, startPage, doc, data.source_x0_pt);
+                    insertColumnBreakIfFigureIsAhead(pageStory, startPage, doc, figurePageX(data, doc));
                     try { doc.recompose(); } catch (eRc2) {}
                     ensureOverflowCapacity(pageHead, doc);
                     pageStory = pageHead.parentStory;
@@ -6740,7 +6767,7 @@ try { app.linkingPreferences.checkLinksAtOpen = false; } catch (e0) {}
                         appendParagraph(pageStory, data.caption, "PHCAP", doc);
                         applyImageCaptionSpacing(pageStory, data);
                         try { doc.recompose(); } catch (eCap) {}
-                        seatFigureOnBody(startPage, doc, data.source_x0_pt);
+                        seatFigureOnBody(startPage, doc, figurePageX(data, doc));
                         try { doc.recompose(); } catch (eSeat) {}
                         ensureOverflowCapacity(pageHead, doc);
                         pageStory = pageHead.parentStory;

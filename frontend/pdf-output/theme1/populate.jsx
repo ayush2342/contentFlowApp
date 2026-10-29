@@ -152,9 +152,32 @@
         return paraRef;
     }
 
+    function linkBlue(doc) {
+        var swatch = doc.colors.itemByName("Link Blue");
+        if (swatch.isValid) return swatch;
+        try {
+            return doc.colors.add({
+                name: "Link Blue",
+                model: ColorModel.PROCESS,
+                space: ColorSpace.RGB,
+                colorValue: [2, 126, 181]
+            });
+        } catch (eSw) {
+            return doc.colors.itemByName("Theme 2 Blue");
+        }
+    }
+
+    function paintLinkRange(doc, range) {
+        var blue = linkBlue(doc);
+        try { range.appliedCharacterStyle = doc.characterStyles.itemByName("Link"); } catch (eCs) {}
+        try { range.fillColor = blue; } catch (eFill) {}
+        try { range.underline = true; } catch (eU) {}
+        try { range.underlineColor = blue; } catch (eUc) {}
+    }
+
     function paintRuns(doc, paraRef, runs) {
         var cursor = 0;
-        var i, run, from, to, styleName, cs;
+        var i, run, from, to, styleName, cs, range, panelLetter;
         for (i = 0; i < runs.length; i++) {
             run = runs[i];
             if (!run.text) continue;
@@ -162,19 +185,23 @@
             to = cursor + run.text.length - 1;
             cursor += run.text.length;
             styleName = null;
+            panelLetter = false;
             var paraName = "";
             var paraFamily = "";
             try { paraName = String(paraRef.appliedParagraphStyle.name); } catch (eName) {}
             try { paraFamily = String(paraRef.appliedParagraphStyle.appliedFont.fontFamily).toLowerCase(); } catch (eFam) {}
+            if (i > 0 && runs[i - 1].link && /^[a-z]$/i.test(run.text)) panelLetter = true;
             if (run.figure) styleName = "FigureLabel";
-            else if (run.link) styleName = "Link";
+            else if (run.link || panelLetter) styleName = "Link";
             else if (run.italic && paraName === "Caption") styleName = "CaptionItalic";
             else if (run.italic && paraFamily.indexOf("plex") !== -1) styleName = "Italic";
             else if (run.bold && paraFamily.indexOf("plex") !== -1) styleName = "Bold";
             if (!styleName || to < from) continue;
             try {
+                range = paraRef.characters.itemByRange(from, to);
                 cs = doc.characterStyles.itemByName(styleName);
-                paraRef.characters.itemByRange(from, to).appliedCharacterStyle = cs;
+                range.appliedCharacterStyle = cs;
+                if (run.link || panelLetter) paintLinkRange(doc, range);
             } catch (e) { note("paint " + styleName + " " + e.message); }
         }
     }
@@ -495,7 +522,7 @@
         var size = data.display_width_pt || 11.201;
         var icon = placeInline(doc, paraRef, size, size, "LogoIcon", "proto:logo");
         if (!icon) return;
-        icon.fillColor = "Theme 2 Green";
+        icon.fillColor = "None";
         icon.insertLabel("display_width_pt", String(size));
         var file = resolveImage(data.url);
         if (file) {
